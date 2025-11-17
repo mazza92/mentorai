@@ -1,0 +1,10 @@
+backend/
+node_modules/
+*.md
+.env*
+!frontend/.env.local.example
+processed/
+uploads/
+temp/
+*.log
+
