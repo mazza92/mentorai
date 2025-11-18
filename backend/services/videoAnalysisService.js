@@ -32,7 +32,7 @@ class VideoAnalysisService {
       }
 
       // Get video duration first
-      ffmpeg.ffprobe(videoPath, (err, metadata) => {
+      ffmpeg.ffprobe(videoPath, async (err, metadata) => {
         if (err) {
           return reject(err);
         }
@@ -40,43 +40,48 @@ class VideoAnalysisService {
         const duration = metadata.format.duration || 10; // Default to 10s if unknown
         const interval = duration / (numFrames + 1); // Space frames evenly
         const frames = [];
-        let extracted = 0;
-        let errors = 0;
 
         if (numFrames === 0) {
           return resolve([]);
         }
 
-        // Extract frames at intervals
+        // Extract frames SEQUENTIALLY (not in parallel) to reduce memory usage
+        // This is critical for Railway's memory limits
         for (let i = 1; i <= numFrames; i++) {
           const timestamp = interval * i;
           const framePath = path.join(this.tempDir, `frame-${uuidv4()}.jpg`);
-          
-          ffmpeg(videoPath)
-            .seekInput(timestamp)
-            .frames(1)
-            .outputOptions('-q:v 2') // High quality JPEG
-            .output(framePath)
-            .on('end', () => {
-              if (fs.existsSync(framePath)) {
-                frames.push({ path: framePath, timestamp });
-              }
-              extracted++;
-              if (extracted === numFrames) {
-                resolve(frames.sort((a, b) => a.timestamp - b.timestamp));
-              }
-            })
-            .on('error', (err) => {
-              console.error(`Error extracting frame at ${timestamp}s:`, err.message);
-              errors++;
-              extracted++;
-              if (extracted === numFrames) {
-                // Return what we have, even if some failed
-                resolve(frames.sort((a, b) => a.timestamp - b.timestamp));
-              }
-            })
-            .run();
+
+          try {
+            await new Promise((resolveFrame, rejectFrame) => {
+              ffmpeg(videoPath)
+                .seekInput(timestamp)
+                .frames(1)
+                .outputOptions([
+                  '-q:v 2',        // High quality JPEG
+                  '-threads 1'     // Limit to 1 thread to reduce memory usage
+                ])
+                .output(framePath)
+                .on('end', () => {
+                  if (fs.existsSync(framePath)) {
+                    frames.push({ path: framePath, timestamp });
+                  }
+                  resolveFrame();
+                })
+                .on('error', (ffmpegErr) => {
+                  console.error(`Error extracting frame at ${timestamp.toFixed(2)}s:`, ffmpegErr.message);
+                  // Continue even if one frame fails
+                  resolveFrame();
+                })
+                .run();
+            });
+          } catch (frameErr) {
+            console.error(`Failed to extract frame ${i}/${numFrames}:`, frameErr.message);
+            // Continue to next frame
+          }
         }
+
+        // Return frames sorted by timestamp
+        resolve(frames.sort((a, b) => a.timestamp - b.timestamp));
       });
     });
   }
