@@ -18,9 +18,10 @@ export default function Auth() {
   // Redirect to home if user is already logged in
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/')
+      console.log('User already logged in, redirecting to home:', user.email)
+      window.location.href = '/'
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,22 +49,25 @@ export default function Auth() {
         }
       } else {
         const result = await signIn(email, password)
+        
+        console.log('Sign-in result:', { 
+          hasError: !!result.error, 
+          hasData: !!result.data, 
+          hasSession: !!result.data?.session,
+          error: result.error?.message 
+        })
 
         if (result.error) {
           setError(result.error.message)
-        } else if (result.data?.session) {
+        } else {
           // Sign-in successful - redirect immediately
           setSuccess('Signing you in...')
-          // Small delay to show success message, then redirect
+          console.log('Sign-in successful, redirecting...')
+          
+          // Force redirect - use window.location for more reliable navigation
           setTimeout(() => {
-            router.push('/')
-          }, 300)
-        } else {
-          // No error but no session - wait a bit for auth state to sync
-          setSuccess('Signing you in...')
-          setTimeout(() => {
-            router.push('/')
-          }, 1000)
+            window.location.href = '/'
+          }, 500)
         }
       }
     } catch (err: any) {
