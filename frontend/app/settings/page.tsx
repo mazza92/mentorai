@@ -14,14 +14,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      fetchSubscriptionStatus()
-    } else {
-      router.push('/auth')
-    }
-  }, [user, router])
-
   const fetchSubscriptionStatus = async () => {
     if (!user) return
 
@@ -35,6 +27,14 @@ export default function SettingsPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (user) {
+      fetchSubscriptionStatus()
+    } else {
+      router.push('/auth')
+    }
+  }, [user, router])
 
   const handleManageSubscription = async () => {
     if (!user) return
