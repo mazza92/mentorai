@@ -57,8 +57,6 @@ export default function SettingsPage() {
     }
   }
 
-  const isCreator = subscriptionStatus?.tier === 'creator' || subscriptionStatus?.hasActiveSubscription
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
@@ -66,6 +64,8 @@ export default function SettingsPage() {
       </div>
     )
   }
+
+  const isCreator = subscriptionStatus?.tier === 'creator' || subscriptionStatus?.hasActiveSubscription
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -101,104 +101,104 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <h1 className="text-3xl font-bold text-slate-900 mb-8">Settings</h1>
 
-          {/* Subscription Section */}
-          <div className="mb-8 pb-8 border-b border-slate-200">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-900 mb-2">Subscription</h2>
-                <div className="flex items-center space-x-2">
-                  {isCreator ? (
-                    <>
-                      <Crown className="w-5 h-5 text-yellow-500" />
-                      <span className="text-slate-700">Creator Tier</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-5 h-5 text-slate-400" />
-                      <span className="text-slate-700">Free Tier</span>
-                    </>
+            {/* Subscription Section */}
+            <div className="mb-8 pb-8 border-b border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900 mb-2">Subscription</h2>
+                  <div className="flex items-center space-x-2">
+                    {isCreator ? (
+                      <>
+                        <Crown className="w-5 h-5 text-yellow-500" />
+                        <span className="text-slate-700">Creator Tier</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5 text-slate-400" />
+                        <span className="text-slate-700">Free Tier</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {isCreator ? (
+                  <button
+                    onClick={handleManageSubscription}
+                    disabled={portalLoading}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center"
+                  >
+                    {portalLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Manage Subscription
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => router.push('/pricing')}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all"
+                  >
+                    Upgrade to Creator
+                  </button>
+                )}
+              </div>
+
+              {subscriptionStatus?.subscription && (
+                <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                  <p className="text-sm text-slate-600">
+                    <strong>Status:</strong> {subscriptionStatus.subscription.status}
+                  </p>
+                  {subscriptionStatus.subscription.currentPeriodEnd && (
+                    <p className="text-sm text-slate-600 mt-1">
+                      <strong>Renews:</strong>{' '}
+                      {new Date(subscriptionStatus.subscription.currentPeriodEnd * 1000).toLocaleDateString()}
+                    </p>
+                  )}
+                  {subscriptionStatus.subscription.cancelAtPeriodEnd && (
+                    <p className="text-sm text-orange-600 mt-1">
+                      Subscription will cancel at the end of the billing period
+                    </p>
                   )}
                 </div>
-              </div>
-              {isCreator ? (
-                <button
-                  onClick={handleManageSubscription}
-                  disabled={portalLoading}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center"
-                >
-                  {portalLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Manage Subscription
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={() => router.push('/pricing')}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all"
-                >
-                  Upgrade to Creator
-                </button>
               )}
             </div>
 
-            {subscriptionStatus?.subscription && (
-              <div className="mt-4 p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-600">
-                  <strong>Status:</strong> {subscriptionStatus.subscription.status}
+            {/* Account Section */}
+            <div className="mb-8 pb-8 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-900 mb-4">Account</h2>
+              <div className="space-y-2">
+                <p className="text-slate-700">
+                  <strong>Email:</strong> {user?.email}
                 </p>
-                {subscriptionStatus.subscription.currentPeriodEnd && (
-                  <p className="text-sm text-slate-600 mt-1">
-                    <strong>Renews:</strong>{' '}
-                    {new Date(subscriptionStatus.subscription.currentPeriodEnd * 1000).toLocaleDateString()}
-                  </p>
-                )}
-                {subscriptionStatus.subscription.cancelAtPeriodEnd && (
-                  <p className="text-sm text-orange-600 mt-1">
-                    Subscription will cancel at the end of the billing period
-                  </p>
-                )}
+                <p className="text-slate-700">
+                  <strong>User ID:</strong> {user?.id}
+                </p>
               </div>
-            )}
-          </div>
-
-          {/* Account Section */}
-          <div className="mb-8 pb-8 border-b border-slate-200">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">Account</h2>
-            <div className="space-y-2">
-              <p className="text-slate-700">
-                <strong>Email:</strong> {user?.email}
-              </p>
-              <p className="text-slate-700">
-                <strong>User ID:</strong> {user?.id}
-              </p>
             </div>
-          </div>
 
-          {/* Usage Section - Comprehensive Dashboard */}
-          <div className="mb-8">
-            {user && <UsageDashboard userId={user.id} />}
-          </div>
+            {/* Usage Section - Comprehensive Dashboard */}
+            <div className="mb-8">
+              {user && <UsageDashboard userId={user.id} />}
+            </div>
 
-          {/* Sign Out */}
-          <div>
-            <button
-              onClick={async () => {
-                await signOut()
-                router.push('/auth')
-              }}
-              className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </button>
+            {/* Sign Out */}
+            <div>
+              <button
+                onClick={async () => {
+                  await signOut()
+                  router.push('/auth')
+                }}
+                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   )
 }
-
