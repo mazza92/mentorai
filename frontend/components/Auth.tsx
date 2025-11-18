@@ -18,7 +18,6 @@ export default function Auth() {
   // Redirect to home if user is already logged in
   useEffect(() => {
     if (!authLoading && user) {
-      console.log('User already logged in, redirecting to home:', user.email)
       window.location.href = '/'
     }
   }, [user, authLoading])
@@ -49,20 +48,12 @@ export default function Auth() {
         }
       } else {
         const result = await signIn(email, password)
-        
-        console.log('Sign-in result:', { 
-          hasError: !!result.error, 
-          hasData: !!result.data, 
-          hasSession: !!result.data?.session,
-          error: result.error?.message 
-        })
 
         if (result.error) {
           setError(result.error.message)
         } else {
           // Sign-in successful - redirect immediately
           setSuccess('Signing you in...')
-          console.log('Sign-in successful, redirecting...')
           
           // Force redirect - use window.location for more reliable navigation
           setTimeout(() => {
