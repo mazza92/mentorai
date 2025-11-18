@@ -9,7 +9,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; data: any }>
   signOut: () => Promise<void>
   signInWithGoogle: () => Promise<void>
 }
@@ -77,12 +77,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabaseUrl) {
       return { error: { message: 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY' } as any }
     }
-    
-    const { error } = await supabase.auth.signUp({
+
+    // Get the current origin dynamically (works for localhost and production)
+    const redirectUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : process.env.NEXT_PUBLIC_SITE_URL
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+        : 'http://localhost:3000/auth/callback'
+
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
     })
-    return { error }
+
+    // Return both error and data so we can check if confirmation email was sent
+    return { error, data }
   }
 
   const signOut = async () => {
