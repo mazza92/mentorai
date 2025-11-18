@@ -45,8 +45,12 @@ class YouTubeService {
       const now = Math.floor(Date.now() / 1000); // Current Unix timestamp
       const oneDayFromNow = now + (24 * 60 * 60); // 24 hours from now
 
+      // Critical cookies that must be valid for downloads to work
+      const criticalCookies = ['VISITOR_INFO1_LIVE', 'LOGIN_INFO', 'PREF', 'CONSENT'];
+
       let expiredCount = 0;
       let expiringSoonCount = 0;
+      let criticalExpired = 0;
       let totalCookies = 0;
 
       for (const line of lines) {
@@ -60,24 +64,33 @@ class YouTubeService {
         totalCookies++;
         const expiration = parseInt(parts[4], 10);
         const cookieName = parts[5];
+        const isCritical = criticalCookies.includes(cookieName);
 
         if (expiration < now) {
           expiredCount++;
-          console.warn(`   ⚠️  Cookie '${cookieName}' is EXPIRED`);
-        } else if (expiration < oneDayFromNow) {
+          if (isCritical) {
+            criticalExpired++;
+            console.error(`   ❌ CRITICAL cookie '${cookieName}' is EXPIRED!`);
+          } else {
+            console.log(`   ℹ️  Non-critical cookie '${cookieName}' is expired (okay)`);
+          }
+        } else if (expiration < oneDayFromNow && isCritical) {
           expiringSoonCount++;
           const hoursLeft = Math.floor((expiration - now) / 3600);
-          console.warn(`   ⚠️  Cookie '${cookieName}' expires in ${hoursLeft} hours`);
+          console.warn(`   ⚠️  Critical cookie '${cookieName}' expires in ${hoursLeft} hours`);
         }
       }
 
-      if (expiredCount > 0) {
-        console.error(`   ❌ WARNING: ${expiredCount} of ${totalCookies} cookies have EXPIRED!`);
-        console.error(`   ❌ YouTube downloads may fail. Please refresh your cookies.`);
+      // Only warn if critical cookies are expired
+      if (criticalExpired > 0) {
+        console.error(`   ❌ CRITICAL: ${criticalExpired} essential cookies have EXPIRED!`);
+        console.error(`   ❌ YouTube downloads WILL FAIL. Please refresh your cookies NOW.`);
         console.error(`   ❌ See YOUTUBE_COOKIES_GUIDE.md for instructions.`);
       } else if (expiringSoonCount > 0) {
-        console.warn(`   ⚠️  ${expiringSoonCount} of ${totalCookies} cookies expire within 24 hours`);
-        console.warn(`   ⚠️  Consider refreshing cookies soon to avoid interruptions`);
+        console.warn(`   ⚠️  ${expiringSoonCount} critical cookies expire within 24 hours`);
+        console.warn(`   ⚠️  Refresh cookies soon to avoid interruptions`);
+      } else if (expiredCount > 0) {
+        console.log(`   ✅ ${expiredCount} non-critical cookies expired (okay, ${totalCookies - expiredCount} valid)`);
       } else {
         console.log(`   ✅ All ${totalCookies} cookies are valid`);
       }
