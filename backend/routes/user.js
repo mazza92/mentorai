@@ -18,11 +18,25 @@ let firestore;
 let useMockMode = false;
 
 try {
-  firestore = new Firestore({
+  const firestoreConfig = {
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'mock-project',
-  });
+  };
+
+  // Handle credentials from Railway environment variable
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    try {
+      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      firestoreConfig.credentials = credentials;
+    } catch (error) {
+      console.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON for user service');
+      throw error;
+    }
+  }
+
+  firestore = new Firestore(firestoreConfig);
 } catch (error) {
   console.log('Firestore not configured, using mock mode for development');
+  console.log('Error:', error.message);
   useMockMode = true;
 }
 

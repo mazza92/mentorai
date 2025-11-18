@@ -50,9 +50,35 @@ try {
     speechClient = new SpeechClient({
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
     });
-    firestore = new Firestore({
+    const firestoreConfig = {
+
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-    });
+
+    };
+
+
+    // Handle credentials from Railway environment variable
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+
+      try {
+
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+
+        firestoreConfig.credentials = credentials;
+
+      } catch (error) {
+
+        console.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON');
+
+        throw error;
+
+      }
+
+    }
+
+
+    firestore = new Firestore(firestoreConfig);
     console.log('✅ Google Cloud Speech-to-Text enabled for transcription');
   } else if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' && useOpenAIFlag) {
     openai = new OpenAI({
