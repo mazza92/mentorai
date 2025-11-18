@@ -1780,7 +1780,7 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
       {/* Desktop View: Split Panels */}
       <div className="hidden lg:flex w-full h-full">
         {/* Far Left: Conversation History */}
-        <div className="w-64 flex-shrink-0 border-r border-slate-200/60">
+        <div className="w-64 flex-shrink-0">
           <ConversationHistory
             userId={userId}
             currentConversationId={null}
@@ -1791,7 +1791,7 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
         </div>
 
         {/* Left Panel: Context & Transcript (reduced by 15%: ~34% width) */}
-        <div className="w-1/3 flex-shrink-0 border-r border-slate-200/60">
+        <div className="w-1/3 flex-shrink-0 border-r border-slate-100">
           <ContextPanel 
             videoUrl={videoUrl}
             transcript={transcript}

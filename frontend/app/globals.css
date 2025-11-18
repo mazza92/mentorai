@@ -48,3 +48,30 @@ body {
   background: #94a3b8;
 }
 
+/* Modern thin scrollbar styles */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+.scrollbar-thumb-slate-200::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
