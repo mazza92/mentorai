@@ -467,15 +467,20 @@ const QnAPanel = ({
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  // Load conversation for this project on mount
+  // Load conversation for this project on mount - only when projectId changes
   useEffect(() => {
     const loadConversation = async () => {
+      // Reset state first
+      setCurrentConversationId(null)
+      setHistory([])
+      
       const conversations = await loadConversations(userId)
-      // Find conversation for this project
+      // Find conversation for this project - must match exactly
       const projectConversation = conversations.find(c => c.projectId === projectId)
       
       if (projectConversation) {
         // Load existing conversation for this project
+        console.log('Loading conversation for project:', projectId, 'Conversation ID:', projectConversation.id)
         setCurrentConversationId(projectConversation.id)
         setHistory(projectConversation.messages.map(msg => ({
           type: msg.type as 'user' | 'ai',
@@ -484,7 +489,8 @@ const QnAPanel = ({
           timestamp: msg.timestamp
         })))
       } else {
-        // Create new conversation for this project
+        // Create new conversation for this project only if none exists
+        console.log('Creating new conversation for project:', projectId)
         const newConv = createConversation(projectId)
         setCurrentConversationId(newConv.id)
         await saveConversation(newConv, userId)
@@ -492,7 +498,7 @@ const QnAPanel = ({
       }
     }
     loadConversation()
-  }, [projectId, userId])
+  }, [projectId, userId]) // Only reload when projectId or userId changes
 
   // Save conversation whenever history changes
   useEffect(() => {
@@ -566,11 +572,17 @@ const QnAPanel = ({
           return acc
         }, [] as Array<{question: string, answer: string}>)
 
+      // Get current language from i18n
+      const currentLanguage = typeof window !== 'undefined' 
+        ? (localStorage.getItem('wandermind_language') || navigator.language.split('-')[0] || 'en')
+        : 'en';
+
       const response = await axios.post(`${apiUrl}/api/qa`, {
         projectId,
         question: userQuery,
         userId,
         chatHistory, // Send conversation history for context
+        language: currentLanguage, // Send language preference
       })
 
       if (response.data.success) {
