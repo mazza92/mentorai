@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus } from 'lucide-react'
+import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus, Crown } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import ConversationHistory from '@/components/ConversationHistory'
 import { Conversation } from '@/lib/conversationStorage'
 import UsageDashboard from '@/components/UsageDashboard'
+import axios from 'axios'
 
 interface ModernHeaderProps {
   onNewProject: () => void
@@ -20,7 +21,25 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
   const { user, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('free')
   const userMenuRef = useRef<HTMLDivElement>(null)
+
+  // Fetch subscription status
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!user?.id) return
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const response = await axios.get(`${apiUrl}/api/subscriptions/status/${user.id}`)
+        setSubscriptionTier(response.data.tier || 'free')
+      } catch (error) {
+        console.error('Error fetching subscription:', error)
+      }
+    }
+
+    fetchSubscription()
+  }, [user?.id])
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -134,7 +153,12 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                   <div className="absolute right-0 mt-2 w-72 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
                     <div className="px-4 py-2 border-b border-slate-100">
                       <p className="text-sm font-medium text-slate-900">{user.email}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Free Tier</p>
+                      <div className="flex items-center space-x-1 mt-0.5">
+                        {subscriptionTier === 'pro' && <Crown className="w-3 h-3 text-yellow-500" />}
+                        <p className="text-xs text-slate-500">
+                          {subscriptionTier === 'pro' ? 'Pro Tier' : 'Free Tier'}
+                        </p>
+                      </div>
                     </div>
                     
                     {/* Compact Usage Widget */}
@@ -213,7 +237,12 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900 truncate">{user.email}</p>
-                    <p className="text-xs text-slate-500">Free Tier</p>
+                    <div className="flex items-center space-x-1">
+                      {subscriptionTier === 'pro' && <Crown className="w-3 h-3 text-yellow-500" />}
+                      <p className="text-xs text-slate-500">
+                        {subscriptionTier === 'pro' ? 'Pro Tier' : 'Free Tier'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
