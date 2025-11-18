@@ -18,24 +18,30 @@ let firestore;
 let useMockMode = false;
 
 try {
-  const firestoreConfig = {
-    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'mock-project',
-  };
+  if (process.env.GOOGLE_CLOUD_PROJECT_ID && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'your_project_id' && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'mock-project') {
+    const firestoreConfig = {
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+    };
 
-  // Handle credentials from Railway environment variable
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-    try {
-      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-      firestoreConfig.credentials = credentials;
-    } catch (error) {
-      console.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON for user service');
-      throw error;
+    // Handle credentials from Railway environment variable
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      try {
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+        firestoreConfig.credentials = credentials;
+      } catch (error) {
+        console.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON for user service');
+        throw error;
+      }
     }
-  }
 
-  firestore = new Firestore(firestoreConfig);
+    firestore = new Firestore(firestoreConfig);
+    console.log('✅ Firestore initialized for user service');
+  } else {
+    useMockMode = true;
+    console.log('Google Cloud not configured, using mock mode for user service');
+  }
 } catch (error) {
-  console.log('Firestore not configured, using mock mode for development');
+  console.log('Firestore initialization failed, using mock mode for user service');
   console.log('Error:', error.message);
   useMockMode = true;
 }
@@ -346,8 +352,6 @@ router.post('/:userId/check-question', async (req, res) => {
       limit: result.limit,
       remaining: result.remaining
     });
-    console.error('Error checking question limit:', error);
-    res.status(500).json({ error: 'Failed to check question eligibility', details: error.message });
   }
 });
 
