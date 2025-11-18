@@ -9,7 +9,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; data: any }>
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; data?: any }>
   signOut: () => Promise<void>
   signInWithGoogle: () => Promise<void>
 }
@@ -75,7 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     if (!supabaseUrl) {
-      return { error: { message: 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY' } as any }
+      return {
+        error: { message: 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY' } as any,
+        data: undefined
+      }
     }
 
     // Get the current origin dynamically (works for localhost and production)
