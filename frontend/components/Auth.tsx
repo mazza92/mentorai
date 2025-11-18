@@ -24,10 +24,16 @@ export default function Auth() {
         const result = await signUp(email, password)
 
         if (result.error) {
-          setError(result.error.message)
+          // Check if it's a "user already exists" error
+          if (result.error.message?.includes('already registered') ||
+              result.error.message?.includes('already exists')) {
+            setError('This email is already registered. Please sign in instead, or check your email for the verification link.')
+          } else {
+            setError(result.error.message)
+          }
         } else {
           // Signup successful - show success message
-          setSuccess('Success! Check your email to confirm your account. Make sure to check your spam folder.')
+          setSuccess('Success! Check your email to confirm your account. Make sure to check your spam folder. If you don\'t receive it within a few minutes, the email may already be registered.')
           setEmail('')
           setPassword('')
         }
