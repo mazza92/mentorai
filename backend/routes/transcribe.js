@@ -350,11 +350,10 @@ router.post('/', async (req, res) => {
       }
 
       console.log('Starting Gemini transcription for project:', projectId);
+      console.log('Audio file path:', project.localAudioPath);
+      console.log('Audio file exists:', fs.existsSync(project.localAudioPath));
 
       try {
-        console.log('Starting Gemini transcription for project:', projectId);
-        console.log('Audio file path:', project.localAudioPath);
-        console.log('Audio file exists:', fs.existsSync(project.localAudioPath));
         
         const transcript = await transcribeWithGemini(project.localAudioPath);
         
