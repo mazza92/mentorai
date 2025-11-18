@@ -292,35 +292,36 @@ router.post('/:userId/check-question', async (req, res) => {
       });
     }
 
-    const userDoc = await firestore.collection('users').doc(userId).get();
+    try {
+      const userDoc = await firestore.collection('users').doc(userId).get();
 
-    if (!userDoc.exists) {
-      const result = canAskQuestion('free', 0);
+      if (!userDoc.exists) {
+        const result = canAskQuestion('free', 0);
+        return res.json({
+          canAsk: true,
+          tier: 'free',
+          questionsThisMonth: 0,
+          limit: result.limit,
+          remaining: result.remaining
+        });
+      }
+
+      const user = userDoc.data();
+      const tier = user.tier || 'free';
+      const questionsThisMonth = user.questionsThisMonth || 0;
+
+      const result = canAskQuestion(tier, questionsThisMonth);
+
       return res.json({
-        canAsk: true,
-        tier: 'free',
-        questionsThisMonth: 0,
+        canAsk: result.canAsk,
+        tier,
+        questionsThisMonth: result.used,
         limit: result.limit,
         remaining: result.remaining
       });
-    }
-
-    const user = userDoc.data();
-    const tier = user.tier || 'free';
-    const questionsThisMonth = user.questionsThisMonth || 0;
-
-    const result = canAskQuestion(tier, questionsThisMonth);
-
-    res.json({
-      canAsk: result.canAsk,
-      tier,
-      questionsThisMonth: result.used,
-      limit: result.limit,
-      remaining: result.remaining
-    });
-  } catch (error) {
-    // Fallback to mock mode
-    if (error.code === 'ENOTFOUND' || error.message.includes('credentials')) {
+    } catch (firestoreError) {
+      console.error('Firestore error in check-question, falling back to mock mode:', firestoreError.message);
+      // Fallback to mock mode
       const { userId } = req.params;
       const user = mockUsers.get(userId) || { tier: 'free', questionsThisMonth: 0 };
       const result = canAskQuestion(user.tier, user.questionsThisMonth || 0);
@@ -332,6 +333,19 @@ router.post('/:userId/check-question', async (req, res) => {
         remaining: result.remaining
       });
     }
+  } catch (error) {
+    // Fallback to mock mode for any other errors
+    console.error('Error in check-question route:', error.message);
+    const { userId } = req.params;
+    const user = mockUsers.get(userId) || { tier: 'free', questionsThisMonth: 0 };
+    const result = canAskQuestion(user.tier, user.questionsThisMonth || 0);
+    return res.json({
+      canAsk: result.canAsk,
+      tier: user.tier,
+      questionsThisMonth: result.used,
+      limit: result.limit,
+      remaining: result.remaining
+    });
     console.error('Error checking question limit:', error);
     res.status(500).json({ error: 'Failed to check question eligibility', details: error.message });
   }
@@ -462,38 +476,45 @@ router.post('/:userId/increment-question', async (req, res) => {
       return res.json({ success: true });
     }
 
-    const userDoc = await firestore.collection('users').doc(userId).get();
+    try {
+      const userDoc = await firestore.collection('users').doc(userId).get();
 
-    if (!userDoc.exists) {
-      await firestore.collection('users').doc(userId).set({
-        userId,
-        tier: 'free',
-        questionsThisMonth: 1,
-        exportsThisMonth: 0,
-        createdAt: new Date(),
-        lastResetDate: new Date(),
+      if (!userDoc.exists) {
+        await firestore.collection('users').doc(userId).set({
+          userId,
+          tier: 'free',
+          questionsThisMonth: 1,
+          exportsThisMonth: 0,
+          createdAt: new Date(),
+          lastResetDate: new Date(),
+        });
+        return res.json({ success: true });
+      }
+
+      const currentCount = userDoc.data().questionsThisMonth || 0;
+      await firestore.collection('users').doc(userId).update({
+        questionsThisMonth: currentCount + 1,
+        updatedAt: new Date(),
       });
+
       return res.json({ success: true });
-    }
-
-    const currentCount = userDoc.data().questionsThisMonth || 0;
-    await firestore.collection('users').doc(userId).update({
-      questionsThisMonth: currentCount + 1,
-      updatedAt: new Date(),
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    // Fallback to mock mode
-    if (error.code === 'ENOTFOUND' || error.message.includes('credentials')) {
+    } catch (firestoreError) {
+      console.error('Firestore error in increment-question, falling back to mock mode:', firestoreError.message);
+      // Fallback to mock mode
       const { userId } = req.params;
       let user = mockUsers.get(userId) || { userId, tier: 'free', questionsThisMonth: 0, exportsThisMonth: 0 };
       user.questionsThisMonth = (user.questionsThisMonth || 0) + 1;
       mockUsers.set(userId, user);
       return res.json({ success: true });
     }
-    console.error('Error incrementing question count:', error);
-    res.status(500).json({ error: 'Failed to increment question count', details: error.message });
+  } catch (error) {
+    // Fallback to mock mode for any other errors
+    console.error('Error in increment-question route:', error.message);
+    const { userId } = req.params;
+    let user = mockUsers.get(userId) || { userId, tier: 'free', questionsThisMonth: 0, exportsThisMonth: 0 };
+    user.questionsThisMonth = (user.questionsThisMonth || 0) + 1;
+    mockUsers.set(userId, user);
+    return res.json({ success: true });
   }
 });
 

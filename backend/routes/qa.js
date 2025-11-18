@@ -88,7 +88,8 @@ router.post('/', async (req, res) => {
 
     // Check question quota before processing
     try {
-      const quotaResponse = await axios.post(`http://localhost:3001/api/user/${userId}/check-question`);
+      const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+      const quotaResponse = await axios.post(`${baseUrl}/api/user/${userId}/check-question`);
       const { canAsk, limit, remaining, questionsThisMonth, tier } = quotaResponse.data;
 
       if (!canAsk) {
@@ -238,20 +239,24 @@ router.post('/', async (req, res) => {
 
     // Increment question count on successful response (don't block)
     let questionsRemaining = null;
-    axios.post(`http://localhost:3001/api/user/${userId}/increment-question`)
+    const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+    
+    axios.post(`${baseUrl}/api/user/${userId}/increment-question`)
       .then(response => {
         console.log(`Question count incremented for user ${userId}`);
       })
       .catch(error => {
         console.error('Error incrementing question count:', error.message);
+        console.error('Error details:', error.response?.data || error.code);
       });
 
     // Get remaining questions for response
     try {
-      const quotaResponse = await axios.post(`http://localhost:3001/api/user/${userId}/check-question`);
+      const quotaResponse = await axios.post(`${baseUrl}/api/user/${userId}/check-question`);
       questionsRemaining = quotaResponse.data.remaining;
     } catch (err) {
       console.error('Error fetching remaining questions:', err.message);
+      console.error('Error details:', err.response?.data || err.code);
     }
 
     res.json({
