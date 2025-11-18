@@ -1,8 +1,42 @@
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { mockProjects } = require('../utils/mockStorage');
+const { Firestore } = require('@google-cloud/firestore');
 
 const router = express.Router();
+
+// Initialize Firestore with error handling
+let firestore;
+let useMockMode = false;
+
+try {
+  if (process.env.GOOGLE_CLOUD_PROJECT_ID && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'your_project_id' && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'mock-project') {
+    const firestoreConfig = {
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+    };
+
+    // Handle credentials from Railway environment variable
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      try {
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+        firestoreConfig.credentials = credentials;
+      } catch (error) {
+        console.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON for topics service');
+        throw error;
+      }
+    }
+
+    firestore = new Firestore(firestoreConfig);
+    console.log('✅ Firestore initialized for topics service');
+  } else {
+    useMockMode = true;
+    console.log('Google Cloud not configured, using mock mode for topics service');
+  }
+} catch (error) {
+  console.log('Firestore initialization failed, using mock mode for topics service');
+  console.log('Error:', error.message);
+  useMockMode = true;
+}
 
 // Initialize Gemini
 let geminiAI;
@@ -24,10 +58,20 @@ router.post('/', async (req, res) => {
 
     console.log('Generating Table of Contents for project:', projectId);
 
-    // Get project
-    const project = mockProjects.get(projectId);
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
+    // Get project from mock storage or Firestore
+    let project;
+    if (useMockMode || !firestore) {
+      project = mockProjects.get(projectId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+    } else {
+      // Get from Firestore
+      const projectDoc = await firestore.collection('projects').doc(projectId).get();
+      if (!projectDoc.exists) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      project = { id: projectId, ...projectDoc.data() };
     }
 
     // Check if video is long enough for TOC (>10 minutes)
@@ -180,7 +224,16 @@ Generate the table of contents as JSON:`;
     // Save TOC to project
     project.tableOfContents = tocData;
     project.updatedAt = new Date();
-    mockProjects.set(projectId, project);
+    
+    if (useMockMode || !firestore) {
+      mockProjects.set(projectId, project);
+    } else {
+      // Save to Firestore
+      await firestore.collection('projects').doc(projectId).update({
+        tableOfContents: tocData,
+        updatedAt: new Date()
+      });
+    }
 
     res.json({
       success: true,
@@ -218,9 +271,29 @@ router.get('/:projectId', async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const project = mockProjects.get(projectId);
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
+    // Get project from mock storage or Firestore
+    let project;
+    if (useMockMode || !firestore) {
+      project = mockProjects.get(projectId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+    } else {
+      // Get from Firestore
+      try {
+        const projectDoc = await firestore.collection('projects').doc(projectId).get();
+        if (!projectDoc.exists) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+        project = { id: projectId, ...projectDoc.data() };
+      } catch (firestoreError) {
+        console.error('Firestore error in TOC retrieval, falling back to mock mode:', firestoreError.message);
+        // Fallback to mock mode
+        project = mockProjects.get(projectId);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+      }
     }
 
     if (!project.tableOfContents) {
