@@ -262,10 +262,18 @@ router.post('/', async (req, res) => {
 
     // Try OpenAI Whisper first if configured
     if (useOpenAI && openai) {
-      // Get project from mock storage
-      project = mockProjects.get(projectId);
-      if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
+      // Get project from Firestore if configured, otherwise from mock storage
+      if (!useMockMode && firestore) {
+        const projectDoc = await firestore.collection('projects').doc(projectId).get();
+        if (!projectDoc.exists) {
+          return res.status(404).json({ error: 'Project not found in Firestore' });
+        }
+        project = projectDoc.data();
+      } else {
+        project = mockProjects.get(projectId);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found in mock storage' });
+        }
       }
 
       // Use local audio file
@@ -306,14 +314,23 @@ router.post('/', async (req, res) => {
           console.log('Word count:', transcript.words.length);
         }
 
-        // Update project in mock storage
-        project.transcript = transcript;
-        project.transcriptionStatus = 'completed';
-        project.updatedAt = new Date();
-        mockProjects.set(projectId, project);
+        // Update project in Firestore or mock storage
+        if (!useMockMode && firestore) {
+          await firestore.collection('projects').doc(projectId).update({
+            transcript,
+            transcriptionStatus: 'completed',
+            updatedAt: new Date(),
+          });
+          console.log('Transcript saved to Firestore');
+        } else {
+          project.transcript = transcript;
+          project.transcriptionStatus = 'completed';
+          project.updatedAt = new Date();
+          mockProjects.set(projectId, project);
+        }
 
         // Generate suggested prompts in background (don't block response)
-        generateSuggestedPromptsAsync(projectId, project).catch(err => {
+        generateSuggestedPromptsAsync(projectId, project, !useMockMode && !!firestore).catch(err => {
           console.error('Failed to generate suggested prompts:', err);
         });
 
@@ -336,14 +353,23 @@ router.post('/', async (req, res) => {
           try {
             const transcript = await transcribeWithGemini(project.localAudioPath);
 
-            // Update project in mock storage
-            project.transcript = transcript;
-            project.transcriptionStatus = 'completed';
-            project.updatedAt = new Date();
-            mockProjects.set(projectId, project);
+            // Update project in Firestore or mock storage
+            if (!useMockMode && firestore) {
+              await firestore.collection('projects').doc(projectId).update({
+                transcript,
+                transcriptionStatus: 'completed',
+                updatedAt: new Date(),
+              });
+              console.log('Transcript saved to Firestore (Gemini fallback)');
+            } else {
+              project.transcript = transcript;
+              project.transcriptionStatus = 'completed';
+              project.updatedAt = new Date();
+              mockProjects.set(projectId, project);
+            }
 
             // Generate suggested prompts in background (don't block response)
-            generateSuggestedPromptsAsync(projectId, project).catch(err => {
+            generateSuggestedPromptsAsync(projectId, project, !useMockMode && !!firestore).catch(err => {
               console.error('Failed to generate suggested prompts:', err);
             });
 
@@ -364,10 +390,18 @@ router.post('/', async (req, res) => {
 
     // Use Gemini if configured (either as primary or fallback)
     if (useGemini && geminiAI) {
-      // Get project from mock storage
-      project = mockProjects.get(projectId);
-      if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
+      // Get project from Firestore if configured, otherwise from mock storage
+      if (!useMockMode && firestore) {
+        const projectDoc = await firestore.collection('projects').doc(projectId).get();
+        if (!projectDoc.exists) {
+          return res.status(404).json({ error: 'Project not found in Firestore' });
+        }
+        project = projectDoc.data();
+      } else {
+        project = mockProjects.get(projectId);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found in mock storage' });
+        }
       }
 
       // Use local audio file
@@ -382,21 +416,29 @@ router.post('/', async (req, res) => {
       try {
         
         const transcript = await transcribeWithGemini(project.localAudioPath);
-        
+
         console.log('Gemini transcription complete');
         console.log('Transcript text length:', transcript.text?.length || 0);
         console.log('Transcript word count:', transcript.words?.length || 0);
 
-        // Update project in mock storage
-        project.transcript = transcript;
-        project.transcriptionStatus = 'completed';
-        project.updatedAt = new Date();
-        mockProjects.set(projectId, project);
-        
-        console.log('Project updated with transcript in mock storage');
+        // Update project in Firestore or mock storage
+        if (!useMockMode && firestore) {
+          await firestore.collection('projects').doc(projectId).update({
+            transcript,
+            transcriptionStatus: 'completed',
+            updatedAt: new Date(),
+          });
+          console.log('Transcript saved to Firestore (Gemini)');
+        } else {
+          project.transcript = transcript;
+          project.transcriptionStatus = 'completed';
+          project.updatedAt = new Date();
+          mockProjects.set(projectId, project);
+          console.log('Project updated with transcript in mock storage');
+        }
 
         // Generate suggested prompts in background (don't block response)
-        generateSuggestedPromptsAsync(projectId, project).catch(err => {
+        generateSuggestedPromptsAsync(projectId, project, !useMockMode && !!firestore).catch(err => {
           console.error('Failed to generate suggested prompts:', err);
         });
 
