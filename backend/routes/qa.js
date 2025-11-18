@@ -72,7 +72,7 @@ const { mockProjects } = require('../utils/mockStorage');
  */
 router.post('/', async (req, res) => {
   try {
-    const { projectId, question, userId, chatHistory } = req.body;
+    const { projectId, question, userId, chatHistory, language } = req.body;
 
     if (!projectId || !question) {
       return res.status(400).json({ error: 'Project ID and question are required' });
@@ -206,7 +206,8 @@ router.post('/', async (req, res) => {
       videoAnalysis,
       transcript,
       chatHistory,
-      personalizedContext // NEW: Add personalized context
+      personalizedContext, // NEW: Add personalized context
+      language // NEW: Add language preference
     );
 
     console.log('Q&A response generated');
