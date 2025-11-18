@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, MessageSquare, TrendingUp, Crown, Loader2, AlertCircle } from 'lucide-react'
+import { Video, MessageSquare, TrendingUp, Crown, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import axios from 'axios'
 import Link from 'next/link'
 
@@ -64,7 +64,8 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
   }
 
   const getUsagePercentage = (used: number, limit: number) => {
-    if (limit === 0) return 100
+    if (limit === 0 || limit === Infinity) return 0
+    if (used === 0) return 0
     return Math.min(100, Math.round((used / limit) * 100))
   }
 
@@ -166,11 +167,21 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
           <h2 className="text-xl font-bold text-slate-900">Usage Dashboard</h2>
           <p className="text-sm text-slate-600 mt-1">Track your monthly quota</p>
         </div>
-        <div className={`px-3 py-1 rounded-full text-sm font-semibold capitalize ${
-          usage.tier === 'free' ? 'bg-slate-100 text-slate-700' : 'bg-blue-100 text-blue-700'
-        }`}>
-          <Crown className="w-4 h-4 inline mr-1" />
-          {usage.tier}
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={fetchUsage}
+            disabled={loading}
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
+            title="Refresh usage data"
+          >
+            <RefreshCw className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <div className={`px-3 py-1 rounded-full text-sm font-semibold capitalize ${
+            usage.tier === 'free' ? 'bg-slate-100 text-slate-700' : 'bg-blue-100 text-blue-700'
+          }`}>
+            <Crown className="w-4 h-4 inline mr-1" />
+            {usage.tier}
+          </div>
         </div>
       </div>
 
