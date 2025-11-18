@@ -18,6 +18,31 @@ export default function Home() {
   const [currentProject, setCurrentProject] = useState<string | null>(null)
   const [userId, setUserId] = useState<string>('anonymous')
 
+  // Function to check URL and update project
+  const checkUrlAndSetProject = () => {
+    if (typeof window === 'undefined') return
+    
+    const urlParams = new URLSearchParams(window.location.search)
+    const projectParam = urlParams.get('project')
+    
+    if (projectParam) {
+      // URL param always wins - update even if currentProject is already set
+      if (currentProject !== projectParam) {
+        console.log('URL project param detected:', projectParam, 'Current:', currentProject)
+        setCurrentProject(projectParam)
+        if (user) {
+          localStorage.setItem(`currentProject_${user.id}`, projectParam)
+        } else {
+          localStorage.setItem('currentProject', projectParam)
+        }
+        // Clear upload flag when switching to a project via URL
+        sessionStorage.removeItem('isUploadingVideo')
+      }
+      return true // URL param found
+    }
+    return false // No URL param
+  }
+
   useEffect(() => {
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -35,31 +60,19 @@ export default function Home() {
       }
       
       // PRIORITY: Check URL params FIRST (for conversation switching)
-      // Always check URL params - they take absolute priority
-      if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search)
-        const projectParam = urlParams.get('project')
-        if (projectParam) {
-          // URL param always wins - update even if currentProject is already set
-          setCurrentProject(projectParam)
-          localStorage.setItem('currentProject', projectParam)
-          return // Exit early - URL param takes priority
-        }
-        
-        // Check if we're in the middle of uploading (don't restore old project)
-        const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
-        if (isUploading) {
-          // Don't restore old project if upload is in progress
-          return
-        }
+      if (checkUrlAndSetProject()) {
+        return // URL param takes priority
       }
       
-      // Fallback: Restore current project from localStorage (only if no URL param and not uploading)
-      // Only set if currentProject is null (initial load)
-      if (!currentProject) {
-        const storedProject = localStorage.getItem('currentProject')
-        if (storedProject) {
-          setCurrentProject(storedProject)
+      // Only restore from localStorage on initial load (when currentProject is null)
+      // Don't restore if we're in the middle of uploading
+      if (!currentProject && typeof window !== 'undefined') {
+        const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
+        if (!isUploading) {
+          const storedProject = localStorage.getItem('currentProject')
+          if (storedProject) {
+            setCurrentProject(storedProject)
+          }
         }
       }
       return
@@ -77,37 +90,74 @@ export default function Home() {
       setUserId(user.id)
 
       // PRIORITY: Check URL params FIRST (for conversation switching)
-      // Always check URL params - they take absolute priority
-      if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search)
-        const projectParam = urlParams.get('project')
-        if (projectParam) {
-          // URL param always wins - update even if currentProject is already set
-          setCurrentProject(projectParam)
-          localStorage.setItem(`currentProject_${user.id}`, projectParam)
-          return // Exit early - URL param takes priority
-        }
-        
-        // Check if we're in the middle of uploading (don't restore old project)
-        const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
-        if (isUploading) {
-          // Don't restore old project if upload is in progress
-          return
-        }
+      if (checkUrlAndSetProject()) {
+        return // URL param takes priority
       }
 
-      // Fallback: Restore current project from localStorage (only if no URL param and not uploading)
-      // Only set if currentProject is null (initial load)
-      if (!currentProject) {
-        const storedProject = localStorage.getItem(`currentProject_${user.id}`)
-        if (storedProject) {
-          setCurrentProject(storedProject)
+      // Only restore from localStorage on initial load (when currentProject is null)
+      // Don't restore if we're in the middle of uploading
+      if (!currentProject && typeof window !== 'undefined') {
+        const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
+        if (!isUploading) {
+          const storedProject = localStorage.getItem(`currentProject_${user.id}`)
+          if (storedProject) {
+            setCurrentProject(storedProject)
+          }
         }
       }
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router]) // Remove currentProject from dependencies to prevent loops
+
+  // Listen for URL changes (popstate for back/forward buttons)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const handleUrlChange = () => {
+      // Re-check URL when browser back/forward is used
+      const urlParams = new URLSearchParams(window.location.search)
+      const projectParam = urlParams.get('project')
+      
+      if (projectParam && currentProject !== projectParam) {
+        console.log('URL changed via popstate:', projectParam)
+        setCurrentProject(projectParam)
+        if (user) {
+          localStorage.setItem(`currentProject_${user.id}`, projectParam)
+        } else {
+          localStorage.setItem('currentProject', projectParam)
+        }
+        sessionStorage.removeItem('isUploadingVideo')
+      } else if (!projectParam && currentProject) {
+        // URL param removed - go to upload screen
+        console.log('URL param removed, clearing project')
+        setCurrentProject(null)
+        if (user) {
+          localStorage.removeItem(`currentProject_${user.id}`)
+        } else {
+          localStorage.removeItem('currentProject')
+        }
+      }
+    }
+    
+    // Listen for popstate (back/forward buttons)
+    window.addEventListener('popstate', handleUrlChange)
+    
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange)
+    }
+  }, [user, currentProject]) // Re-setup listeners when user or currentProject changes
 
   const handleProjectCreated = async (projectId: string) => {
+    // Clear upload flag first
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('isUploadingVideo')
+    }
+    
+    // Update URL to include project parameter (this will trigger useEffect to set currentProject)
+    if (typeof window !== 'undefined') {
+      const newUrl = `/?project=${projectId}`
+      window.history.pushState({ projectId }, '', newUrl)
+    }
+    
     setCurrentProject(projectId)
     if (user) {
       localStorage.setItem(`currentProject_${user.id}`, projectId)
@@ -152,6 +202,13 @@ export default function Home() {
   }
 
   const handleNewProject = () => {
+    // Clear upload flag
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('isUploadingVideo')
+      // Update URL to remove project parameter
+      window.history.pushState({}, '', '/')
+    }
+    
     setCurrentProject(null)
     if (user) {
       localStorage.removeItem(`currentProject_${user.id}`)
