@@ -56,7 +56,6 @@ class YouTubeService {
         fragmentRetries: 3,
         // Additional options to avoid detection
         noPlaylist: true,
-        extractFlat: false,
       });
 
       // Extract thumbnail - handle multiple possible formats

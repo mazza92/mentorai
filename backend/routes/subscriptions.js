@@ -66,19 +66,29 @@ async function getOrCreateCustomer(userId, email) {
       user.stripeCustomerId = customer.id;
       mockUsers.set(userId, user);
     } else {
-      if (user) {
-        await firestore.collection('users').doc(userId).update({
-          stripeCustomerId: customer.id,
-        });
-      } else {
-        await firestore.collection('users').doc(userId).set({
-          userId,
-          stripeCustomerId: customer.id,
-          tier: 'free',
-          exportsThisMonth: 0,
-          questionsThisMonth: 0,
-          createdAt: new Date(),
-        });
+      try {
+        if (user) {
+          await firestore.collection('users').doc(userId).update({
+            stripeCustomerId: customer.id,
+          });
+        } else {
+          await firestore.collection('users').doc(userId).set({
+            userId,
+            stripeCustomerId: customer.id,
+            tier: 'free',
+            exportsThisMonth: 0,
+            questionsThisMonth: 0,
+            createdAt: new Date(),
+          });
+        }
+      } catch (firestoreError) {
+        console.error('Error saving to Firestore, falling back to mock storage:', firestoreError.message);
+        // Fallback to mock storage
+        if (!user) {
+          user = { userId, tier: 'free', exportsThisMonth: 0, questionsThisMonth: 0 };
+        }
+        user.stripeCustomerId = customer.id;
+        mockUsers.set(userId, user);
       }
     }
 
@@ -192,8 +202,13 @@ router.get('/status/:userId', async (req, res) => {
     if (useMockMode || !firestore) {
       user = mockUsers.get(userId);
     } else {
-      const userDoc = await firestore.collection('users').doc(userId).get();
-      user = userDoc.exists ? userDoc.data() : null;
+      try {
+        const userDoc = await firestore.collection('users').doc(userId).get();
+        user = userDoc.exists ? userDoc.data() : null;
+      } catch (firestoreError) {
+        console.error('Error fetching from Firestore, falling back to mock storage:', firestoreError.message);
+        user = mockUsers.get(userId);
+      }
     }
 
     if (!user) {
