@@ -419,6 +419,10 @@ router.post('/:userId/check-video', async (req, res) => {
 });
 
 // Increment video count
+// IMPORTANT: This tracks TOTAL videos processed this month, not active videos.
+// The count is incremented when a video is uploaded and NEVER decremented,
+// even if a project is deleted. This prevents users from deleting videos
+// and uploading new ones to bypass monthly limits.
 router.post('/:userId/increment-video', async (req, res) => {
   try {
     const { userId } = req.params;
