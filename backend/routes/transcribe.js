@@ -352,13 +352,23 @@ router.post('/', async (req, res) => {
       console.log('Starting Gemini transcription for project:', projectId);
 
       try {
+        console.log('Starting Gemini transcription for project:', projectId);
+        console.log('Audio file path:', project.localAudioPath);
+        console.log('Audio file exists:', fs.existsSync(project.localAudioPath));
+        
         const transcript = await transcribeWithGemini(project.localAudioPath);
+        
+        console.log('Gemini transcription complete');
+        console.log('Transcript text length:', transcript.text?.length || 0);
+        console.log('Transcript word count:', transcript.words?.length || 0);
 
         // Update project in mock storage
         project.transcript = transcript;
         project.transcriptionStatus = 'completed';
         project.updatedAt = new Date();
         mockProjects.set(projectId, project);
+        
+        console.log('Project updated with transcript in mock storage');
 
         // Generate suggested prompts in background (don't block response)
         generateSuggestedPromptsAsync(projectId, project).catch(err => {

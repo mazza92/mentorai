@@ -42,11 +42,21 @@ class YouTubeService {
   async getVideoInfo(url) {
     try {
       // Get video info using youtube-dl-exec
+      // Add options to bypass YouTube bot detection
       const info = await youtubedl(url, {
         dumpSingleJson: true,
         noCheckCertificates: true,
         noWarnings: true,
         preferFreeFormats: true,
+        // Bypass bot detection
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        referer: 'https://www.youtube.com/',
+        // Add retry options
+        retries: 3,
+        fragmentRetries: 3,
+        // Additional options to avoid detection
+        noPlaylist: true,
+        extractFlat: false,
       });
 
       // Extract thumbnail - handle multiple possible formats
@@ -77,6 +87,17 @@ class YouTubeService {
       };
     } catch (error) {
       console.error('Error getting YouTube video info:', error);
+      
+      // Check for bot detection error
+      if (error.stderr && (error.stderr.includes('Sign in to confirm') || error.stderr.includes('bot'))) {
+        console.error('YouTube bot detection triggered. This is a known issue with yt-dlp.');
+        console.error('Possible solutions:');
+        console.error('1. Wait a few minutes and try again');
+        console.error('2. Use cookies (requires manual setup)');
+        console.error('3. YouTube may be rate-limiting this IP');
+        throw new Error('YouTube is blocking automated access. Please try again in a few minutes or contact support if the issue persists.');
+      }
+      
       throw new Error('Failed to fetch video information from YouTube');
     }
   }
@@ -114,12 +135,19 @@ class YouTubeService {
 
       // Download video using youtube-dl-exec
       // This automatically handles binary downloads and updates
+      // Add options to bypass YouTube bot detection
       await youtubedl(url, {
         output: videoPath,
         format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         noPlaylist: true,
         noWarnings: true,
         noCheckCertificates: true,
+        // Bypass bot detection
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        referer: 'https://www.youtube.com/',
+        // Add retry options
+        retries: 3,
+        fragmentRetries: 3,
       });
 
       console.log('Video download complete');
