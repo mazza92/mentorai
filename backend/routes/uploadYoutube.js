@@ -209,9 +209,28 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('YouTube upload error:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to download YouTube video';
+    let errorDetails = error.message;
+    
+    // Check for specific error types
+    if (error.message && error.message.includes('python3')) {
+      errorMessage = 'Server configuration error: Python 3 is required for YouTube downloads';
+      errorDetails = 'The server is missing Python 3. Please contact support.';
+    } else if (error.message && error.message.includes('yt-dlp')) {
+      errorMessage = 'YouTube downloader error';
+      errorDetails = error.message;
+    } else if (error.message && error.message.includes('FFmpeg')) {
+      errorMessage = 'Video processing error: FFmpeg is required';
+      errorDetails = 'The server is missing FFmpeg. Please contact support.';
+    }
+    
     res.status(500).json({
-      error: 'Failed to download YouTube video',
-      details: error.message,
+      error: errorMessage,
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 });

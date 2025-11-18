@@ -5,6 +5,9 @@
 export function getApiUrl(): string {
   let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
   
+  // Remove all whitespace (including newlines, carriage returns, spaces, tabs)
+  apiUrl = apiUrl.trim().replace(/\s+/g, '')
+  
   // Remove trailing slash
   apiUrl = apiUrl.replace(/\/$/, '')
   
