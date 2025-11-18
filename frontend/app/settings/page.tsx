@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2, Crown, Zap, CreditCard, LogOut, ArrowLeft } from 'lucide-react'
@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
 
-  const fetchSubscriptionStatus = async () => {
+  const fetchSubscriptionStatus = useCallback(async () => {
     if (!user) return
 
     try {
@@ -26,7 +26,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
   useEffect(() => {
     if (user) {
@@ -34,7 +34,7 @@ export default function SettingsPage() {
     } else {
       router.push('/auth')
     }
-  }, [user, router])
+  }, [user, router, fetchSubscriptionStatus])
 
   const handleManageSubscription = async () => {
     if (!user) return
