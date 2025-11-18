@@ -69,6 +69,7 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 WanderCut Backend running on port ${PORT}`);
   console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔧 Google Cloud Project: ${process.env.GOOGLE_CLOUD_PROJECT_ID ? 'Configured' : 'Not configured'}`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`❌ Port ${PORT} is already in use.`);
