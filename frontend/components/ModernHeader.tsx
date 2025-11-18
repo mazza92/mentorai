@@ -6,6 +6,7 @@ import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageS
 import { useAuth } from '@/contexts/AuthContext'
 import ConversationHistory from '@/components/ConversationHistory'
 import { Conversation } from '@/lib/conversationStorage'
+import UsageDashboard from '@/components/UsageDashboard'
 
 interface ModernHeaderProps {
   onNewProject: () => void
@@ -130,11 +131,19 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
 
                 {/* User Dropdown Menu */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-72 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
                     <div className="px-4 py-2 border-b border-slate-100">
                       <p className="text-sm font-medium text-slate-900">{user.email}</p>
                       <p className="text-xs text-slate-500 mt-0.5">Free Tier</p>
                     </div>
+                    
+                    {/* Compact Usage Widget */}
+                    {userId && (
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <UsageDashboard userId={userId} compact={true} />
+                      </div>
+                    )}
+                    
                     <button
                       onClick={() => {
                         router.push('/pricing')
@@ -145,21 +154,10 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                       <CreditCard className="w-4 h-4" />
                       <span>Pricing</span>
                     </button>
-                    <div className="border-t border-slate-100 my-1" />
                     <button
                       onClick={() => {
-                        router.push('/pricing')
+                        router.push('/settings')
                         setUserMenuOpen(false)
-                      }}
-                      className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      <span>Upgrade to Pro</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false)
-                        // Settings page can be added later
                       }}
                       className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
@@ -286,6 +284,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                   </button>
                   <button
                     onClick={() => {
+                      router.push('/settings')
                       setMobileMenuOpen(false)
                     }}
                     className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"

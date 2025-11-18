@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2, Crown, Zap, CreditCard, LogOut } from 'lucide-react'
 import axios from 'axios'
+import UsageDashboard from '@/components/UsageDashboard'
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth()
@@ -149,23 +150,9 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Usage Section */}
+          {/* Usage Section - Comprehensive Dashboard */}
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">Usage This Month</h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-600 mb-1">Exports</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {subscriptionStatus?.exportsThisMonth || 0} / {isCreator ? '∞' : '3'}
-                </p>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-600 mb-1">Questions</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {subscriptionStatus?.questionsThisMonth || 0} / {isCreator ? '∞' : '50'}
-                </p>
-              </div>
-            </div>
+            {user && <UsageDashboard userId={user.id} />}
           </div>
 
           {/* Sign Out */}
