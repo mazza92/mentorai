@@ -1,9 +1,21 @@
 const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { Firestore } = require('@google-cloud/firestore');
 const { mockUsers } = require('../utils/mockStorage');
 
 const router = express.Router();
+
+// Initialize Stripe only if API key is provided
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.trim() !== '') {
+  try {
+    stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    console.log('✅ Stripe initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize Stripe:', error.message);
+  }
+} else {
+  console.warn('⚠️ STRIPE_SECRET_KEY not configured. Payment features will be disabled.');
+}
 
 // Initialize Firestore
 let firestore;
@@ -20,6 +32,10 @@ try {
 
 // Get or create Stripe customer for user
 async function getOrCreateCustomer(userId, email) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.');
+  }
+
   try {
     // Check if user already has a Stripe customer ID
     let user;
@@ -79,6 +95,10 @@ async function getOrCreateCustomer(userId, email) {
  */
 router.post('/create-checkout-session', async (req, res) => {
   try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Payment service is not configured. Please contact support.' });
+    }
+
     const { userId, email, priceId } = req.body;
 
     if (!userId || !email) {
@@ -123,6 +143,10 @@ router.post('/create-checkout-session', async (req, res) => {
  */
 router.post('/create-portal-session', async (req, res) => {
   try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Payment service is not configured. Please contact support.' });
+    }
+
     const { userId } = req.body;
 
     if (!userId) {
@@ -181,7 +205,7 @@ router.get('/status/:userId', async (req, res) => {
     }
 
     // If user has Stripe customer ID, get subscription from Stripe
-    if (user.stripeCustomerId) {
+    if (user.stripeCustomerId && stripe) {
       try {
         const subscriptions = await stripe.subscriptions.list({
           customer: user.stripeCustomerId,
@@ -226,6 +250,11 @@ router.get('/status/:userId', async (req, res) => {
  * Note: This route is registered in server.js with raw body parser BEFORE json middleware
  */
 const webhookHandler = async (req, res) => {
+  if (!stripe) {
+    console.error('Stripe not configured, cannot process webhook');
+    return res.status(503).send('Payment service not configured');
+  }
+
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
