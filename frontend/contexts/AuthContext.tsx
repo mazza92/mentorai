@@ -50,8 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email)
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -63,32 +62,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     if (!supabaseUrl) {
-      console.error('Supabase not configured')
       return { error: { message: 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY' } as any }
     }
     
-    console.log('Attempting sign-in for:', email)
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
     
-    console.log('Sign-in response:', { 
-      hasError: !!error, 
-      hasData: !!data, 
-      hasSession: !!data?.session,
-      userEmail: data?.user?.email,
-      error: error?.message 
-    })
-    
     // If successful, update state immediately
     if (data?.session && !error) {
-      console.log('Updating auth state with session:', data.session.user.email)
       setSession(data.session)
       setUser(data.session.user)
       setLoading(false)
-    } else if (error) {
-      console.error('Sign-in error:', error)
     }
     
     return { error, data }
