@@ -22,11 +22,16 @@ let firestore;
 let useMockMode = false;
 
 try {
-  firestore = new Firestore({
-    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'mock-project',
-  });
+  if (process.env.GOOGLE_CLOUD_PROJECT_ID && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'your_project_id' && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'mock-project') {
+    firestore = new Firestore({
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+    });
+  } else {
+    useMockMode = true;
+    console.log('Google Cloud not configured, using mock storage for subscriptions');
+  }
 } catch (error) {
-  console.log('Firestore not configured, using mock mode for subscriptions');
+  console.error('Firestore initialization failed:', error.message);
   useMockMode = true;
 }
 
