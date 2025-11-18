@@ -1,6 +1,7 @@
 const youtubedl = require('youtube-dl-exec');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const ffmpeg = require('fluent-ffmpeg');
 const { v4: uuidv4 } = require('uuid');
 
@@ -41,9 +42,8 @@ class YouTubeService {
    */
   async getVideoInfo(url) {
     try {
-      // Get video info using youtube-dl-exec
-      // Add options to bypass YouTube bot detection
-      const info = await youtubedl(url, {
+      // Build yt-dlp options
+      const options = {
         dumpSingleJson: true,
         noCheckCertificates: true,
         noWarnings: true,
@@ -56,7 +56,42 @@ class YouTubeService {
         fragmentRetries: 3,
         // Additional options to avoid detection
         noPlaylist: true,
-      });
+      };
+
+      // Add cookies if available (critical for production)
+      console.log('🍪 Checking for YouTube cookies...');
+      console.log('   YOUTUBE_COOKIES env var exists:', !!process.env.YOUTUBE_COOKIES);
+
+      if (process.env.YOUTUBE_COOKIES) {
+        try {
+          // Cookies can be provided as base64-encoded Netscape format
+          const cookiesPath = path.join(__dirname, '../temp', 'youtube_cookies.txt');
+
+          // Ensure temp directory exists
+          const tempDir = path.join(__dirname, '../temp');
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+
+          const cookiesContent = Buffer.from(process.env.YOUTUBE_COOKIES, 'base64').toString('utf-8');
+          fs.writeFileSync(cookiesPath, cookiesContent);
+          options.cookies = cookiesPath;
+
+          console.log('✅ Using YouTube cookies for authentication');
+          console.log('   Cookie file saved to:', cookiesPath);
+          console.log('   Cookie file size:', fs.statSync(cookiesPath).size, 'bytes');
+        } catch (error) {
+          console.error('❌ Error loading YouTube cookies:', error.message);
+          console.error('   Proceeding without cookies (may trigger bot detection)');
+        }
+      } else {
+        console.warn('⚠️  No YouTube cookies found in environment');
+        console.warn('   Set YOUTUBE_COOKIES env var to bypass bot detection');
+        console.warn('   See YOUTUBE_COOKIES_GUIDE.md for instructions');
+      }
+
+      // Get video info using youtube-dl-exec
+      const info = await youtubedl(url, options);
 
       // Extract thumbnail - handle multiple possible formats
       let thumbnail = '';
@@ -132,10 +167,8 @@ class YouTubeService {
 
       console.log('Downloading video from YouTube...');
 
-      // Download video using youtube-dl-exec
-      // This automatically handles binary downloads and updates
-      // Add options to bypass YouTube bot detection
-      await youtubedl(url, {
+      // Build download options
+      const downloadOptions = {
         output: videoPath,
         format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         noPlaylist: true,
@@ -147,7 +180,31 @@ class YouTubeService {
         // Add retry options
         retries: 3,
         fragmentRetries: 3,
-      });
+      };
+
+      // Add cookies if available (critical for production)
+      if (process.env.YOUTUBE_COOKIES) {
+        try {
+          const cookiesPath = path.join(__dirname, '../temp', 'youtube_cookies.txt');
+
+          // Ensure temp directory exists
+          const tempDir = path.join(__dirname, '../temp');
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+
+          const cookiesContent = Buffer.from(process.env.YOUTUBE_COOKIES, 'base64').toString('utf-8');
+          fs.writeFileSync(cookiesPath, cookiesContent);
+          downloadOptions.cookies = cookiesPath;
+
+          console.log('✅ Using YouTube cookies for download authentication');
+        } catch (error) {
+          console.error('❌ Error loading YouTube cookies for download:', error.message);
+        }
+      }
+
+      // Download video using youtube-dl-exec
+      await youtubedl(url, downloadOptions);
 
       console.log('Video download complete');
 
