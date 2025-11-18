@@ -78,11 +78,11 @@ router.get('/:userId', async (req, res) => {
             status: 'active',
             limit: 1,
           });
-          
-          if (subscriptions.data.length > 0 && user.tier !== 'creator') {
-            user.tier = 'creator';
+
+          if (subscriptions.data.length > 0 && user.tier !== 'pro') {
+            user.tier = 'pro';
             mockUsers.set(userId, user);
-          } else if (subscriptions.data.length === 0 && user.tier === 'creator') {
+          } else if (subscriptions.data.length === 0 && user.tier === 'pro') {
             user.tier = 'free';
             mockUsers.set(userId, user);
           }
@@ -134,12 +134,12 @@ router.get('/:userId', async (req, res) => {
           status: 'active',
           limit: 1,
         });
-        
-        const shouldBeCreator = subscriptions.data.length > 0;
-        if (shouldBeCreator && user.tier !== 'creator') {
-          await firestore.collection('users').doc(userId).update({ tier: 'creator' });
-          user.tier = 'creator';
-        } else if (!shouldBeCreator && user.tier === 'creator') {
+
+        const shouldBePro = subscriptions.data.length > 0;
+        if (shouldBePro && user.tier !== 'pro') {
+          await firestore.collection('users').doc(userId).update({ tier: 'pro' });
+          user.tier = 'pro';
+        } else if (!shouldBePro && user.tier === 'pro') {
           await firestore.collection('users').doc(userId).update({ tier: 'free' });
           user.tier = 'free';
         }
@@ -191,7 +191,7 @@ router.post('/:userId/check-export', async (req, res) => {
     // Use mock mode if Firestore is not available
     if (useMockMode || !process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID === 'your_project_id') {
       const user = mockUsers.get(userId) || { tier: 'free', exportsThisMonth: 0 };
-      const limits = { free: 3, creator: Infinity };
+      const limits = { free: 3, pro: Infinity };
       const limit = limits[user.tier] || 3;
       const canExport = user.exportsThisMonth < limit;
       return res.json({ canExport, tier: user.tier, exportsThisMonth: user.exportsThisMonth || 0, limit });
@@ -209,7 +209,7 @@ router.post('/:userId/check-export', async (req, res) => {
     
     const limits = {
       free: 3,
-      creator: Infinity,
+      pro: Infinity,
     };
 
     const limit = limits[tier] || 3;
