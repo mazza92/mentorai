@@ -36,6 +36,57 @@ class YouTubeService {
   }
 
   /**
+   * Check if YouTube cookies are expired or expiring soon
+   * @param {string} cookiesContent - Content of cookies.txt file
+   */
+  checkCookieExpiry(cookiesContent) {
+    try {
+      const lines = cookiesContent.split('\n');
+      const now = Math.floor(Date.now() / 1000); // Current Unix timestamp
+      const oneDayFromNow = now + (24 * 60 * 60); // 24 hours from now
+
+      let expiredCount = 0;
+      let expiringSoonCount = 0;
+      let totalCookies = 0;
+
+      for (const line of lines) {
+        // Skip comments and empty lines
+        if (!line || line.startsWith('#') || line.trim() === '') continue;
+
+        // Netscape cookie format: domain, flag, path, secure, expiration, name, value
+        const parts = line.split('\t');
+        if (parts.length < 7) continue;
+
+        totalCookies++;
+        const expiration = parseInt(parts[4], 10);
+        const cookieName = parts[5];
+
+        if (expiration < now) {
+          expiredCount++;
+          console.warn(`   ⚠️  Cookie '${cookieName}' is EXPIRED`);
+        } else if (expiration < oneDayFromNow) {
+          expiringSoonCount++;
+          const hoursLeft = Math.floor((expiration - now) / 3600);
+          console.warn(`   ⚠️  Cookie '${cookieName}' expires in ${hoursLeft} hours`);
+        }
+      }
+
+      if (expiredCount > 0) {
+        console.error(`   ❌ WARNING: ${expiredCount} of ${totalCookies} cookies have EXPIRED!`);
+        console.error(`   ❌ YouTube downloads may fail. Please refresh your cookies.`);
+        console.error(`   ❌ See YOUTUBE_COOKIES_GUIDE.md for instructions.`);
+      } else if (expiringSoonCount > 0) {
+        console.warn(`   ⚠️  ${expiringSoonCount} of ${totalCookies} cookies expire within 24 hours`);
+        console.warn(`   ⚠️  Consider refreshing cookies soon to avoid interruptions`);
+      } else {
+        console.log(`   ✅ All ${totalCookies} cookies are valid`);
+      }
+    } catch (error) {
+      console.error('   Error checking cookie expiry:', error.message);
+    }
+  }
+
+  /**
    * Get video info from YouTube
    * @param {string} url - YouTube URL
    * @returns {Promise<Object>} - Video info (title, duration, etc.)
@@ -80,6 +131,9 @@ class YouTubeService {
           console.log('✅ Using YouTube cookies for authentication');
           console.log('   Cookie file saved to:', cookiesPath);
           console.log('   Cookie file size:', fs.statSync(cookiesPath).size, 'bytes');
+
+          // Check cookie expiry
+          this.checkCookieExpiry(cookiesContent);
         } catch (error) {
           console.error('❌ Error loading YouTube cookies:', error.message);
           console.error('   Proceeding without cookies (may trigger bot detection)');
