@@ -42,6 +42,56 @@ try {
 }
 
 /**
+ * Helper function to check if project is ready and update status
+ * Called after transcription or video analysis completes
+ */
+async function checkAndUpdateProjectStatus(projectId) {
+  try {
+    // Get current project state
+    let project;
+    if (useMockMode || !firestore) {
+      project = mockProjects.get(projectId);
+    } else {
+      const doc = await firestore.collection('projects').doc(projectId).get();
+      if (!doc.exists) {
+        console.error('Project not found for status update:', projectId);
+        return;
+      }
+      project = doc.data();
+    }
+
+    if (!project) {
+      console.error('Project not found for status update:', projectId);
+      return;
+    }
+
+    // Check if both transcription and analysis are done (completed, failed, or skipped)
+    const transcriptionDone = ['completed', 'failed'].includes(project.transcriptionStatus);
+    const analysisDone = ['completed', 'failed', 'skipped'].includes(project.analysisStatus);
+
+    if (transcriptionDone && analysisDone) {
+      console.log(`✅ All processing complete for project ${projectId}, updating status to 'ready'`);
+
+      // Update status to 'ready'
+      if (useMockMode || !firestore) {
+        project.status = 'ready';
+        project.updatedAt = new Date();
+        mockProjects.set(projectId, project);
+      } else {
+        await firestore.collection('projects').doc(projectId).update({
+          status: 'ready',
+          updatedAt: new Date(),
+        });
+      }
+    } else {
+      console.log(`⏳ Project ${projectId} still processing - transcription: ${project.transcriptionStatus}, analysis: ${project.analysisStatus}`);
+    }
+  } catch (error) {
+    console.error('Error checking project status:', error.message);
+  }
+}
+
+/**
  * POST /api/upload-youtube
  * Download video from YouTube URL and create project
  */
@@ -143,8 +193,15 @@ router.post('/', async (req, res) => {
           projectId,
         });
         console.log('Background transcription complete for project:', projectId);
+
+        // Check if project is ready (transcription + analysis both done)
+        await checkAndUpdateProjectStatus(projectId);
       } catch (error) {
         console.error('Background transcription failed:', error.message);
+
+        // Even if transcription fails, check if we should mark project as ready
+        // (e.g., if analysis is already done or skipped)
+        await checkAndUpdateProjectStatus(projectId);
       }
     }, 10000); // 10-second delay to avoid overwhelming Gemini API immediately
 
@@ -173,7 +230,10 @@ router.post('/', async (req, res) => {
               updatedAt: new Date(),
             });
           }
-        }).catch(error => {
+
+          // Check if project is ready (transcription + analysis both done)
+          await checkAndUpdateProjectStatus(projectId);
+        }).catch(async (error) => {
           console.error('Background video analysis failed:', error);
           // Mark as failed instead of leaving as pending
           if (useMockMode || !firestore) {
@@ -184,11 +244,14 @@ router.post('/', async (req, res) => {
               mockProjects.set(projectId, existingProject);
             }
           } else {
-            firestore.collection('projects').doc(projectId).update({
+            await firestore.collection('projects').doc(projectId).update({
               analysisStatus: 'failed',
               updatedAt: new Date(),
             });
           }
+
+          // Even if analysis fails, check if we should mark project as ready
+          await checkAndUpdateProjectStatus(projectId);
         });
       }, 60000); // 60-second delay (transcription starts after 10s, so this is 50s after that)
     } else {
@@ -207,6 +270,10 @@ router.post('/', async (req, res) => {
           updatedAt: new Date(),
         });
       }
+
+      // Video analysis skipped, but project might still become ready after transcription
+      // We don't check status here since analysis was skipped synchronously,
+      // but transcription will check later
     }
 
     res.json({
