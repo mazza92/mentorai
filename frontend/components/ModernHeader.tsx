@@ -68,9 +68,15 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
   }
 
   // Check if Supabase is configured
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  const isSupabaseConfigured = supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_id'
+  // In production, environment variables are embedded at build time
+  // We need to check both at build time and runtime
+  const supabaseUrl = typeof window !== 'undefined' 
+    ? (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    : process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const supabaseAnonKey = typeof window !== 'undefined'
+    ? (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  const isSupabaseConfigured = supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_id' && !supabaseUrl.includes('placeholder')
 
   // Get user display name/email
   const userDisplayName = user?.email?.split('@')[0] || user?.user_metadata?.name || 'User'
@@ -97,6 +103,15 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
 
           {/* Right: User Menu & Mobile Menu Button */}
           <div className="flex items-center space-x-2">
+            {/* Desktop Pricing Link (always visible) */}
+            <button
+              onClick={handlePricing}
+              className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Pricing</span>
+            </button>
+
             {/* Desktop User Menu */}
             {isSupabaseConfigured && user && (
               <div className="hidden md:block relative" ref={userMenuRef}>
