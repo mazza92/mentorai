@@ -26,55 +26,27 @@ const plans: PricingPlan[] = [
     description: 'Perfect for trying out WanderMind',
     features: [
       '3 videos per month',
-      '15 questions total',
+      '15 questions per month',
       'All AI features',
       'Community support',
     ],
     icon: <Zap className="w-6 h-6" />,
   },
   {
-    name: 'Starter',
-    price: '$15',
-    priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || '',
-    description: 'Great for students and learners',
+    name: 'Pro',
+    price: '$19',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
+    description: 'For serious learners',
     features: [
-      '25 videos per month',
-      '100 questions per month',
-      'All AI features',
-      'Email support',
-    ],
-    icon: <Zap className="w-6 h-6" />,
-  },
-  {
-    name: 'Creator',
-    price: '$35',
-    priceId: process.env.NEXT_PUBLIC_STRIPE_CREATOR_PRICE_ID || '',
-    description: 'For serious learners and professionals',
-    features: [
-      '75 videos per month',
-      '300 questions per month',
+      '50 videos per month',
+      'Unlimited questions',
       'All AI features',
       'Priority support',
       'Export transcripts',
+      'Early access to new features',
     ],
     icon: <Crown className="w-6 h-6" />,
     popular: true,
-  },
-  {
-    name: 'Pro',
-    price: '$89',
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
-    description: 'For power users and educators',
-    features: [
-      '200 videos per month',
-      '1000 questions per month',
-      'All AI features',
-      'Priority support',
-      'Export transcripts',
-      'API access',
-      'White-label option',
-    ],
-    icon: <Rocket className="w-6 h-6" />,
   },
 ]
 
@@ -176,7 +148,7 @@ export default function Pricing() {
           <p className="text-lg text-slate-600">Unlock the full potential of WanderMind AI</p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {plans.map((plan) => {
             const isCurrentPlan = plan.name.toLowerCase() === currentTier.toLowerCase()
 

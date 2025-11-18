@@ -2,11 +2,11 @@ const express = require('express');
 const videoQAService = require('../services/videoQAService');
 const videoAnalysisService = require('../services/videoAnalysisService');
 const userMemoryService = require('../services/userMemoryService');
+const userService = require('../services/userService');
 const path = require('path');
 const fs = require('fs');
 const { Firestore } = require('@google-cloud/firestore');
 const { Storage } = require('@google-cloud/storage');
-const axios = require('axios');
 
 const router = express.Router();
 
@@ -88,9 +88,7 @@ router.post('/', async (req, res) => {
 
     // Check question quota before processing
     try {
-      const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
-      const quotaResponse = await axios.post(`${baseUrl}/api/user/${userId}/check-question`);
-      const { canAsk, limit, remaining, questionsThisMonth, tier } = quotaResponse.data;
+      const { canAsk, limit, remaining, questionsThisMonth, tier } = await userService.checkQuestionQuota(userId);
 
       if (!canAsk) {
         return res.status(403).json({
@@ -237,26 +235,22 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Increment question count on successful response (don't block)
+    // Increment question count on successful response
     let questionsRemaining = null;
-    const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
-    
-    axios.post(`${baseUrl}/api/user/${userId}/increment-question`)
-      .then(response => {
-        console.log(`Question count incremented for user ${userId}`);
-      })
-      .catch(error => {
-        console.error('Error incrementing question count:', error.message);
-        console.error('Error details:', error.response?.data || error.code);
-      });
+
+    try {
+      await userService.incrementQuestionCount(userId);
+      console.log(`Question count incremented for user ${userId}`);
+    } catch (error) {
+      console.error('Error incrementing question count:', error.message);
+    }
 
     // Get remaining questions for response
     try {
-      const quotaResponse = await axios.post(`${baseUrl}/api/user/${userId}/check-question`);
-      questionsRemaining = quotaResponse.data.remaining;
-    } catch (err) {
-      console.error('Error fetching remaining questions:', err.message);
-      console.error('Error details:', err.response?.data || err.code);
+      const remainingInfo = await userService.getRemainingQuestions(userId);
+      questionsRemaining = remainingInfo.remaining;
+    } catch (error) {
+      console.error('Error fetching remaining questions:', error.message);
     }
 
     res.json({
