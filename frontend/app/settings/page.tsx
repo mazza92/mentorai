@@ -65,7 +65,7 @@ export default function SettingsPage() {
     )
   }
 
-  const isCreator = subscriptionStatus?.tier === 'creator' || subscriptionStatus?.hasActiveSubscription
+  const isPro = subscriptionStatus?.tier === 'pro' || subscriptionStatus?.hasActiveSubscription
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -107,10 +107,10 @@ export default function SettingsPage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900 mb-2">Subscription</h2>
                   <div className="flex items-center space-x-2">
-                    {isCreator ? (
+                    {isPro ? (
                       <>
                         <Crown className="w-5 h-5 text-yellow-500" />
-                        <span className="text-slate-700">Creator Tier</span>
+                        <span className="text-slate-700">Pro Tier</span>
                       </>
                     ) : (
                       <>
@@ -120,7 +120,7 @@ export default function SettingsPage() {
                     )}
                   </div>
                 </div>
-                {isCreator ? (
+                {isPro ? (
                   <button
                     onClick={handleManageSubscription}
                     disabled={portalLoading}
@@ -140,7 +140,7 @@ export default function SettingsPage() {
                     onClick={() => router.push('/pricing')}
                     className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all"
                   >
-                    Upgrade to Creator
+                    Upgrade to Pro
                   </button>
                 )}
               </div>
