@@ -12,9 +12,35 @@ let useMockMode = false;
 
 try {
   if (process.env.GOOGLE_CLOUD_PROJECT_ID && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'your_project_id') {
-    firestore = new Firestore({
+    const firestoreConfig = {
+
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-    });
+
+    };
+
+
+    // Handle credentials from Railway environment variable
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+
+      try {
+
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+
+        firestoreConfig.credentials = credentials;
+
+      } catch (error) {
+
+        console.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON');
+
+        throw error;
+
+      }
+
+    }
+
+
+    firestore = new Firestore(firestoreConfig);
   } else {
     useMockMode = true;
     console.log('Using mock project storage for development');
