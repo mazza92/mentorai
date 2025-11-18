@@ -41,14 +41,21 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
     setError(null)
     setUploading(true)
     setProcessingStage('Downloading video from YouTube...')
+    
+    // Mark that we're uploading to prevent restoring old project
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('isUploadingVideo', 'true')
+    }
 
     try {
       const apiUrl = getApiUrl()
 
-      // Start YouTube download
+      // Start YouTube download with extended timeout (20 minutes for long videos)
       const response = await axios.post(`${apiUrl}/api/upload-youtube`, {
         youtubeUrl,
         userId,
+      }, {
+        timeout: 20 * 60 * 1000, // 20 minutes timeout
       })
 
       if (response.data.success) {
@@ -56,6 +63,11 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
 
         setUploaded(true)
         setProcessingStage('Video ready! Processing in background...')
+        
+        // Clear upload flag
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('isUploadingVideo')
+        }
 
         // Navigate to Q&A interface immediately (transcription auto-started by backend)
         setTimeout(() => {
@@ -64,6 +76,11 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
       }
     } catch (err: any) {
       console.error('YouTube upload error:', err)
+      
+      // Clear upload flag on error
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('isUploadingVideo')
+      }
 
       // Handle quota exceeded error
       if (err.response?.status === 403 && err.response?.data?.upgradeRequired) {
@@ -73,6 +90,9 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
         })
         setShowUpgradeModal(true)
         setError(err.response.data.message || 'Video limit reached')
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        // Timeout error - the download might still be processing
+        setError('Download is taking longer than expected. The video may still be processing. Please wait a few minutes and check your conversations.')
       } else {
         setError(err.response?.data?.error || err.response?.data?.details || 'Failed to download YouTube video. Please check the URL and try again.')
       }
