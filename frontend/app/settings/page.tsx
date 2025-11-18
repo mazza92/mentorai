@@ -57,6 +57,8 @@ export default function SettingsPage() {
     }
   }
 
+  const isCreator = subscriptionStatus?.tier === 'creator' || subscriptionStatus?.hasActiveSubscription
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
@@ -64,8 +66,6 @@ export default function SettingsPage() {
       </div>
     )
   }
-
-  const isCreator = subscriptionStatus?.tier === 'creator' || subscriptionStatus?.hasActiveSubscription
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
