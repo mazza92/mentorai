@@ -27,14 +27,19 @@ let useGemini = false;
 
 // Check environment configuration flags (USE_OPENAI_WHISPER, USE_GEMINI)
 const useOpenAIFlag = process.env.USE_OPENAI_WHISPER !== 'false'; // Default to true if not set
-const useGeminiFlag = process.env.USE_GEMINI === 'true'; // Default to false if not set
+// Enable Gemini transcription by default if GEMINI_API_KEY is available (since it's used for Q&A anyway)
+const useGeminiFlag = process.env.USE_GEMINI !== 'false'; // Default to true if GEMINI_API_KEY exists
 
-// Initialize Gemini if API key is available and enabled
-if (process.env.GEMINI_API_KEY && useGeminiFlag) {
+// Initialize Gemini if API key is available
+if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
   try {
     geminiAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    useGemini = true;
-    console.log('✅ Gemini API enabled for transcription');
+    if (useGeminiFlag) {
+      useGemini = true;
+      console.log('✅ Gemini API enabled for transcription');
+    } else {
+      console.log('ℹ️  Gemini API key found but transcription disabled (set USE_GEMINI=false to disable)');
+    }
   } catch (error) {
     console.error('❌ Gemini initialization failed:', error.message);
   }
@@ -48,17 +53,19 @@ try {
     firestore = new Firestore({
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
     });
+    console.log('✅ Google Cloud Speech-to-Text enabled for transcription');
   } else if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' && useOpenAIFlag) {
     openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
     useOpenAI = true;
     console.log('✅ OpenAI Whisper enabled for transcription');
-  } else if (useGemini) {
+  } else if (useGemini && geminiAI) {
     console.log('✅ Using Gemini-only mode for transcription');
   } else {
     useMockMode = true;
     console.log('⚠️  No transcription service configured, using mock transcription for development');
+    console.log('⚠️  To enable transcription, set one of: OPENAI_API_KEY, GEMINI_API_KEY, or GOOGLE_CLOUD_PROJECT_ID');
   }
 } catch (error) {
   if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' && useOpenAIFlag) {
@@ -67,11 +74,12 @@ try {
     });
     useOpenAI = true;
     console.log('⚠️  Google Cloud initialization failed, using OpenAI Whisper for transcription');
-  } else if (useGemini) {
+  } else if (useGemini && geminiAI) {
     console.log('⚠️  Google Cloud initialization failed, using Gemini for transcription');
   } else {
     useMockMode = true;
     console.log('⚠️  Google Cloud initialization failed, using mock transcription for development');
+    console.log('⚠️  To enable transcription, set one of: OPENAI_API_KEY, GEMINI_API_KEY, or GOOGLE_CLOUD_PROJECT_ID');
   }
 }
 
@@ -328,8 +336,8 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Use Gemini if configured and OpenAI is not available
-    if (!useOpenAI && useGemini && geminiAI) {
+    // Use Gemini if configured (either as primary or fallback)
+    if (useGemini && geminiAI) {
       // Get project from mock storage
       project = mockProjects.get(projectId);
       if (!project) {
