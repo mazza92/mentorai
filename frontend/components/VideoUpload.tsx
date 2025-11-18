@@ -4,6 +4,7 @@ import { useState } from 'react'
 import axios from 'axios'
 import { Youtube, Video, Loader2, CheckCircle, Link2 } from 'lucide-react'
 import UpgradeModal from './UpgradeModal'
+import { getApiUrl } from '@/lib/apiUrl'
 
 interface VideoUploadProps {
   userId: string
@@ -42,7 +43,7 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
     setProcessingStage('Downloading video from YouTube...')
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = getApiUrl()
 
       // Start YouTube download
       const response = await axios.post(`${apiUrl}/api/upload-youtube`, {
@@ -84,7 +85,7 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
   const startTranscription = async (projectId: string) => {
     try {
       setProcessingStage('Transcribing video (this may take several minutes)...')
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const apiUrl = getApiUrl()
       await axios.post(`${apiUrl}/api/transcribe`, {
         projectId,
       })

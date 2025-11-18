@@ -49,7 +49,8 @@ router.post('/', async (req, res) => {
 
     // Check video quota before processing
     try {
-      const quotaResponse = await axios.post(`http://localhost:3001/api/user/${userId}/check-video`);
+      const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+      const quotaResponse = await axios.post(`${baseUrl}/api/user/${userId}/check-video`);
       const { canProcess, limit, remaining, videosThisMonth } = quotaResponse.data;
 
       if (!canProcess) {
@@ -109,7 +110,8 @@ router.post('/', async (req, res) => {
     }
 
     // Increment video count for user (don't block response)
-    axios.post(`http://localhost:3001/api/user/${userId}/increment-video`)
+    const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+    axios.post(`${baseUrl}/api/user/${userId}/increment-video`)
       .then(response => {
         console.log(`Video count incremented for user ${userId}:`, response.data.videosThisMonth);
       })
@@ -121,7 +123,8 @@ router.post('/', async (req, res) => {
     console.log('Starting background transcription...');
     setTimeout(async () => {
       try {
-        await axios.post('http://localhost:3001/api/transcribe', {
+        const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+        await axios.post(`${baseUrl}/api/transcribe`, {
           projectId,
         });
         console.log('Background transcription complete for project:', projectId);
