@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react'
 import { Check, Zap, Crown, Rocket, Loader2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import axios from 'axios'
-import { loadStripe } from '@stripe/stripe-js'
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
 interface PricingPlan {
   name: string
@@ -95,15 +92,13 @@ export default function Pricing() {
         priceId: priceId,
       })
 
-      const stripe = await stripePromise
-      if (stripe && response.data.sessionId) {
-        // @ts-ignore - Stripe types may be outdated
-        await stripe.redirectToCheckout({ sessionId: response.data.sessionId })
+      // Redirect directly to Stripe Checkout URL (modern approach)
+      if (response.data.url) {
+        window.location.href = response.data.url
       }
     } catch (error: any) {
       console.error('Error creating checkout session:', error)
       alert(error.response?.data?.error || 'Failed to start checkout. Please try again.')
-    } finally {
       setCheckoutLoading(null)
     }
   }
