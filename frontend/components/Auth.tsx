@@ -1,17 +1,26 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2, Mail, Lock, LogIn, UserPlus, Chrome } from 'lucide-react'
 
 export default function Auth() {
-  const { signIn, signUp, signInWithGoogle } = useAuth()
+  const { user, signIn, signUp, signInWithGoogle, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Redirect to home if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/')
+    }
+  }, [user, authLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,8 +51,20 @@ export default function Auth() {
 
         if (result.error) {
           setError(result.error.message)
+        } else if (result.data?.session) {
+          // Sign-in successful - redirect immediately
+          setSuccess('Signing you in...')
+          // Small delay to show success message, then redirect
+          setTimeout(() => {
+            router.push('/')
+          }, 300)
+        } else {
+          // No error but no session - wait a bit for auth state to sync
+          setSuccess('Signing you in...')
+          setTimeout(() => {
+            router.push('/')
+          }, 1000)
         }
-        // If signin successful, AuthContext will handle navigation
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred. Please try again.')
