@@ -262,7 +262,7 @@ router.get('/status/:userId', async (req, res) => {
         if (subscriptions.data.length > 0) {
           const subscription = subscriptions.data[0];
           return res.json({
-            tier: 'creator',
+            tier: 'pro',
             subscription: {
               id: subscription.id,
               status: subscription.status,
@@ -326,22 +326,22 @@ const webhookHandler = async (req, res) => {
         const userId = session.metadata?.userId;
 
         if (userId) {
-          // Update user tier to creator
+          // Update user tier to pro
           if (useMockMode || !firestore) {
             const user = mockUsers.get(userId) || { userId, tier: 'free' };
-            user.tier = 'creator';
+            user.tier = 'pro';
             user.stripeCustomerId = session.customer;
             user.subscriptionId = session.subscription;
             mockUsers.set(userId, user);
           } else {
             await firestore.collection('users').doc(userId).update({
-              tier: 'creator',
+              tier: 'pro',
               stripeCustomerId: session.customer,
               subscriptionId: session.subscription,
               updatedAt: new Date(),
             });
           }
-          console.log(`User ${userId} upgraded to creator tier`);
+          console.log(`User ${userId} upgraded to pro tier`);
         }
         break;
       }
@@ -357,7 +357,7 @@ const webhookHandler = async (req, res) => {
           for (const [userId, user] of mockUsers.entries()) {
             if (user.stripeCustomerId === customerId) {
               if (subscription.status === 'active') {
-                user.tier = 'creator';
+                user.tier = 'pro';
                 user.subscriptionId = subscription.id;
               } else {
                 user.tier = 'free';
@@ -380,7 +380,7 @@ const webhookHandler = async (req, res) => {
             };
 
             if (subscription.status === 'active') {
-              updateData.tier = 'creator';
+              updateData.tier = 'pro';
             } else {
               updateData.tier = 'free';
             }

@@ -1,12 +1,12 @@
 /**
  * WanderCut Pricing Tiers Configuration
- * Solution 3: Usage-Based Pricing with Credit System
+ * Simplified 2-Tier Pricing for Better Conversion
  *
  * Cost Analysis (Gemini-only):
  * - Video processing: ~$0.09 per video (transcription + analysis)
  * - Question: ~$0.015 per question (with optimizations)
  *
- * Target: 75-85% profit margin
+ * Target: 60-75% profit margin
  */
 
 const PRICING_TIERS = {
@@ -21,7 +21,7 @@ const PRICING_TIERS = {
       videoQuality: '720p',
       features: [
         '3 videos per month',
-        '15 questions total',
+        '15 questions per month',
         'All AI features',
         'Community support'
       ]
@@ -31,78 +31,36 @@ const PRICING_TIERS = {
     margin: -100 // Acquisition cost
   },
 
-  starter: {
-    id: 'starter',
-    name: 'Starter',
-    price: 15,
-    priceId: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter',
-    features: {
-      videosPerMonth: 25,
-      questionsPerMonth: 100,
-      videoQuality: '1080p',
-      features: [
-        '25 videos per month',
-        '100 questions per month',
-        'All AI features',
-        'Email support'
-      ]
-    },
-    // Cost: 25 × $0.09 + 100 × $0.015 = $2.25 + $1.50 = $3.75
-    estimatedCost: 3.75,
-    margin: 75 // (15 - 3.75) / 15 = 75%
-  },
-
-  creator: {
-    id: 'creator',
-    name: 'Creator',
-    price: 35,
-    priceId: process.env.STRIPE_CREATOR_PRICE_ID || 'price_creator',
-    popular: true,
-    features: {
-      videosPerMonth: 75,
-      questionsPerMonth: 300,
-      videoQuality: '4K',
-      features: [
-        '75 videos per month',
-        '300 questions per month',
-        'All AI features',
-        'Priority support',
-        'Export transcripts'
-      ]
-    },
-    // Cost: 75 × $0.09 + 300 × $0.015 = $6.75 + $4.50 = $11.25
-    estimatedCost: 11.25,
-    margin: 68 // (35 - 11.25) / 35 = 68%
-  },
-
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 89,
+    price: 19,
     priceId: process.env.STRIPE_PRO_PRICE_ID || 'price_pro',
+    popular: true,
     features: {
-      videosPerMonth: 200,
-      questionsPerMonth: 1000,
-      videoQuality: '4K',
+      videosPerMonth: 50,
+      questionsPerMonth: 10000, // Effectively unlimited
+      videoQuality: '1080p',
       features: [
-        '200 videos per month',
-        '1000 questions per month',
+        '50 videos per month',
+        'Unlimited questions',
         'All AI features',
         'Priority support',
         'Export transcripts',
-        'API access',
-        'White-label option'
+        'Early access to new features'
       ]
     },
-    // Cost: 200 × $0.09 + 1000 × $0.015 = $18.00 + $15.00 = $33.00
-    estimatedCost: 33.00,
-    margin: 63 // (89 - 33) / 89 = 63%
+    // Estimated cost: 50 videos × $0.09 + avg 200 questions × $0.015 = $4.50 + $3.00 = $7.50
+    // Conservative estimate with higher usage: 50 videos + 500 questions = $4.50 + $7.50 = $12.00
+    estimatedCost: 7.50,
+    estimatedCostHeavyUser: 12.00,
+    margin: 61 // (19 - 7.50) / 19 = 61%
   }
 };
 
 /**
  * Get tier configuration by tier ID
- * @param {string} tierId - Tier ID (free, starter, creator, pro)
+ * @param {string} tierId - Tier ID (free, pro)
  * @returns {object} Tier configuration
  */
 function getTierConfig(tierId) {
