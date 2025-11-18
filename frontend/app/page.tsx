@@ -45,9 +45,16 @@ export default function Home() {
           localStorage.setItem('currentProject', projectParam)
           return // Exit early - URL param takes priority
         }
+        
+        // Check if we're in the middle of uploading (don't restore old project)
+        const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
+        if (isUploading) {
+          // Don't restore old project if upload is in progress
+          return
+        }
       }
       
-      // Fallback: Restore current project from localStorage (only if no URL param)
+      // Fallback: Restore current project from localStorage (only if no URL param and not uploading)
       // Only set if currentProject is null (initial load)
       if (!currentProject) {
         const storedProject = localStorage.getItem('currentProject')
@@ -80,9 +87,16 @@ export default function Home() {
           localStorage.setItem(`currentProject_${user.id}`, projectParam)
           return // Exit early - URL param takes priority
         }
+        
+        // Check if we're in the middle of uploading (don't restore old project)
+        const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
+        if (isUploading) {
+          // Don't restore old project if upload is in progress
+          return
+        }
       }
 
-      // Fallback: Restore current project from localStorage (only if no URL param)
+      // Fallback: Restore current project from localStorage (only if no URL param and not uploading)
       // Only set if currentProject is null (initial load)
       if (!currentProject) {
         const storedProject = localStorage.getItem(`currentProject_${user.id}`)
