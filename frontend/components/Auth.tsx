@@ -11,20 +11,37 @@ export default function Auth() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
     setLoading(true)
 
     try {
-      const result = isSignUp ? await signUp(email, password) : await signIn(email, password)
-      
-      if (result.error) {
-        setError(result.error.message)
+      if (isSignUp) {
+        const result = await signUp(email, password)
+
+        if (result.error) {
+          setError(result.error.message)
+        } else {
+          // Signup successful - show success message
+          setSuccess('Success! Check your email to confirm your account. Make sure to check your spam folder.')
+          setEmail('')
+          setPassword('')
+        }
+      } else {
+        const result = await signIn(email, password)
+
+        if (result.error) {
+          setError(result.error.message)
+        }
+        // If signin successful, AuthContext will handle navigation
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred')
+      setError(err.message || 'An error occurred. Please try again.')
+      console.error('Auth error:', err)
     } finally {
       setLoading(false)
     }
@@ -53,6 +70,12 @@ export default function Auth() {
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            {success}
           </div>
         )}
 
@@ -138,6 +161,7 @@ export default function Auth() {
             onClick={() => {
               setIsSignUp(!isSignUp)
               setError(null)
+              setSuccess(null)
             }}
             className="text-blue-600 hover:text-blue-700 font-medium text-sm"
           >
