@@ -434,10 +434,50 @@ class VideoQAService {
   }
 
   /**
+   * Detect language from transcript or user question
+   */
+  detectLanguage(transcript, userQuestion) {
+    // Check if language is explicitly provided
+    if (transcript && transcript.language) {
+      return transcript.language;
+    }
+
+    // Simple language detection based on common French words/patterns
+    const textToAnalyze = (transcript?.text || userQuestion || '').toLowerCase();
+    
+    // French indicators
+    const frenchIndicators = [
+      /\b(le|la|les|un|une|des|de|du|dans|sur|avec|pour|par|est|sont|être|avoir|faire|aller|venir|voir|savoir|pouvoir|vouloir|devoir|il|elle|nous|vous|ils|elles|ce|que|qui|quoi|comment|pourquoi|où|quand|combien)\b/gi,
+      /\b(et|ou|mais|donc|car|parce|que|si|alors|mais|cependant|toutefois|ainsi|aussi|même|très|plus|moins|beaucoup|peu|tout|tous|toutes|chaque|aucun|aucune|rien|personne)\b/gi,
+      /\b(je|tu|il|elle|nous|vous|ils|elles|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|votre|leur|leurs)\b/gi
+    ];
+
+    let frenchScore = 0;
+    frenchIndicators.forEach(pattern => {
+      const matches = textToAnalyze.match(pattern);
+      if (matches) {
+        frenchScore += matches.length;
+      }
+    });
+
+    // If we find significant French indicators, return 'fr'
+    if (frenchScore > 5 || (textToAnalyze.length < 100 && frenchScore > 2)) {
+      return 'fr';
+    }
+
+    // Default to English
+    return 'en';
+  }
+
+  /**
    * Answer a question about the video using Gemini
    */
-  async answerQuestion(userQuestion, videoAnalysis, transcript, chatHistory = null, personalizedContext = '') {
+  async answerQuestion(userQuestion, videoAnalysis, transcript, chatHistory = null, personalizedContext = '', userLanguage = null) {
     this.ensureInitialized();
+
+    // Detect language from transcript, user question, or use provided language
+    const detectedLanguage = userLanguage || this.detectLanguage(transcript, userQuestion);
+    console.log('Detected language for Q&A:', detectedLanguage);
 
     // Build context from video analysis
     const videoContext = this.buildVideoContext(videoAnalysis, transcript);
@@ -446,8 +486,12 @@ class VideoQAService {
     const chatHistoryContext = this.buildChatHistoryContext(chatHistory);
 
     if (!videoContext.trim()) {
+      const errorMessage = detectedLanguage === 'fr' 
+        ? 'J\'ai besoin des données d\'analyse vidéo pour répondre aux questions. Veuillez d\'abord analyser la vidéo.'
+        : 'I need video analysis data to answer questions. Please analyze the video first.';
+      
       return {
-        answer: 'I need video analysis data to answer questions. Please analyze the video first.',
+        answer: errorMessage,
         citations: [],
         visualContext: {},
         insights: null
@@ -457,13 +501,28 @@ class VideoQAService {
     // Use Gemini API if available
     if (this.model) {
       try {
+        // Build language-specific system instruction
+        const isFrench = detectedLanguage === 'fr';
+        const languageInstruction = isFrench ? `
+IMPORTANT - RÉPONDEZ EN FRANÇAIS:
+- Répondez toujours en français naturel et conversationnel
+- Utilisez le vouvoiement (vous) pour être poli
+- Adaptez votre style à la langue française
+- Utilisez la ponctuation française correcte (espaces avant : ; ! ?)
+- Les exemples et citations doivent être en français` : `
+IMPORTANT - RESPOND IN ENGLISH:
+- Always respond in natural, conversational English
+- Use a friendly, helpful tone
+- Adapt your style to English conventions`;
+
         const systemInstruction = `You are a helpful expert who has internalized all the content from this video. Your goal is to help people understand and apply what they learned in a natural, conversational way.
+${languageInstruction}
 
 CORE PRINCIPLES:
 - Teach the knowledge directly and naturally
 - Be concise and conversational - like explaining to a friend
 - Don't reference "the video" or say "I show you..." - just teach the concepts
-- Make your answer actually MORE useful than watching the video by being clear and actionable${chatHistoryContext ? '\n\n(This is a follow-up question - build on what we discussed before.)' : ''}
+- Make your answer actually MORE useful than watching the video by being clear and actionable${chatHistoryContext ? (isFrench ? '\n\n(C\'est une question de suivi - développez ce dont nous avons discuté précédemment.)' : '\n\n(This is a follow-up question - build on what we discussed before.)') : ''}
 
 RESPONSE STYLE:
 
@@ -566,9 +625,13 @@ ${personalizedContext ? '\n---\n' + personalizedContext + '\n' : ''}
 
 You are an expert teacher sharing knowledge, NOT someone describing a video.
 
-Be clear, helpful, and conversational.${chatHistoryContext ? '\n\nContinue the conversation naturally, building on previous explanations.' : ''}`;
+Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nContinuez la conversation naturellement, en développant les explications précédentes.' : '\n\nContinue the conversation naturally, building on previous explanations.') : ''}`;
 
-        const prompt = `${systemInstruction}\n\nQUESTION: ${userQuestion}\n\nAnswer naturally and conversationally. Start with a clear, direct answer to the question.`;
+        const promptInstruction = isFrench 
+          ? 'Répondez naturellement et de manière conversationnelle. Commencez par une réponse claire et directe à la question.'
+          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question.';
+        
+        const prompt = `${systemInstruction}\n\nQUESTION: ${userQuestion}\n\n${promptInstruction}`;
 
         console.log('Sending Q&A query to Gemini...');
         
@@ -670,9 +733,17 @@ Be clear, helpful, and conversational.${chatHistoryContext ? '\n\nContinue the c
         
         // Check if it's a 503 error (service overloaded) after all retries
         if (error.message && error.message.includes('503')) {
+          const errorMsg = detectedLanguage === 'fr'
+            ? '⚠️ **Service temporairement indisponible**\n\nLe service IA est actuellement surchargé. Veuillez réessayer dans quelques instants.\n\nSi cela persiste, le service peut connaître une forte demande.'
+            : '⚠️ **Service Temporarily Unavailable**\n\nThe AI service is currently overloaded. Please try again in a few moments.\n\nIf this persists, the service may be experiencing high demand.';
+          
+          const errorHtml = detectedLanguage === 'fr'
+            ? '<p><strong>⚠️ Service temporairement indisponible</strong></p><p>Le service IA est actuellement surchargé. Veuillez réessayer dans quelques instants.</p><p>Si cela persiste, le service peut connaître une forte demande.</p>'
+            : '<p><strong>⚠️ Service Temporarily Unavailable</strong></p><p>The AI service is currently overloaded. Please try again in a few moments.</p><p>If this persists, the service may be experiencing high demand.</p>';
+          
           return {
-            answer: '⚠️ **Service Temporarily Unavailable**\n\nThe AI service is currently overloaded. Please try again in a few moments.\n\nIf this persists, the service may be experiencing high demand.',
-            answerHtml: '<p><strong>⚠️ Service Temporarily Unavailable</strong></p><p>The AI service is currently overloaded. Please try again in a few moments.</p><p>If this persists, the service may be experiencing high demand.</p>',
+            answer: errorMsg,
+            answerHtml: errorHtml,
             citations: [],
             visualContext: {},
             insights: {
@@ -688,9 +759,17 @@ Be clear, helpful, and conversational.${chatHistoryContext ? '\n\nContinue the c
         }
         
         // For other errors, return a user-friendly error message
+        const errorMsg = detectedLanguage === 'fr'
+          ? `❌ **Impossible de traiter la demande**\n\nUne erreur s'est produite lors du traitement de votre question. Veuillez réessayer.\n\n**Détails de l'erreur :** ${error.message || 'Erreur inconnue'}`
+          : `❌ **Unable to Process Request**\n\nWe encountered an error while processing your question. Please try again.\n\n**Error details:** ${error.message || 'Unknown error'}`;
+        
+        const errorHtml = detectedLanguage === 'fr'
+          ? `<p><strong>❌ Impossible de traiter la demande</strong></p><p>Une erreur s'est produite lors du traitement de votre question. Veuillez réessayer.</p><p><strong>Détails de l'erreur :</strong> ${error.message || 'Erreur inconnue'}</p>`
+          : `<p><strong>❌ Unable to Process Request</strong></p><p>We encountered an error while processing your question. Please try again.</p><p><strong>Error details:</strong> ${error.message || 'Unknown error'}</p>`;
+        
         return {
-          answer: `❌ **Unable to Process Request**\n\nWe encountered an error while processing your question. Please try again.\n\n**Error details:** ${error.message || 'Unknown error'}`,
-          answerHtml: `<p><strong>❌ Unable to Process Request</strong></p><p>We encountered an error while processing your question. Please try again.</p><p><strong>Error details:</strong> ${error.message || 'Unknown error'}</p>`,
+          answer: errorMsg,
+          answerHtml: errorHtml,
           citations: [],
           visualContext: {},
           insights: {
