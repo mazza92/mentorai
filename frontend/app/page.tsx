@@ -197,7 +197,7 @@ export default function Home() {
   // If no project, show upload screen
   if (!currentProject) {
     return (
-      <div className="h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col overflow-hidden">
+      <div className="h-screen bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 flex flex-col overflow-hidden">
         <ModernHeader 
           onNewProject={handleNewProject}
           userId={userId}
@@ -207,7 +207,7 @@ export default function Home() {
         
         <div className="flex flex-1 overflow-hidden">
           {/* Desktop: Show conversation history sidebar */}
-          <div className="hidden lg:block w-64 flex-shrink-0 border-r border-slate-200/60 bg-white h-full">
+          <div className="hidden lg:block w-64 flex-shrink-0 h-full">
             <ConversationHistory
               userId={userId}
               currentConversationId={null}
@@ -217,21 +217,23 @@ export default function Home() {
             />
           </div>
           
-          <main className="flex-1 container mx-auto px-4 py-12 max-w-4xl overflow-y-auto">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-500 mb-6">
-                <Zap className="w-8 h-8 text-white" />
+          <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+            <div className="container mx-auto px-6 py-16 max-w-3xl">
+              <div className="text-center mb-16">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-500 mb-8 shadow-lg shadow-blue-500/20">
+                  <Zap className="w-10 h-10 text-white" />
+                </div>
+                <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent mb-5">
+                  WanderMind
+                </h1>
+                <p className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                  Turn video content into searchable knowledge. Ask questions and get instant answers with timestamp citations.
+                </p>
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-                WanderMind
-              </h1>
-              <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto">
-                Turn video content into searchable knowledge. Ask questions and get instant answers with timestamp citations.
-              </p>
-            </div>
-            
-            <div className="bg-white rounded-xl p-6 md:p-8 border border-slate-200 shadow-sm">
-              <VideoUpload userId={userId} onUploadComplete={handleProjectCreated} />
+              
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 md:p-10 border border-slate-200/60 shadow-xl shadow-slate-200/50">
+                <VideoUpload userId={userId} onUploadComplete={handleProjectCreated} />
+              </div>
             </div>
           </main>
         </div>
@@ -241,7 +243,7 @@ export default function Home() {
 
   // If project exists, show the split-panel Q&A interface
   return (
-    <div className="h-screen bg-gradient-to-br from-white to-slate-50 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/20 flex flex-col">
       <ModernHeader 
         onNewProject={handleNewProject}
         userId={userId}

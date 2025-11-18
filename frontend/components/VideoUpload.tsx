@@ -98,49 +98,40 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
   }
 
   return (
-    <div className="bg-transparent p-8 max-w-2xl mx-auto">
+    <div className="bg-transparent max-w-2xl mx-auto">
       <div className="text-center">
-        <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
-            <Youtube className="w-10 h-10 text-white" />
-          </div>
-        </div>
-
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
-          Upload YouTube Video
-        </h2>
-        <p className="text-slate-600 mb-8">
-          Paste a YouTube URL and ask questions about the video content
-        </p>
-
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          <div className="mb-6 p-4 bg-red-50/80 border border-red-200/60 rounded-xl text-red-700 text-sm backdrop-blur-sm">
             {error}
           </div>
         )}
 
         {uploaded ? (
-          <div className="space-y-4">
+          <div className="space-y-6 py-8">
             <div className="flex justify-center">
-              <CheckCircle className="w-16 h-16 text-green-500" />
+              <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle className="w-12 h-12 text-green-600" />
+              </div>
             </div>
-            <p className="text-lg font-medium text-slate-900">
-              Video processed successfully!
-            </p>
-            <p className="text-sm text-slate-600">
-              {processingStage || 'Ready to answer your questions...'}
-            </p>
+            <div>
+              <p className="text-xl font-semibold text-slate-900 mb-2">
+                Video processed successfully!
+              </p>
+              <p className="text-sm text-slate-600">
+                {processingStage || 'Ready to answer your questions...'}
+              </p>
+            </div>
           </div>
         ) : (
-          <form onSubmit={handleYouTubeSubmit} className="space-y-4">
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 hover:border-blue-400 transition-colors bg-slate-50/50">
+          <form onSubmit={handleYouTubeSubmit} className="space-y-6">
+            <div className="border border-slate-200/80 rounded-2xl p-8 hover:border-slate-300/80 transition-all bg-white/50 backdrop-blur-sm">
               {uploading ? (
-                <div className="space-y-4">
+                <div className="space-y-5 py-4">
                   <div className="flex justify-center">
                     <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-base font-medium text-slate-800">
                       {processingStage}
                     </p>
                     <p className="text-xs text-slate-500">
@@ -149,13 +140,15 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="text-center mb-4">
-                    <Link2 className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-                    <p className="text-lg font-medium text-slate-900 mb-1">
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-purple-50 mb-4">
+                      <Link2 className="w-8 h-8 text-blue-500" />
+                    </div>
+                    <p className="text-xl font-semibold text-slate-900 mb-2">
                       Enter YouTube URL
                     </p>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-slate-500">
                       Works with videos up to 3 hours long
                     </p>
                   </div>
@@ -166,7 +159,7 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
                       placeholder="https://www.youtube.com/watch?v=..."
-                      className="w-full px-4 py-3 bg-white border border-slate-300 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none placeholder-slate-400"
+                      className="w-full px-5 py-4 bg-white/80 border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 outline-none placeholder-slate-400 transition-all shadow-sm hover:shadow-md"
                       disabled={uploading}
                     />
                   </div>
@@ -174,12 +167,19 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
                   <button
                     type="submit"
                     disabled={uploading || !youtubeUrl.trim()}
-                    className="w-full bg-white border-2 border-blue-500 text-blue-600 py-3 px-6 rounded-lg font-semibold hover:bg-blue-50 hover:border-blue-600 hover:text-blue-700 disabled:bg-slate-100 disabled:border-slate-300 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors shadow-sm hover:shadow-md"
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    Process Video
+                    {uploading ? (
+                      <span className="flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        Processing...
+                      </span>
+                    ) : (
+                      'Process Video'
+                    )}
                   </button>
 
-                  <div className="text-xs text-slate-500 text-center">
+                  <div className="text-xs text-slate-400 text-center pt-2">
                     Example: Paste a link to an educational video, tutorial, or any YouTube content
                   </div>
                 </div>
