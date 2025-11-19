@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, CheckCircle, Clock, Sparkles } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface ProcessingStage {
   id: string
@@ -25,6 +26,7 @@ export default function ProcessingProgress({
   loadingTopics,
   videoDuration = 0
 }: ProcessingProgressProps) {
+  const { t } = useTranslation('common')
   const [elapsedTime, setElapsedTime] = useState(0)
 
   // Calculate estimated times based on video duration
@@ -36,40 +38,43 @@ export default function ProcessingProgress({
   const stages: ProcessingStage[] = [
     {
       id: 'download',
-      name: 'Downloading Video',
-      description: 'Fetching video from YouTube...',
+      name: t('processing.stages.download_title'),
+      description: t('processing.stages.download_description'),
       completed: !!project.localAudioPath || !!project.transcript,
       inProgress: !project.localAudioPath && !project.transcript,
       estimatedSeconds: 60
     },
     {
       id: 'audio',
-      name: 'Extracting Audio',
-      description: 'Converting video to audio format...',
+      name: t('processing.stages.audio_title'),
+      description: t('processing.stages.audio_description'),
       completed: !!project.localAudioPath || !!project.transcript,
       inProgress: !!project.localAudioPath && !project.transcript,
       estimatedSeconds: 50
     },
     {
       id: 'transcription',
-      name: 'Transcribing Audio',
-      description: `Ultra-fast AI transcription (${estimatedTranscriptionTime}s for ${Math.round(durationMinutes)}min video)`,
+      name: t('processing.stages.transcription_title'),
+      description: t('processing.stages.transcription_description', {
+        seconds: estimatedTranscriptionTime,
+        minutes: Math.round(durationMinutes)
+      }),
       completed: !!project.transcript,
       inProgress: !!project.localAudioPath && !project.transcript,
       estimatedSeconds: estimatedTranscriptionTime
     },
     {
       id: 'analysis',
-      name: 'Video Analysis',
-      description: 'Analyzing video content...',
+      name: t('processing.stages.analysis_title'),
+      description: t('processing.stages.analysis_description'),
       completed: !!project.videoAnalysis || project.analysisStatus === 'completed',
       inProgress: !!project.transcript && !project.videoAnalysis && (!project.duration || project.duration <= 1800),
       estimatedSeconds: 15
     },
     {
       id: 'toc',
-      name: 'Table of Contents',
-      description: 'Generating chapter markers...',
+      name: t('processing.stages.toc_title'),
+      description: t('processing.stages.toc_description'),
       completed: !loadingTopics && topics.length > 0,
       inProgress: loadingTopics,
       estimatedSeconds: estimatedTOCTime
@@ -124,7 +129,7 @@ export default function ProcessingProgress({
               </div>
             </div>
             <h3 className="text-2xl font-bold text-slate-900 mb-2">
-              Processing Your Video
+              {t('processing.header')}
             </h3>
             <p className="text-sm text-slate-600 text-center">
               {currentStage.description}
@@ -134,7 +139,7 @@ export default function ProcessingProgress({
           {/* Progress Bar */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-600 font-medium">Progress</span>
+              <span className="text-slate-600 font-medium">{t('processing.progress')}</span>
               <span className="text-slate-900 font-bold">{progressPercent}%</span>
             </div>
             <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner">
@@ -198,7 +203,7 @@ export default function ProcessingProgress({
           <div className="flex items-center justify-between px-4 py-3 bg-slate-100 rounded-lg">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-slate-600" />
-              <span className="text-xs text-slate-600">Elapsed Time</span>
+              <span className="text-xs text-slate-600">{t('processing.elapsed_time')}</span>
             </div>
             <span className="text-sm font-semibold text-slate-900">
               {formatTime(elapsedTime)}
@@ -209,7 +214,7 @@ export default function ProcessingProgress({
             <div className="flex items-center justify-between px-4 py-3 bg-blue-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-blue-600" />
-                <span className="text-xs text-blue-600">Estimated Remaining</span>
+                <span className="text-xs text-blue-600">{t('processing.estimated_remaining')}</span>
               </div>
               <span className="text-sm font-semibold text-blue-900">
                 ~{formatTime(estimatedTimeRemaining)}
@@ -220,7 +225,7 @@ export default function ProcessingProgress({
           {/* Helpful Tip */}
           <div className="pt-4 border-t border-slate-200">
             <p className="text-xs text-slate-500 text-center leading-relaxed">
-              💡 <span className="font-medium">Pro tip:</span> You can safely close this page. We'll process your video in the background and save it for you.
+              💡 <span className="font-medium">Pro tip:</span> {t('processing.pro_tip')}
             </p>
           </div>
         </div>
