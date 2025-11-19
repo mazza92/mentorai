@@ -104,6 +104,10 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
         )
 
         if (response.data.success) {
+          // Debug: Log the HTML being received
+          console.log('📝 Markdown:', response.data.answer?.substring(0, 200))
+          console.log('🎨 HTML:', response.data.answerHtml?.substring(0, 200))
+
           const assistantMessage: QAMessage = {
             role: 'assistant',
             content: response.data.answer,
@@ -164,49 +168,54 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg h-[600px] flex flex-col">
-      <style jsx>{`
-        .formatted-content p {
-          margin: 0.5rem 0;
+    <>
+      <style dangerouslySetInnerHTML={{__html: `
+        .qa-formatted-content p {
+          margin: 0.75rem 0;
+          line-height: 1.6;
         }
-        .formatted-content p:first-child {
+        .qa-formatted-content p:first-child {
           margin-top: 0;
         }
-        .formatted-content p:last-child {
+        .qa-formatted-content p:last-child {
           margin-bottom: 0;
         }
-        .formatted-content h1,
-        .formatted-content h2,
-        .formatted-content h3 {
+        .qa-formatted-content h1,
+        .qa-formatted-content h2,
+        .qa-formatted-content h3 {
           font-weight: 600;
-          margin: 1rem 0 0.5rem 0;
+          margin: 1.25rem 0 0.5rem 0;
+          line-height: 1.3;
         }
-        .formatted-content h3 {
+        .qa-formatted-content h3 {
           font-size: 1rem;
         }
-        .formatted-content ul,
-        .formatted-content ol {
-          margin: 0.5rem 0;
+        .qa-formatted-content ul,
+        .qa-formatted-content ol {
+          margin: 0.75rem 0;
           padding-left: 1.5rem;
+          line-height: 1.6;
         }
-        .formatted-content li {
-          margin: 0.25rem 0;
+        .qa-formatted-content li {
+          margin: 0.35rem 0;
         }
-        .formatted-content strong {
+        .qa-formatted-content strong {
           font-weight: 600;
           color: #1e293b;
         }
-        .formatted-content code {
+        .qa-formatted-content code {
           background: #f1f5f9;
-          padding: 0.125rem 0.25rem;
+          padding: 0.125rem 0.375rem;
           border-radius: 0.25rem;
           font-size: 0.875em;
+          font-family: monospace;
         }
-      `}</style>
-      <div className="p-4 border-b border-gray-200 flex items-center space-x-2">
-        <MessageCircle className="w-5 h-5 text-primary-600" />
-        <h3 className="text-lg font-semibold text-gray-900">WanderMind Q&A</h3>
-      </div>
+      `}} />
+      <div className="bg-white rounded-lg shadow-lg h-[600px] flex flex-col">
+        <div className="p-4 border-b border-gray-200 flex items-center space-x-2">
+          <MessageCircle className="w-5 h-5 text-primary-600" />
+          <h3 className="text-lg font-semibold text-gray-900">WanderMind Q&A</h3>
+        </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
@@ -223,11 +232,8 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
             >
               {message.role === 'assistant' && message.contentHtml ? (
                 <div
-                  className="text-sm formatted-content"
+                  className="text-sm qa-formatted-content"
                   dangerouslySetInnerHTML={{ __html: message.contentHtml }}
-                  style={{
-                    lineHeight: '1.6',
-                  }}
                 />
               ) : (
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -297,6 +303,7 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
         </p>
       </div>
     </div>
+    </>
   )
 }
 
