@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MessageSquare, Plus, Trash2, Clock, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { 
   Conversation, 
   loadConversations, 
@@ -26,6 +27,7 @@ export default function ConversationHistory({
   onNewConversation,
   isMobileDrawer = false,
 }: ConversationHistoryProps) {
+  const { t } = useTranslation('common')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isOpen, setIsOpen] = useState(true)
   
@@ -49,7 +51,7 @@ export default function ConversationHistory({
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation()
-    if (confirm('Delete this conversation?')) {
+    if (confirm(t('conversations.delete_confirm'))) {
       await deleteConversation(userId, conversationId)
       setConversations(prev => prev.filter(c => c.id !== conversationId))
       // If deleted conversation was active, navigate to upload
@@ -65,11 +67,11 @@ export default function ConversationHistory({
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     
     if (days === 0) {
-      return 'Today'
+      return t('conversations.today')
     } else if (days === 1) {
-      return 'Yesterday'
+      return t('conversations.yesterday')
     } else if (days < 7) {
-      return `${days} days ago`
+      return t('conversations.days_ago_plural', { count: days })
     } else {
       return date.toLocaleDateString()
     }
@@ -85,7 +87,7 @@ export default function ConversationHistory({
           {displayIsOpen && (
             <div className="flex items-center space-x-2">
               <MessageSquare className="w-4 h-4 text-slate-500" />
-              <h3 className="text-sm font-medium text-slate-700">Conversations</h3>
+              <h3 className="text-sm font-medium text-slate-700">{t('header.conversations')}</h3>
             </div>
           )}
           <div className="flex items-center space-x-1">
@@ -115,13 +117,13 @@ export default function ConversationHistory({
           {conversations.length === 0 ? (
             <div className="p-6 text-center text-sm text-slate-500">
               <MessageSquare className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-600 mb-1">No conversations yet</p>
-              <p className="text-xs text-slate-400 mb-4">Start a new video to begin</p>
+              <p className="text-slate-600 mb-1">{t('conversations.empty_state')}</p>
+              <p className="text-xs text-slate-400 mb-4">{t('conversations.empty_hint')}</p>
               <button
                 onClick={handleNewConversation}
                 className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg text-sm font-medium hover:from-blue-600 hover:to-purple-600 transition-all shadow-sm hover:shadow-md"
               >
-                Start New Chat
+                {t('conversations.start_new')}
               </button>
             </div>
           ) : (
@@ -152,7 +154,10 @@ export default function ConversationHistory({
                           <>
                             <span className="text-xs text-slate-300">•</span>
                             <span className="text-xs text-slate-400">
-                              {conv.messages.length} {conv.messages.length === 1 ? 'message' : 'messages'}
+                              {conv.messages.length === 1 
+                                ? t('conversations.message_count', { count: conv.messages.length })
+                                : t('conversations.message_count_plural', { count: conv.messages.length })
+                              }
                             </span>
                           </>
                         )}

@@ -121,12 +121,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
     }
     
-    await supabase.auth.signInWithOAuth({
+    // Get redirect URL - use NEXT_PUBLIC_SITE_URL if available (for production), otherwise use current origin
+    const redirectUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : process.env.NEXT_PUBLIC_SITE_URL
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+        : 'http://localhost:3000/auth/callback'
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
+    
+    if (error) {
+      console.error('Google OAuth error:', error)
+      throw error
+    }
+    
+    // OAuth redirect will happen automatically via data.url
+    // The redirectTo option should handle the callback
   }
 
   const value = {

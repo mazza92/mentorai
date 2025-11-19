@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import axios from 'axios'
-import { Youtube, Video, Loader2, CheckCircle, Link2 } from 'lucide-react'
+import { Youtube, Video, Loader2, CheckCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import UpgradeModal from './UpgradeModal'
 import { getApiUrl } from '@/lib/apiUrl'
 
@@ -12,6 +13,7 @@ interface VideoUploadProps {
 }
 
 export default function VideoUpload({ userId, onUploadComplete }: VideoUploadProps) {
+  const { t } = useTranslation('common')
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [processingStage, setProcessingStage] = useState('')
@@ -29,18 +31,18 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
     e.preventDefault()
 
     if (!youtubeUrl.trim()) {
-      setError('Please enter a YouTube URL')
+      setError(t('upload.error_enter_url'))
       return
     }
 
     if (!isValidYouTubeUrl(youtubeUrl)) {
-      setError('Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=...)')
+      setError(t('upload.error_invalid_url'))
       return
     }
 
     setError(null)
     setUploading(true)
-    setProcessingStage('Downloading video from YouTube...')
+    setProcessingStage(t('upload.downloading'))
     
     // Mark that we're uploading to prevent restoring old project
     if (typeof window !== 'undefined') {
@@ -62,7 +64,7 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
         const projectId = response.data.projectId
 
         setUploaded(true)
-        setProcessingStage('Video ready! Processing in background...')
+        setProcessingStage(t('upload.video_ready'))
         
         // Clear upload flag
         if (typeof window !== 'undefined') {
@@ -92,9 +94,9 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
         setError(err.response.data.message || 'Video limit reached')
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
         // Timeout error - the download might still be processing
-        setError('Download is taking longer than expected. The video may still be processing. Please wait a few minutes and check your conversations.')
+        setError(t('upload.error_timeout'))
       } else {
-        setError(err.response?.data?.error || err.response?.data?.details || 'Failed to download YouTube video. Please check the URL and try again.')
+        setError(err.response?.data?.error || err.response?.data?.details || t('upload.error_download_failed'))
       }
 
       setUploading(false)
@@ -104,16 +106,16 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
 
   const startTranscription = async (projectId: string) => {
     try {
-      setProcessingStage('Transcribing video (this may take several minutes)...')
+      setProcessingStage(t('upload.transcribing'))
       const apiUrl = getApiUrl()
       await axios.post(`${apiUrl}/api/transcribe`, {
         projectId,
       })
-      setProcessingStage('Analyzing video frames...')
+      setProcessingStage(t('upload.analyzing'))
     } catch (err) {
       console.error('Transcription error:', err)
       // Don't block the flow if transcription fails
-      setProcessingStage('Transcription in progress (continuing in background)...')
+      setProcessingStage(t('upload.transcription_background'))
     }
   }
 
@@ -135,10 +137,10 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
             </div>
             <div>
               <p className="text-xl font-semibold text-slate-900 mb-2">
-                Video processed successfully!
+                {t('upload.success')}
               </p>
               <p className="text-sm text-slate-600">
-                {processingStage || 'Ready to answer your questions...'}
+                {processingStage || t('upload.ready')}
               </p>
             </div>
           </div>
@@ -155,7 +157,7 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
                       {processingStage}
                     </p>
                     <p className="text-xs text-slate-500">
-                      This may take several minutes for long videos...
+                      {t('upload.processing_time')}
                     </p>
                   </div>
                 </div>
@@ -163,13 +165,13 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
                 <div className="space-y-6">
                   <div className="text-center">
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-purple-50 mb-4">
-                      <Link2 className="w-8 h-8 text-blue-500" />
+                      <Youtube className="w-8 h-8 text-red-500" />
                     </div>
                     <p className="text-xl font-semibold text-slate-900 mb-2">
-                      Enter YouTube URL
+                      {t('upload.enter_youtube_url')}
                     </p>
                     <p className="text-sm text-slate-500">
-                      Works with videos up to 3 hours long
+                      {t('upload.video_length_limit')}
                     </p>
                   </div>
 
@@ -192,15 +194,15 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
                     {uploading ? (
                       <span className="flex items-center justify-center">
                         <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                        Processing...
+                        {t('upload.processing')}
                       </span>
                     ) : (
-                      'Process Video'
+                      t('upload.process')
                     )}
                   </button>
 
                   <div className="text-xs text-slate-400 text-center pt-2">
-                    Example: Paste a link to an educational video, tutorial, or any YouTube content
+                    {t('upload.example')}
                   </div>
                 </div>
               )}

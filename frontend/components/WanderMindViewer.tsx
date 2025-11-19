@@ -1365,6 +1365,33 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
     }
   }
 
+  const handleRetryTranscription = async () => {
+    try {
+      // Reset transcription status to pending
+      setProject((prev: any) => ({
+        ...prev,
+        transcriptionStatus: 'pending',
+        transcriptionError: undefined,
+      }))
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      await axios.post(`${apiUrl}/api/transcribe`, {
+        projectId,
+      })
+      
+      // Refresh project to get updated status
+      await fetchProject()
+    } catch (error: any) {
+      console.error('Retry transcription error:', error)
+      // Update project with error
+      setProject((prev: any) => ({
+        ...prev,
+        transcriptionStatus: 'failed',
+        transcriptionError: error.response?.data?.error || error.message || 'Failed to retry transcription',
+      }))
+    }
+  }
+
   // Update refs when project or error state changes
   useEffect(() => {
     projectRef.current = project
@@ -1414,9 +1441,15 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
       }
 
       const isProcessing = currentProject?.status === 'processing' ||
-          currentProject?.transcriptionStatus === 'pending' ||
-          currentProject?.transcriptionStatus === 'processing' ||
+          (currentProject?.transcriptionStatus === 'pending' || currentProject?.transcriptionStatus === 'processing') ||
           (currentProject?.analysisStatus === 'pending' && currentProject?.duration && currentProject.duration <= 1800)
+      
+      // Stop polling if transcription failed
+      const transcriptionFailed = currentProject?.transcriptionStatus === 'failed'
+      if (transcriptionFailed) {
+        isPolling = false
+        return
+      }
 
       if (isProcessing && isPolling) {
         pollCount++
@@ -1730,11 +1763,15 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
 
   const videoUrl = getVideoUrl(project.processedUrl || project.publicUrl)
 
-  // Check if still processing
-  const isProcessing = !project.transcript ||
+  // Check if transcription failed
+  const transcriptionFailed = project.transcriptionStatus === 'failed'
+  
+  // Check if still processing (exclude failed status)
+  const isProcessing = !transcriptionFailed && (
+                       !project.transcript ||
                        project.transcriptionStatus === 'pending' ||
                        project.transcriptionStatus === 'processing' ||
-                       loadingTopics
+                       loadingTopics)
 
   return (
     <>
@@ -1794,6 +1831,52 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
         }
       `}} />
       <div className="h-full bg-gradient-to-br from-white to-slate-50 text-slate-900 font-sans flex flex-col overflow-hidden relative">
+        {/* Failed Transcription Overlay */}
+        {transcriptionFailed && (
+          <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-red-200/80">
+              <div className="text-center space-y-6">
+                <div className="flex justify-center">
+                  <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center">
+                    <AlertCircle className="w-10 h-10 text-red-500" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-900">Transcription Failed</h3>
+                  <p className="text-sm text-slate-600">
+                    The transcription service encountered an error. This is usually due to high demand on the AI service.
+                  </p>
+                  {project.transcriptionError && (
+                    <p className="text-xs text-slate-500 mt-2 bg-slate-50 p-2 rounded">
+                      {project.transcriptionError}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleRetryTranscription}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    Retry Transcription
+                  </button>
+                  <button
+                    onClick={handleNewConversation}
+                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-6 rounded-xl transition-all"
+                  >
+                    Start New Video
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-500 pt-2">
+                  The video was downloaded successfully. You can retry transcription or start a new video.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Loading Overlay */}
       {isProcessing && (
         <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex items-center justify-center">
