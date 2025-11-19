@@ -12,6 +12,7 @@ interface VideoQAProps {
 interface QAMessage {
   role: 'user' | 'assistant'
   content: string
+  contentHtml?: string // HTML formatted content for better rendering
   citations?: number[] // Timestamps in seconds
   timestamp: Date
 }
@@ -106,6 +107,7 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
           const assistantMessage: QAMessage = {
             role: 'assistant',
             content: response.data.answer,
+            contentHtml: response.data.answerHtml, // Use HTML formatted version for better rendering
             citations: response.data.citations || [],
             timestamp: new Date(),
           }
@@ -163,6 +165,44 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
 
   return (
     <div className="bg-white rounded-lg shadow-lg h-[600px] flex flex-col">
+      <style jsx>{`
+        .formatted-content p {
+          margin: 0.5rem 0;
+        }
+        .formatted-content p:first-child {
+          margin-top: 0;
+        }
+        .formatted-content p:last-child {
+          margin-bottom: 0;
+        }
+        .formatted-content h1,
+        .formatted-content h2,
+        .formatted-content h3 {
+          font-weight: 600;
+          margin: 1rem 0 0.5rem 0;
+        }
+        .formatted-content h3 {
+          font-size: 1rem;
+        }
+        .formatted-content ul,
+        .formatted-content ol {
+          margin: 0.5rem 0;
+          padding-left: 1.5rem;
+        }
+        .formatted-content li {
+          margin: 0.25rem 0;
+        }
+        .formatted-content strong {
+          font-weight: 600;
+          color: #1e293b;
+        }
+        .formatted-content code {
+          background: #f1f5f9;
+          padding: 0.125rem 0.25rem;
+          border-radius: 0.25rem;
+          font-size: 0.875em;
+        }
+      `}</style>
       <div className="p-4 border-b border-gray-200 flex items-center space-x-2">
         <MessageCircle className="w-5 h-5 text-primary-600" />
         <h3 className="text-lg font-semibold text-gray-900">WanderMind Q&A</h3>
@@ -181,7 +221,17 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
                   : 'bg-gray-100 text-gray-900'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              {message.role === 'assistant' && message.contentHtml ? (
+                <div
+                  className="text-sm formatted-content"
+                  dangerouslySetInnerHTML={{ __html: message.contentHtml }}
+                  style={{
+                    lineHeight: '1.6',
+                  }}
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              )}
               {message.citations && message.citations.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-gray-300">
                   <div className="flex items-center space-x-1 text-xs opacity-70">
