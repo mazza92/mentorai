@@ -1,5 +1,5 @@
 {
-  "app_name": "WanderMind",
+  "app_name": "Lurnia",
   "tagline": "Your AI Learning Companion",
 
   "auth": {
@@ -38,9 +38,9 @@
 
   "pricing": {
     "title": "Choose Your Plan",
-    "subtitle": "Unlock the full potential of WanderMind AI",
+    "subtitle": "Unlock the full potential of Lurnia AI",
     "free_tier": "Free",
-    "free_description": "Perfect for trying out WanderMind",
+    "free_description": "Perfect for trying out Lurnia",
     "pro_tier": "Pro",
     "pro_description": "For serious learners",
     "most_popular": "Most Popular",
