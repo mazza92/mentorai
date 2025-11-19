@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useLanguage } from '@/contexts/LanguageContext'
 import { Loader2, Mail, Lock, LogIn, UserPlus, Chrome } from 'lucide-react'
 
 export default function Auth() {
   const { user, signIn, signUp, signInWithGoogle, loading: authLoading } = useAuth()
+  const { t } = useLanguage()
   const router = useRouter()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
@@ -36,13 +38,13 @@ export default function Auth() {
           // Check if it's a "user already exists" error
           if (result.error.message?.includes('already registered') ||
               result.error.message?.includes('already exists')) {
-            setError('This email is already registered. Please sign in instead, or check your email for the verification link.')
+            setError(t('auth.error_email_exists'))
           } else {
             setError(result.error.message)
           }
         } else {
           // Signup successful - show success message
-          setSuccess('Success! Check your email to confirm your account. Make sure to check your spam folder. If you don\'t receive it within a few minutes, the email may already be registered.')
+          setSuccess(t('auth.success_check_email'))
           setEmail('')
           setPassword('')
         }
@@ -83,9 +85,9 @@ export default function Auth() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome to WanderMind</h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">{t('app_name')}</h1>
           <p className="text-slate-600">
-            {isSignUp ? 'Create your account' : 'Sign in to your account'}
+            {isSignUp ? t('auth.sign_up') : t('auth.sign_in')}
           </p>
         </div>
 
@@ -104,7 +106,7 @@ export default function Auth() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Email
+              {t('auth.email')}
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -121,7 +123,7 @@ export default function Auth() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Password
+              {t('auth.password')}
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -147,12 +149,12 @@ export default function Auth() {
             ) : isSignUp ? (
               <>
                 <UserPlus className="w-5 h-5 mr-2" />
-                Sign Up
+                {t('auth.sign_up_button')}
               </>
             ) : (
               <>
                 <LogIn className="w-5 h-5 mr-2" />
-                Sign In
+                {t('auth.sign_in_button')}
               </>
             )}
           </button>
@@ -187,7 +189,7 @@ export default function Auth() {
             }}
             className="text-blue-600 hover:text-blue-700 font-medium text-sm"
           >
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+            {isSignUp ? t('auth.already_have_account') : t('auth.dont_have_account')}
           </button>
         </div>
       </div>
