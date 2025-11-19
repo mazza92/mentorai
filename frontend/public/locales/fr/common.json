@@ -119,6 +119,26 @@
     "after_download_tip": "Après le téléchargement, la transcription démarrera automatiquement (~1-3 min pour la plupart des vidéos)"
   },
 
+  "processing": {
+    "header": "Traitement de votre vidéo",
+    "progress": "Progression",
+    "elapsed_time": "Temps écoulé",
+    "estimated_remaining": "Temps restant estimé",
+    "pro_tip": "Vous pouvez fermer cette page en toute sécurité. Nous traiterons votre vidéo en arrière-plan et la sauvegarderons pour vous.",
+    "stages": {
+      "download_title": "Téléchargement de la vidéo",
+      "download_description": "Récupération de la vidéo depuis YouTube...",
+      "audio_title": "Extraction de l'audio",
+      "audio_description": "Conversion de la vidéo en format audio...",
+      "transcription_title": "Transcription de l'audio",
+      "transcription_description": "Transcription IA ultra-rapide ({{seconds}}s pour une vidéo de {{minutes}}min)",
+      "analysis_title": "Analyse de la vidéo",
+      "analysis_description": "Analyse du contenu vidéo...",
+      "toc_title": "Table des matières",
+      "toc_description": "Génération des marqueurs de chapitre..."
+    }
+  },
+
   "conversations": {
     "empty_state": "Aucune conversation pour le moment",
     "empty_hint": "Ajouter une nouvelle vidéo pour commencer",

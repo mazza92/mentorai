@@ -119,6 +119,26 @@
     "after_download_tip": "After download, transcription will start automatically (~1-3 min for most videos)"
   },
 
+  "processing": {
+    "header": "Processing Your Video",
+    "progress": "Progress",
+    "elapsed_time": "Elapsed Time",
+    "estimated_remaining": "Estimated Remaining",
+    "pro_tip": "You can safely close this page. We'll process your video in the background and save it for you.",
+    "stages": {
+      "download_title": "Downloading Video",
+      "download_description": "Fetching video from YouTube...",
+      "audio_title": "Extracting Audio",
+      "audio_description": "Converting video to audio format...",
+      "transcription_title": "Transcribing Audio",
+      "transcription_description": "Ultra-fast AI transcription ({{seconds}}s for {{minutes}}min video)",
+      "analysis_title": "Video Analysis",
+      "analysis_description": "Analyzing video content...",
+      "toc_title": "Table of Contents",
+      "toc_description": "Generating chapter markers..."
+    }
+  },
+
   "conversations": {
     "empty_state": "No conversations yet",
     "empty_hint": "Start a new video to begin",
