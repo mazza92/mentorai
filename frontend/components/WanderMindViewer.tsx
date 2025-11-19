@@ -4,9 +4,10 @@ import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { Send, Clock, BookOpen, Loader2, Zap, Youtube, ThumbsUp, List, ChevronDown, ChevronUp, CheckCircle, AlertCircle, Menu, X, Video } from 'lucide-react'
 import ConversationHistory from './ConversationHistory'
-import { 
-  Conversation, 
-  loadConversations, 
+import ProcessingProgress from './ProcessingProgress'
+import {
+  Conversation,
+  loadConversations,
   createConversation,
   saveConversation,
   updateConversationTitle,
@@ -1877,82 +1878,14 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
           </div>
         )}
 
-        {/* Loading Overlay */}
+        {/* Loading Overlay - New Improved Progress UI */}
       {isProcessing && (
-        <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex items-center justify-center">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-slate-200/80">
-            <div className="text-center space-y-6">
-              <div className="flex justify-center">
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 animate-pulse"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="w-10 h-10 text-white animate-spin" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-900">Processing Your Video</h3>
-                <p className="text-sm text-slate-600">
-                  {!project.transcript ? 'Transcribing audio...' :
-                   loadingTopics ? 'Generating table of contents...' :
-                   'Finalizing...'}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {/* Progress Bar */}
-                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500"
-                    style={{ width: !project.transcript ? '40%' : loadingTopics ? '70%' : '90%' }}
-                  ></div>
-                </div>
-
-                {/* Status List */}
-                <div className="space-y-2 text-left">
-                  <div className="flex items-center gap-2 text-sm">
-                    {project.transcript ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                    )}
-                    <span className={project.transcript ? 'text-green-700' : 'text-slate-700'}>
-                      Audio transcription
-                    </span>
-                  </div>
-                  {/* Only show video analysis for videos <= 30 minutes */}
-                  {(!project.duration || project.duration <= 1800) && (
-                    <div className="flex items-center gap-2 text-sm">
-                      {project.videoAnalysis || project.analysisStatus === 'completed' ? (
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                      )}
-                      <span className={project.videoAnalysis || project.analysisStatus === 'completed' ? 'text-green-700' : 'text-slate-700'}>
-                        Video analysis
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-sm">
-                    {!loadingTopics && topics.length > 0 ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                    )}
-                    <span className={!loadingTopics && topics.length > 0 ? 'text-green-700' : 'text-slate-700'}>
-                      Table of contents
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-500 pt-2">
-                  This usually takes 1-2 minutes. Hang tight!
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProcessingProgress
+          project={project}
+          topics={topics}
+          loadingTopics={loadingTopics}
+          videoDuration={project.duration}
+        />
       )}
 
       {/* Desktop View: Split Panels */}
