@@ -289,6 +289,7 @@ async function transcribeWithAssemblyAI(audioFilePath) {
     const transcript = await assemblyai.transcripts.transcribe({
       audio: audioFilePath,
       speech_model: 'best', // Use best quality model
+      language_detection: true, // Auto-detect language (supports EN, FR, and 90+ languages)
     });
 
     if (transcript.status === 'error') {
@@ -297,6 +298,7 @@ async function transcribeWithAssemblyAI(audioFilePath) {
 
     console.log('✅ AssemblyAI transcription complete');
     console.log('📊 Transcript length:', transcript.text.length, 'characters');
+    console.log('🌍 Detected language:', transcript.language_code || 'unknown');
 
     // Format transcript with word-level timestamps
     const formattedTranscript = {
@@ -308,6 +310,7 @@ async function transcribeWithAssemblyAI(audioFilePath) {
         confidence: w.confidence,
       })),
       segments: [],
+      detectedLanguage: transcript.language_code, // Store detected language for debugging
     };
 
     console.log('📊 Word count:', formattedTranscript.words.length);
