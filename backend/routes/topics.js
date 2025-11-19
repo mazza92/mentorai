@@ -177,6 +177,11 @@ REQUIREMENTS:
 4. Focus on substantive topic changes, not minor tangents
 5. Use the timestamps from the transcript
 
+IMPORTANT - JSON FORMAT:
+- Return ONLY valid JSON, no additional text
+- Do NOT use trailing commas
+- All text must use double quotes (")
+
 OUTPUT FORMAT (JSON):
 {
   "chapters": [
@@ -194,7 +199,7 @@ OUTPUT FORMAT (JSON):
     }
   ]
 }`,
-        closing: 'Generate the table of contents as JSON:'
+        closing: 'Generate ONLY the table of contents JSON (no text before or after):'
       },
       fr: {
         instruction: `Vous êtes un expert en analyse de contenu vidéo long format et en création de tables des matières structurées.
@@ -210,6 +215,12 @@ EXIGENCES:
 3. Les sujets doivent être ordonnés chronologiquement
 4. Concentrez-vous sur les changements de sujet substantiels, pas les digressions mineures
 5. Utilisez les horodatages de la transcription
+
+IMPORTANT - FORMAT JSON:
+- Retournez UNIQUEMENT du JSON valide, sans texte supplémentaire
+- N'utilisez PAS de virgules finales
+- Tous les textes doivent utiliser des guillemets doubles (")
+- Les apostrophes dans le texte français sont autorisées dans les chaînes
 
 FORMAT DE SORTIE (JSON):
 {
@@ -228,7 +239,7 @@ FORMAT DE SORTIE (JSON):
     }
   ]
 }`,
-        closing: 'Générez la table des matières au format JSON:'
+        closing: 'Générez UNIQUEMENT le JSON de la table des matières (pas de texte avant ou après):'
       }
     };
 
@@ -274,13 +285,40 @@ ${promptConfig.closing}`;
       }
     }
 
-    // Extract JSON from response
-    const jsonMatch = tocText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to parse TOC response');
+    // Extract JSON from response (handle markdown code blocks and clean formatting)
+    console.log('Raw TOC response length:', tocText.length, 'characters');
+
+    let jsonString;
+
+    // Try to extract from markdown code block first
+    const codeBlockMatch = tocText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch) {
+      jsonString = codeBlockMatch[1];
+      console.log('Extracted JSON from markdown code block');
+    } else {
+      // Fallback to simple regex
+      const jsonMatch = tocText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error('Failed to find JSON in response');
+        throw new Error('Failed to parse TOC response - no JSON found');
+      }
+      jsonString = jsonMatch[0];
     }
 
-    const tocData = JSON.parse(jsonMatch[0]);
+    // Clean up common JSON issues
+    // 1. Remove trailing commas before closing braces/brackets
+    jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1');
+    // 2. Fix single quotes to double quotes (only for property names)
+    jsonString = jsonString.replace(/'([^']+)':/g, '"$1":');
+
+    let tocData;
+    try {
+      tocData = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError.message);
+      console.error('Attempted to parse:', jsonString.substring(0, 500) + '...');
+      throw new Error(`Failed to parse TOC JSON: ${parseError.message}`);
+    }
 
     console.log('TOC generated with', tocData.chapters.length, 'chapters');
 
