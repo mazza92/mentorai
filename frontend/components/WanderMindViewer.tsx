@@ -508,6 +508,11 @@ const QnAPanel = ({
         const conversations = await loadConversations(userId)
         const currentConv = conversations.find(c => c.id === currentConversationId)
         if (currentConv) {
+          // Check if messages actually changed (new messages added)
+          const existingMessageCount = currentConv.messages.length
+          const newMessageCount = history.length
+          const messagesChanged = newMessageCount > existingMessageCount
+
           const updated = {
             ...currentConv,
             messages: history.map(msg => ({
@@ -516,7 +521,8 @@ const QnAPanel = ({
               citations: msg.citations,
               timestamp: msg.timestamp
             })),
-            updatedAt: new Date()
+            // Only update timestamp if messages actually changed
+            updatedAt: messagesChanged ? new Date() : currentConv.updatedAt
           }
           // Auto-update title from first user message
           const titleUpdated = updateConversationTitle(updated)
