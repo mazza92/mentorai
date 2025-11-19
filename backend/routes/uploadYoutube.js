@@ -184,20 +184,49 @@ router.post('/', async (req, res) => {
         console.error('Error incrementing video count:', error.message);
       });
 
-    // Start transcription in background (don't wait for it)
-    console.log('Starting background transcription...');
+    // Start transcription in background with optimized delay
+    // Add random delay (10-30 seconds) to spread load and avoid thundering herd
+    const initialDelay = 10000 + Math.random() * 20000; // 10-30 seconds
+    console.log(`Starting background transcription in ${Math.floor(initialDelay/1000)}s (optimized delay to spread API load)...`);
+    
     setTimeout(async () => {
       try {
         const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
         await axios.post(`${baseUrl}/api/transcribe`, {
           projectId,
+        }, {
+          timeout: 30 * 60 * 1000, // 30 minute timeout for long videos
         });
-        console.log('Background transcription complete for project:', projectId);
+        console.log('✅ Background transcription complete for project:', projectId);
 
         // Check if project is ready (transcription + analysis both done)
         await checkAndUpdateProjectStatus(projectId);
       } catch (error) {
         console.error('Background transcription failed:', error.message);
+        console.error('Transcription error details:', error.response?.data || error.message);
+
+        // Mark transcription as failed in Firestore
+        if (!useMockMode && firestore) {
+          try {
+            await firestore.collection('projects').doc(projectId).update({
+              transcriptionStatus: 'failed',
+              transcriptionError: error.response?.data?.error || error.message || 'Transcription failed after multiple retries',
+              updatedAt: new Date(),
+            });
+            console.log('Project marked as transcription failed:', projectId);
+          } catch (updateError) {
+            console.error('Failed to update project status:', updateError.message);
+          }
+        } else if (useMockMode) {
+          // Update mock storage
+          const existingProject = mockProjects.get(projectId);
+          if (existingProject) {
+            existingProject.transcriptionStatus = 'failed';
+            existingProject.transcriptionError = error.response?.data?.error || error.message || 'Transcription failed after multiple retries';
+            existingProject.updatedAt = new Date();
+            mockProjects.set(projectId, existingProject);
+          }
+        }
 
         // Even if transcription fails, check if we should mark project as ready
         // (e.g., if analysis is already done or skipped)

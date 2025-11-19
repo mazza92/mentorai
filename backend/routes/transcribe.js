@@ -130,13 +130,20 @@ async function transcribeWithGemini(audioFilePath) {
   // Use Gemini 2.5 Flash (same as rest of codebase - videoQAService, topics, etc.)
   const model = geminiAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-  // Retry logic for Gemini transcription (VERY long delays due to infrastructure overload)
-  const maxRetries = 6; // Increased to 6 attempts
+    // Retry logic for Gemini transcription with optimized delays
+  const maxRetries = 8; // Increased to 8 attempts for better success rate
   let retryCount = 0;
   let lastError;
+  let consecutive503Errors = 0; // Track consecutive 503 errors for circuit breaker
 
   while (retryCount < maxRetries) {
     try {
+      // Add small random delay before each attempt to avoid thundering herd
+      if (retryCount > 0) {
+        const preAttemptDelay = Math.random() * 2000; // 0-2s random delay
+        await new Promise(resolve => setTimeout(resolve, preAttemptDelay));
+      }
+
       const result = await model.generateContent([
         {
           inlineData: {
@@ -152,9 +159,10 @@ async function transcribeWithGemini(audioFilePath) {
       const response = await result.response;
       const transcriptionText = response.text();
 
-      // Success! Break out of retry loop
-      console.log('Gemini transcription complete');
-      console.log('Transcript length:', transcriptionText.length, 'characters');
+      // Success! Reset error counters
+      consecutive503Errors = 0;
+      console.log('✅ Gemini transcription complete');
+      console.log('📊 Transcript length:', transcriptionText.length, 'characters');
 
       // Note: Gemini doesn't provide word-level timestamps
       // We'll create estimated timestamps based on word count
@@ -173,35 +181,65 @@ async function transcribeWithGemini(audioFilePath) {
       return transcript;
     } catch (error) {
       lastError = error;
+      const is503Error = error.message?.includes('503') || error.message?.includes('overloaded');
+      const isRateLimit = error.message?.includes('rate limit') || error.message?.includes('429');
 
-      // Check if we should retry (503 Service Unavailable or rate limit errors)
-      const shouldRetry = (
-        error.message?.includes('503') ||
-        error.message?.includes('overloaded') ||
-        error.message?.includes('rate limit') ||
-        error.message?.includes('429')
-      );
+      if (is503Error) {
+        consecutive503Errors++;
+      } else {
+        consecutive503Errors = 0; // Reset if not 503
+      }
 
-      if (shouldRetry && retryCount < maxRetries - 1) {
+      // Circuit breaker: If we get 3+ consecutive 503 errors, use longer delays
+      const isInfrastructureOverload = consecutive503Errors >= 3;
+
+      // Check if we should retry
+      const shouldRetry = (is503Error || isRateLimit) && retryCount < maxRetries - 1;
+
+      if (shouldRetry) {
         retryCount++;
-        // MUCH longer delays for audio transcription to avoid infrastructure overload
-        // Delays: 15s, 30s, 60s, 120s, 240s (up to 4 minutes)
-        const baseDelay = Math.pow(2, retryCount) * 7500;
-        const jitter = Math.random() * 5000;
-        const waitTime = baseDelay + jitter;
+        
+        // Optimized delay strategy:
+        // - Infrastructure overload (503): Much longer delays
+        // - Rate limits (429): Moderate delays
+        // - Use exponential backoff with jitter
+        let baseDelay;
+        if (isInfrastructureOverload) {
+          // For infrastructure overload, use very long delays
+          // Delays: 30s, 60s, 120s, 240s, 480s, 960s, 1920s, 3840s
+          baseDelay = Math.pow(2, retryCount) * 15000; // Start at 30s
+        } else if (isRateLimit) {
+          // For rate limits, use moderate delays
+          // Delays: 10s, 20s, 40s, 80s, 160s, 320s, 640s, 1280s
+          baseDelay = Math.pow(2, retryCount) * 5000; // Start at 10s
+        } else {
+          // Default: moderate delays
+          baseDelay = Math.pow(2, retryCount) * 5000;
+        }
 
-        console.log(`Gemini transcription failed (${error.message.includes('503') ? '503 overloaded' : 'rate limit'}). Retrying in ${Math.floor(waitTime/1000)}s... (attempt ${retryCount}/${maxRetries})`);
-        console.log(`⏳ This is a Gemini infrastructure issue, not your quota. Waiting for API to recover...`);
+        // Add jitter (20-30% of base delay) to avoid synchronized retries
+        const jitterPercent = 0.2 + Math.random() * 0.1; // 20-30%
+        const jitter = baseDelay * jitterPercent;
+        const waitTime = Math.floor(baseDelay + jitter);
+
+        const errorType = is503Error ? '503 overloaded' : 'rate limit';
+        console.log(`⚠️  Gemini transcription failed (${errorType}). Retrying in ${Math.floor(waitTime/1000)}s... (attempt ${retryCount}/${maxRetries})`);
+        if (isInfrastructureOverload) {
+          console.log(`⏳ Infrastructure overload detected. Using extended delays to allow API recovery...`);
+        }
+        
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
 
       // Max retries reached or non-retryable error
+      console.error(`❌ Transcription failed after ${retryCount} retries. Error:`, error.message);
       throw error;
     }
   }
 
   // If we get here, all retries failed
+  console.error(`❌ All ${maxRetries} transcription attempts failed`);
   throw lastError;
 }
 
@@ -250,13 +288,119 @@ async function generateSuggestedPromptsAsync(projectId, project, useFirestore = 
   }
 }
 
+// Transcription queue to prevent API overload
+let transcriptionQueue = [];
+let isProcessingQueue = false;
+let activeTranscriptions = 0;
+const MAX_CONCURRENT_TRANSCRIPTIONS = 1; // Process one at a time for maximum success rate
+
+async function processTranscriptionQueue() {
+  if (isProcessingQueue || transcriptionQueue.length === 0 || activeTranscriptions >= MAX_CONCURRENT_TRANSCRIPTIONS) {
+    return;
+  }
+
+  isProcessingQueue = true;
+  const { projectId, resolve, reject } = transcriptionQueue.shift();
+  activeTranscriptions++;
+
+  try {
+    console.log(`🎯 Processing transcription from queue (${transcriptionQueue.length} remaining)...`);
+    
+    // Get project
+    let project;
+    if (!useMockMode && firestore) {
+      const projectDoc = await firestore.collection('projects').doc(projectId).get();
+      if (!projectDoc.exists) {
+        throw new Error('Project not found');
+      }
+      project = projectDoc.data();
+    } else {
+      project = mockProjects.get(projectId);
+      if (!project) {
+        throw new Error('Project not found in mock storage');
+      }
+    }
+
+    // Use local audio file
+    if (!project.localAudioPath || !fs.existsSync(project.localAudioPath)) {
+      throw new Error('No audio file found for transcription');
+    }
+
+    console.log('Starting Gemini transcription for project:', projectId);
+    const transcript = await transcribeWithGemini(project.localAudioPath);
+
+    // Update project
+    if (!useMockMode && firestore) {
+      await firestore.collection('projects').doc(projectId).update({
+        transcript,
+        transcriptionStatus: 'completed',
+        updatedAt: new Date(),
+      });
+    } else {
+      project.transcript = transcript;
+      project.transcriptionStatus = 'completed';
+      project.updatedAt = new Date();
+      mockProjects.set(projectId, project);
+    }
+
+    console.log('✅ Transcription completed and saved');
+    resolve({ success: true, transcript });
+  } catch (error) {
+    console.error('❌ Transcription failed:', error.message);
+    
+    // Mark as failed
+    if (!useMockMode && firestore) {
+      try {
+        await firestore.collection('projects').doc(projectId).update({
+          transcriptionStatus: 'failed',
+          transcriptionError: error.message || 'Transcription failed',
+          updatedAt: new Date(),
+        });
+      } catch (updateError) {
+        console.error('Failed to update project status:', updateError.message);
+      }
+    }
+    
+    reject(error);
+  } finally {
+    activeTranscriptions--;
+    isProcessingQueue = false;
+    // Process next item in queue
+    setTimeout(() => processTranscriptionQueue(), 2000); // 2s delay between transcriptions
+  }
+}
+
 router.post('/', async (req, res) => {
   try {
-    const { projectId, audioUrl } = req.body;
+    const { projectId } = req.body;
 
-    if (!projectId) {
-      return res.status(400).json({ error: 'Project ID is required' });
+    // If using queue system (recommended for production)
+    const useQueue = process.env.USE_TRANSCRIPTION_QUEUE !== 'false'; // Default to true
+    
+    if (useQueue) {
+      // Add to queue and return immediately
+      return new Promise((resolve, reject) => {
+        transcriptionQueue.push({ projectId, resolve, reject });
+        console.log(`📥 Transcription queued for project ${projectId} (queue length: ${transcriptionQueue.length})`);
+        
+        // Start processing queue if not already running
+        processTranscriptionQueue();
+        
+        // Return success immediately (processing happens in background)
+        res.json({
+          success: true,
+          message: 'Transcription queued and will be processed shortly',
+          queuePosition: transcriptionQueue.length,
+        });
+      }).catch(error => {
+        // This shouldn't happen since we return immediately, but handle just in case
+        console.error('Queue error:', error);
+        res.status(500).json({ error: 'Failed to queue transcription' });
+      });
     }
+
+    // Original synchronous processing (fallback)
+    const { audioUrl } = req.body; // projectId already extracted above
 
     let project;
 
