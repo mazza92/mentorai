@@ -27,6 +27,13 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
 
   useEffect(() => {
     fetchUsage()
+
+    // Auto-refresh every 30 seconds to keep quota display up-to-date
+    const intervalId = setInterval(() => {
+      fetchUsage()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(intervalId)
   }, [userId])
 
   const fetchUsage = async () => {
@@ -66,7 +73,10 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
   const getUsagePercentage = (used: number, limit: number) => {
     if (limit === 0 || limit === Infinity) return 0
     if (used === 0) return 0
-    return Math.min(100, Math.round((used / limit) * 100))
+    const percentage = (used / limit) * 100
+    // Show at least 1% if any usage exists, but keep decimal precision for small values
+    if (percentage < 1 && used > 0) return Math.max(1, percentage)
+    return Math.min(100, Math.round(percentage))
   }
 
   const getStatusColor = (percentage: number) => {
@@ -131,8 +141,8 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
             </div>
             <div className="w-full bg-slate-200 rounded-full h-1.5">
               <div
-                className={`h-1.5 rounded-full ${getProgressColor(videoPercentage)}`}
-                style={{ width: `${videoPercentage}%` }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(videoPercentage)}`}
+                style={{ width: `${videoPercentage}%`, minWidth: videoPercentage > 0 ? '2px' : '0px' }}
               />
             </div>
           </div>
@@ -150,8 +160,8 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
             </div>
             <div className="w-full bg-slate-200 rounded-full h-1.5">
               <div
-                className={`h-1.5 rounded-full ${getProgressColor(questionPercentage)}`}
-                style={{ width: `${questionPercentage}%` }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(questionPercentage)}`}
+                style={{ width: `${questionPercentage}%`, minWidth: questionPercentage > 0 ? '2px' : '0px' }}
               />
             </div>
           </div>
@@ -210,7 +220,7 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
           <div className="w-full bg-slate-200 rounded-full h-3">
             <div
               className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(videoPercentage)}`}
-              style={{ width: `${videoPercentage}%` }}
+              style={{ width: `${videoPercentage}%`, minWidth: videoPercentage > 0 ? '4px' : '0px' }}
             />
           </div>
           {videoPercentage >= 80 && (
@@ -244,7 +254,7 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
           <div className="w-full bg-slate-200 rounded-full h-3">
             <div
               className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(questionPercentage)}`}
-              style={{ width: `${questionPercentage}%` }}
+              style={{ width: `${questionPercentage}%`, minWidth: questionPercentage > 0 ? '4px' : '0px' }}
             />
           </div>
           {questionPercentage >= 80 && (
