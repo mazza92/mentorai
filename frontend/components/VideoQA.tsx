@@ -173,6 +173,7 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
         .qa-formatted-content p {
           margin: 0.75rem 0;
           line-height: 1.6;
+          color: #475569;
         }
         .qa-formatted-content p:first-child {
           margin-top: 0;
@@ -180,12 +181,16 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
         .qa-formatted-content p:last-child {
           margin-bottom: 0;
         }
+        .qa-formatted-content p:empty {
+          display: none;
+        }
         .qa-formatted-content h1,
         .qa-formatted-content h2,
         .qa-formatted-content h3 {
           font-weight: 600;
           margin: 1.25rem 0 0.5rem 0;
           line-height: 1.3;
+          color: #1e293b;
         }
         .qa-formatted-content h3 {
           font-size: 1rem;
@@ -196,8 +201,16 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
           padding-left: 1.5rem;
           line-height: 1.6;
         }
+        .qa-formatted-content ul {
+          list-style-type: disc;
+        }
+        .qa-formatted-content ol {
+          list-style-type: decimal;
+        }
         .qa-formatted-content li {
           margin: 0.35rem 0;
+          color: #475569;
+          display: list-item;
         }
         .qa-formatted-content strong {
           font-weight: 600;
