@@ -135,19 +135,59 @@ async function chunkAudioFile(audioFilePath, chunkDurationSeconds = 600) {
   }
 }
 
-// Helper function to transcribe with Google Cloud Speech-to-Text (best for long audio)
-async function transcribeWithGoogleCloud(audioFilePath, duration) {
+// Helper function to upload audio to Google Cloud Storage
+async function uploadToGCS(audioFilePath, projectId) {
+  const { Storage } = require('@google-cloud/storage');
+
+  // Initialize storage with same credentials as speech client
+  const storageConfig = {
+    projectId: projectId,
+  };
+
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+    storageConfig.credentials = credentials;
+  }
+
+  const storage = new Storage(storageConfig);
+  const bucketName = process.env.GOOGLE_CLOUD_STORAGE_BUCKET;
+
+  if (!bucketName || bucketName === 'your_bucket_name') {
+    throw new Error('Google Cloud Storage bucket not configured. Set GOOGLE_CLOUD_STORAGE_BUCKET env var.');
+  }
+
+  const bucket = storage.bucket(bucketName);
+  const fileName = `transcription-audio/${Date.now()}-${path.basename(audioFilePath)}`;
+  const file = bucket.file(fileName);
+
+  console.log(`📤 Uploading audio to GCS: gs://${bucketName}/${fileName}`);
+
+  await file.save(fs.readFileSync(audioFilePath), {
+    metadata: {
+      contentType: 'audio/mp3',
+    },
+  });
+
+  const gcsUri = `gs://${bucketName}/${fileName}`;
+  console.log(`✅ Upload complete: ${gcsUri}`);
+
+  return { gcsUri, fileName, bucket };
+}
+
+// Helper function to transcribe with Google Cloud Speech-to-Text Long Running API
+async function transcribeWithGoogleCloudLongRunning(audioFilePath, duration, projectId) {
   if (!speechClient) {
     throw new Error('Google Cloud Speech-to-Text not configured');
   }
 
-  console.log('🎙️  Using Google Cloud Speech-to-Text for reliable transcription...');
+  console.log('🎙️  Using Google Cloud Speech-to-Text Long Running API for reliable transcription...');
+  console.log(`📊 Audio duration: ${Math.round(duration / 60)} minutes`);
 
-  // Read audio file
-  const audioBytes = fs.readFileSync(audioFilePath);
+  // Upload audio to GCS (required for long running recognition)
+  const { gcsUri, fileName, bucket } = await uploadToGCS(audioFilePath, projectId);
 
   const audio = {
-    content: audioBytes.toString('base64'),
+    uri: gcsUri,
   };
 
   const config = {
@@ -156,8 +196,10 @@ async function transcribeWithGoogleCloud(audioFilePath, duration) {
     languageCode: 'en-US',
     enableAutomaticPunctuation: true,
     enableWordTimeOffsets: true,
-    model: 'video',
+    model: 'video', // Optimized for video content
     useEnhanced: true, // Use enhanced model for better accuracy
+    audioChannelCount: 2, // Stereo audio
+    enableSeparateRecognitionPerChannel: false,
   };
 
   const request = {
@@ -165,15 +207,23 @@ async function transcribeWithGoogleCloud(audioFilePath, duration) {
     config: config,
   };
 
-  // Use longRunningRecognize for files > 60 seconds
-  if (duration > 60) {
-    const [operation] = await speechClient.longRunningRecognize(request);
-    const [response] = await operation.promise();
-    return formatGoogleCloudTranscript(response);
-  } else {
-    const [response] = await speechClient.recognize(request);
-    return formatGoogleCloudTranscript(response);
+  console.log('🚀 Starting long running recognition...');
+  const [operation] = await speechClient.longRunningRecognize(request);
+
+  console.log('⏳ Waiting for transcription to complete...');
+  const [response] = await operation.promise();
+
+  console.log('✅ Transcription complete!');
+
+  // Clean up GCS file
+  try {
+    await bucket.file(fileName).delete();
+    console.log('🗑️  Cleaned up GCS file');
+  } catch (cleanupError) {
+    console.warn('⚠️  Failed to cleanup GCS file:', cleanupError.message);
   }
+
+  return formatGoogleCloudTranscript(response);
 }
 
 // Format Google Cloud transcript response
@@ -298,104 +348,34 @@ async function transcribeWithGemini(audioFilePath) {
 }
 
 // Smart transcription function - chooses best strategy based on video duration
-async function transcribeAudioSmart(audioFilePath, videoDuration) {
+async function transcribeAudioSmart(audioFilePath, videoDuration, projectId) {
   const durationMinutes = videoDuration / 60;
   console.log(`📊 Video duration: ${durationMinutes.toFixed(1)} minutes`);
 
-  // Strategy 1: Short videos (< 15 min) - Use Gemini directly (fast & free)
-  if (durationMinutes < 15 && useGemini && geminiAI) {
-    console.log('✨ Strategy: Gemini direct (short video, < 15 min)');
+  // Strategy 1: Short videos (< 10 min) - Use Gemini directly (fast & free)
+  // Only for very short videos where Gemini is reliable
+  if (durationMinutes < 10 && useGemini && geminiAI) {
+    console.log('✨ Strategy: Gemini direct (short video, < 10 min)');
     try {
       return await transcribeWithGemini(audioFilePath);
     } catch (geminiError) {
-      console.log('⚠️  Gemini failed, falling back to Google Cloud...');
-      if (speechClient) {
-        return await transcribeWithGoogleCloud(audioFilePath, videoDuration);
+      console.log('⚠️  Gemini failed, falling back to Google Cloud Long Running API...');
+      if (speechClient && projectId) {
+        return await transcribeWithGoogleCloudLongRunning(audioFilePath, videoDuration, projectId);
       }
       throw geminiError;
     }
   }
 
-  // Strategy 2: Medium videos (15-30 min) - Use Google Cloud directly (reliable)
-  if (durationMinutes < 30 && speechClient) {
-    console.log('✨ Strategy: Google Cloud direct (medium video, 15-30 min)');
-    return await transcribeWithGoogleCloud(audioFilePath, videoDuration);
+  // Strategy 2: ALL videos >= 10 min - Use Google Cloud Long Running API
+  // This is the RELIABLE path - designed for production use
+  if (speechClient && projectId) {
+    console.log('✨ Strategy: Google Cloud Long Running API (production-grade, supports up to 8 hours)');
+    return await transcribeWithGoogleCloudLongRunning(audioFilePath, videoDuration, projectId);
   }
 
-  // Strategy 3: Long videos (30+ min) - Chunk + process sequentially
-  console.log('✨ Strategy: Chunking + sequential processing (long video, 30+ min)');
-
-  // Check if we have Gemini available (required for chunking)
-  if (!useGemini || !geminiAI) {
-    throw new Error('Gemini API required for long video transcription. Please configure GEMINI_API_KEY.');
-  }
-
-  // Step 1: Chunk audio into 5-minute segments (better for API limits)
-  const chunkFiles = await chunkAudioFile(audioFilePath, 300); // 5 min chunks
-  console.log(`Processing ${chunkFiles.length} chunks sequentially to avoid API overload...`);
-
-  // Step 2: Process chunks SEQUENTIALLY with delays to avoid 503 errors
-  const chunkTranscripts = [];
-  const chunkDuration = 300; // 5 minutes per chunk
-
-  for (let i = 0; i < chunkFiles.length; i++) {
-    const chunkPath = chunkFiles[i];
-    const chunkNumber = i;
-
-    console.log(`📦 Processing chunk ${i + 1}/${chunkFiles.length} (${Math.round((i + 1) / chunkFiles.length * 100)}% complete)`);
-
-    try {
-      // Wait 3 seconds before each chunk to spread API load
-      if (i > 0) {
-        console.log('⏳ Waiting 3s before next chunk to avoid API overload...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
-
-      // Use Gemini only (Google Cloud has inline duration limits)
-      const transcript = await transcribeWithGemini(chunkPath);
-
-      // Adjust timestamps for chunk position
-      transcript.words = transcript.words.map(w => ({
-        ...w,
-        startTime: w.startTime + (chunkNumber * chunkDuration),
-        endTime: w.endTime + (chunkNumber * chunkDuration),
-      }));
-
-      chunkTranscripts.push(transcript);
-      console.log(`✅ Chunk ${i + 1} complete (${transcript.words.length} words)`);
-    } catch (chunkError) {
-      console.error(`❌ Chunk ${i + 1} failed:`, chunkError.message);
-      // Return partial transcript to avoid losing all progress
-      chunkTranscripts.push({
-        text: `[Transcription failed for this segment]`,
-        words: [],
-        segments: [],
-      });
-    }
-  }
-
-  // Step 3: Merge all chunk transcripts
-  const mergedTranscript = {
-    text: chunkTranscripts.map(t => t.text).join(' '),
-    words: chunkTranscripts.flatMap(t => t.words),
-    segments: chunkTranscripts.flatMap(t => t.segments || []),
-  };
-
-  // Step 4: Clean up chunk files
-  chunkFiles.forEach(chunkPath => {
-    try {
-      if (fs.existsSync(chunkPath)) {
-        fs.unlinkSync(chunkPath);
-      }
-    } catch (cleanupError) {
-      console.warn(`Failed to delete chunk ${chunkPath}:`, cleanupError.message);
-    }
-  });
-
-  console.log('✅ All chunks transcribed and merged successfully');
-  console.log(`📊 Total words: ${mergedTranscript.words.length}`);
-
-  return mergedTranscript;
+  // Fallback: If Google Cloud not configured, fail gracefully
+  throw new Error('Google Cloud Speech-to-Text required for videos >= 10 minutes. Gemini API is unreliable for long audio.');
 }
 
 // Helper function to generate suggested prompts asynchronously
@@ -483,7 +463,8 @@ async function processTranscriptionQueue() {
 
     console.log('Starting smart transcription for project:', projectId);
     console.log('Video duration:', project.duration, 'seconds');
-    const transcript = await transcribeAudioSmart(project.localAudioPath, project.duration || 600);
+    const gcpProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+    const transcript = await transcribeAudioSmart(project.localAudioPath, project.duration || 600, gcpProjectId);
 
     // Update project
     if (!useMockMode && firestore) {
