@@ -122,7 +122,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                 <Zap className="w-4 h-4 text-white" />
               </div>
               <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                WanderMind
+                Lurnia
               </span>
             </button>
           </div>
