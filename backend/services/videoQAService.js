@@ -311,15 +311,16 @@ class VideoQAService {
     enhanced = enhanced.replace(/([^\n])\n(#{1,3}\s+.+)/g, '$1\n\n$2');
     enhanced = enhanced.replace(/(#{1,3}\s+.+)\n([^\n#])/g, '$1\n\n$2');
 
-    // Blank line before numbered and bullet lists
+    // Blank line before numbered and bullet lists (but ONLY before first item)
     enhanced = enhanced.replace(/([^\n])\n(\d+\.\s+)/g, '$1\n\n$2');
-    enhanced = enhanced.replace(/([^\n])\n([-\*]\s+)/g, '$1\n\n$2');
+    enhanced = enhanced.replace(/([^\n-\*])\n([-\*]\s+)/g, '$1\n\n$2');
 
-    // Blank line after lists (before regular text)
+    // Blank line after lists (before regular text) - but ONLY after last item
     enhanced = enhanced.replace(/(\d+\.\s+.+)\n([^\d\n])/g, '$1\n\n$2');
     enhanced = enhanced.replace(/([-\*]\s+.+)\n([^\-\*\n#])/g, '$1\n\n$2');
 
     // --- PHASE 2: ULTRA-AGGRESSIVE PARAGRAPH BREAKING (1-2 SENTENCES MAX) ---
+    // BUT: Keep list items together!
 
     const paragraphs = enhanced.split(/\n\n+/);
     const processedParagraphs = paragraphs.map(para => {
@@ -332,6 +333,14 @@ class VideoQAService {
           trimmed.match(/^[-\*]\s+/) ||
           trimmed.match(/^References?:/i) ||
           trimmed.match(/^[🎯⚡💰🚀⚠️✅❌💡🔥]\s*\*\*/)) {  // Skip emoji-prefixed headings
+        return para;
+      }
+
+      // Check if this paragraph contains list items (keep them together!)
+      const lines = trimmed.split('\n');
+      const hasListItems = lines.some(line => line.match(/^[-\*\d+\.]\s+/));
+      if (hasListItems) {
+        // Don't break up paragraphs that contain lists
         return para;
       }
 
