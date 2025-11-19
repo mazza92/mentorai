@@ -113,7 +113,10 @@
     "error_enter_url": "Please enter a YouTube URL",
     "error_invalid_url": "Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=...)",
     "error_timeout": "Download is taking longer than expected. The video may still be processing. Please wait a few minutes and check your conversations.",
-    "error_download_failed": "Failed to download YouTube video. Please check the URL and try again."
+    "error_download_failed": "Failed to download YouTube video. Please check the URL and try again.",
+    "whats_happening": "What's happening:",
+    "download_description": "We're downloading your video from YouTube and extracting the audio. This typically takes 1-2 minutes depending on video length.",
+    "after_download_tip": "After download, transcription will start automatically (~1-3 min for most videos)"
   },
 
   "conversations": {

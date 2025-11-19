@@ -169,15 +169,15 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
 
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
                       <p className="text-xs text-blue-900 font-medium">
-                        📥 What's happening:
+                        📥 {t('upload.whats_happening')}
                       </p>
                       <p className="text-xs text-blue-700 leading-relaxed">
-                        We're downloading your video from YouTube and extracting the audio. This typically takes 1-2 minutes depending on video length.
+                        {t('upload.download_description')}
                       </p>
                     </div>
 
                     <p className="text-xs text-slate-500">
-                      💡 After download, transcription will start automatically (~1-3 min for most videos)
+                      💡 {t('upload.after_download_tip')}
                     </p>
                   </div>
                 </div>
