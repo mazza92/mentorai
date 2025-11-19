@@ -295,7 +295,7 @@ export default function Home() {
                   <Zap className="w-10 h-10 text-white" />
                 </div>
                 <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent mb-5">
-                  WanderMind
+                  Lurnia
                 </h1>
                 <p className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
                   Turn video content into searchable knowledge. Ask questions and get instant answers with timestamp citations.
