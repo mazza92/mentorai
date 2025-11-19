@@ -279,8 +279,8 @@ async function transcribeWithGemini(audioFilePath) {
 
       if (shouldRetry) {
         retryCount++;
-        // Simple exponential backoff: 5s, 10s, 20s
-        const waitTime = Math.pow(2, retryCount) * 2500 + Math.random() * 1000;
+        // Longer delays to give API time to recover: 10s, 20s, 40s
+        const waitTime = Math.pow(2, retryCount) * 5000 + Math.random() * 2000;
         console.log(`⚠️  Gemini failed (${is503Error ? '503' : '429'}). Retrying in ${Math.floor(waitTime/1000)}s... (${retryCount}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
@@ -322,77 +322,55 @@ async function transcribeAudioSmart(audioFilePath, videoDuration) {
     return await transcribeWithGoogleCloud(audioFilePath, videoDuration);
   }
 
-  // Strategy 3: Long videos (30+ min) - Chunk + process in parallel
-  console.log('✨ Strategy: Chunking + parallel processing (long video, 30+ min)');
+  // Strategy 3: Long videos (30+ min) - Chunk + process sequentially
+  console.log('✨ Strategy: Chunking + sequential processing (long video, 30+ min)');
 
-  // Check if we have any transcription service available
-  if (!useGemini && !geminiAI && !speechClient) {
-    throw new Error('No transcription service available for chunking. Configure GEMINI_API_KEY or Google Cloud credentials.');
+  // Check if we have Gemini available (required for chunking)
+  if (!useGemini || !geminiAI) {
+    throw new Error('Gemini API required for long video transcription. Please configure GEMINI_API_KEY.');
   }
 
-  // Step 1: Chunk audio into 10-minute segments
-  const chunkFiles = await chunkAudioFile(audioFilePath, 600);
-  console.log(`Processing ${chunkFiles.length} chunks in parallel...`);
+  // Step 1: Chunk audio into 5-minute segments (better for API limits)
+  const chunkFiles = await chunkAudioFile(audioFilePath, 300); // 5 min chunks
+  console.log(`Processing ${chunkFiles.length} chunks sequentially to avoid API overload...`);
 
-  // Step 2: Process chunks in parallel (2 at a time to avoid overload)
+  // Step 2: Process chunks SEQUENTIALLY with delays to avoid 503 errors
   const chunkTranscripts = [];
-  const PARALLEL_LIMIT = 2;
+  const chunkDuration = 300; // 5 minutes per chunk
 
-  for (let i = 0; i < chunkFiles.length; i += PARALLEL_LIMIT) {
-    const batch = chunkFiles.slice(i, i + PARALLEL_LIMIT);
-    console.log(`📦 Processing batch ${Math.floor(i/PARALLEL_LIMIT) + 1}/${Math.ceil(chunkFiles.length/PARALLEL_LIMIT)} (chunks ${i + 1}-${Math.min(i + PARALLEL_LIMIT, chunkFiles.length)})`);
+  for (let i = 0; i < chunkFiles.length; i++) {
+    const chunkPath = chunkFiles[i];
+    const chunkNumber = i;
 
-    const batchPromises = batch.map(async (chunkPath, batchIndex) => {
-      const chunkNumber = i + batchIndex;
-      const chunkDuration = 600; // 10 minutes per chunk
+    console.log(`📦 Processing chunk ${i + 1}/${chunkFiles.length} (${Math.round((i + 1) / chunkFiles.length * 100)}% complete)`);
 
-      try {
-        let transcript;
-
-        // Try Gemini first for chunks (free, fast for 10-min segments), fallback to Google Cloud
-        if (useGemini && geminiAI) {
-          try {
-            transcript = await transcribeWithGemini(chunkPath);
-          } catch (geminiError) {
-            console.warn(`⚠️  Gemini failed for chunk ${chunkNumber + 1}, falling back to Google Cloud:`, geminiError.message);
-            if (speechClient) {
-              transcript = await transcribeWithGoogleCloud(chunkPath, chunkDuration);
-            } else {
-              throw geminiError;
-            }
-          }
-        } else if (speechClient) {
-          // Use Google Cloud if Gemini not available
-          transcript = await transcribeWithGoogleCloud(chunkPath, chunkDuration);
-        } else {
-          throw new Error('No transcription service available');
-        }
-
-        // Adjust timestamps for chunk position
-        transcript.words = transcript.words.map(w => ({
-          ...w,
-          startTime: w.startTime + (chunkNumber * chunkDuration),
-          endTime: w.endTime + (chunkNumber * chunkDuration),
-        }));
-
-        return transcript;
-      } catch (chunkError) {
-        console.error(`❌ Chunk ${chunkNumber + 1} failed after all attempts:`, chunkError.message);
-        // Return partial transcript to avoid losing all progress
-        return {
-          text: `[Transcription failed for this segment]`,
-          words: [],
-          segments: [],
-        };
+    try {
+      // Wait 3 seconds before each chunk to spread API load
+      if (i > 0) {
+        console.log('⏳ Waiting 3s before next chunk to avoid API overload...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
-    });
 
-    const batchResults = await Promise.all(batchPromises);
-    chunkTranscripts.push(...batchResults);
+      // Use Gemini only (Google Cloud has inline duration limits)
+      const transcript = await transcribeWithGemini(chunkPath);
 
-    // Small delay between batches to avoid API overload
-    if (i + PARALLEL_LIMIT < chunkFiles.length) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Adjust timestamps for chunk position
+      transcript.words = transcript.words.map(w => ({
+        ...w,
+        startTime: w.startTime + (chunkNumber * chunkDuration),
+        endTime: w.endTime + (chunkNumber * chunkDuration),
+      }));
+
+      chunkTranscripts.push(transcript);
+      console.log(`✅ Chunk ${i + 1} complete (${transcript.words.length} words)`);
+    } catch (chunkError) {
+      console.error(`❌ Chunk ${i + 1} failed:`, chunkError.message);
+      // Return partial transcript to avoid losing all progress
+      chunkTranscripts.push({
+        text: `[Transcription failed for this segment]`,
+        words: [],
+        segments: [],
+      });
     }
   }
 
