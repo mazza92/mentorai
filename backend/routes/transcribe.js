@@ -47,37 +47,27 @@ if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_ap
 
 try {
   if (process.env.GOOGLE_CLOUD_PROJECT_ID && process.env.GOOGLE_CLOUD_PROJECT_ID !== 'your_project_id') {
-    speechClient = new SpeechClient({
+    const speechConfig = {
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-    });
-    const firestoreConfig = {
-
-      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-
     };
 
+    const firestoreConfig = {
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+    };
 
     // Handle credentials from Railway environment variable
-
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-
       try {
-
         const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-
+        speechConfig.credentials = credentials;
         firestoreConfig.credentials = credentials;
-
       } catch (error) {
-
         console.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON');
-
         throw error;
-
       }
-
     }
 
-
+    speechClient = new SpeechClient(speechConfig);
     firestore = new Firestore(firestoreConfig);
     console.log('✅ Google Cloud Speech-to-Text enabled for transcription');
   } else if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' && useOpenAIFlag) {
@@ -335,6 +325,11 @@ async function transcribeAudioSmart(audioFilePath, videoDuration) {
   // Strategy 3: Long videos (30+ min) - Chunk + process in parallel
   console.log('✨ Strategy: Chunking + parallel processing (long video, 30+ min)');
 
+  // Check if we have any transcription service available
+  if (!useGemini && !geminiAI && !speechClient) {
+    throw new Error('No transcription service available for chunking. Configure GEMINI_API_KEY or Google Cloud credentials.');
+  }
+
   // Step 1: Chunk audio into 10-minute segments
   const chunkFiles = await chunkAudioFile(audioFilePath, 600);
   console.log(`Processing ${chunkFiles.length} chunks in parallel...`);
@@ -352,30 +347,37 @@ async function transcribeAudioSmart(audioFilePath, videoDuration) {
       const chunkDuration = 600; // 10 minutes per chunk
 
       try {
-        // Prefer Google Cloud for reliability, fallback to Gemini
-        if (speechClient) {
-          const transcript = await transcribeWithGoogleCloud(chunkPath, chunkDuration);
-          // Adjust timestamps for chunk position
-          transcript.words = transcript.words.map(w => ({
-            ...w,
-            startTime: w.startTime + (chunkNumber * chunkDuration),
-            endTime: w.endTime + (chunkNumber * chunkDuration),
-          }));
-          return transcript;
-        } else if (useGemini && geminiAI) {
-          const transcript = await transcribeWithGemini(chunkPath);
-          // Adjust timestamps for chunk position
-          transcript.words = transcript.words.map(w => ({
-            ...w,
-            startTime: w.startTime + (chunkNumber * chunkDuration),
-            endTime: w.endTime + (chunkNumber * chunkDuration),
-          }));
-          return transcript;
+        let transcript;
+
+        // Try Gemini first for chunks (free, fast for 10-min segments), fallback to Google Cloud
+        if (useGemini && geminiAI) {
+          try {
+            transcript = await transcribeWithGemini(chunkPath);
+          } catch (geminiError) {
+            console.warn(`⚠️  Gemini failed for chunk ${chunkNumber + 1}, falling back to Google Cloud:`, geminiError.message);
+            if (speechClient) {
+              transcript = await transcribeWithGoogleCloud(chunkPath, chunkDuration);
+            } else {
+              throw geminiError;
+            }
+          }
+        } else if (speechClient) {
+          // Use Google Cloud if Gemini not available
+          transcript = await transcribeWithGoogleCloud(chunkPath, chunkDuration);
         } else {
           throw new Error('No transcription service available');
         }
+
+        // Adjust timestamps for chunk position
+        transcript.words = transcript.words.map(w => ({
+          ...w,
+          startTime: w.startTime + (chunkNumber * chunkDuration),
+          endTime: w.endTime + (chunkNumber * chunkDuration),
+        }));
+
+        return transcript;
       } catch (chunkError) {
-        console.error(`❌ Chunk ${chunkNumber + 1} failed:`, chunkError.message);
+        console.error(`❌ Chunk ${chunkNumber + 1} failed after all attempts:`, chunkError.message);
         // Return partial transcript to avoid losing all progress
         return {
           text: `[Transcription failed for this segment]`,
