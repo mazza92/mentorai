@@ -358,6 +358,9 @@ class VideoQAService {
     enhanced = enhanced.replace(/([^\n])\n(#{1,3}\s+.+)/g, '$1\n\n$2');
     enhanced = enhanced.replace(/(#{1,3}\s+.+)\n([^\n#])/g, '$1\n\n$2');
 
+    // CRITICAL: Blank line before emoji section headers (⚡, 🎯, ✅, 💡, 🚫, ⚠️, etc.)
+    enhanced = enhanced.replace(/([^\n])\n([🎯⚡💰🚀⚠️✅❌💡🔥🚫]\s*\*\*)/g, '$1\n\n$2');
+
     // Blank line before numbered and bullet lists (but ONLY before first item)
     enhanced = enhanced.replace(/([^\n])\n(\d+\.\s+)/g, '$1\n\n$2');
     enhanced = enhanced.replace(/([^\n-\*])\n([-\*]\s+)/g, '$1\n\n$2');
@@ -416,8 +419,17 @@ class VideoQAService {
     // Remove excessive newlines (max 2)
     enhanced = enhanced.replace(/\n{3,}/g, '\n\n');
 
-    // Ensure blank line before "References:" if not already present
-    enhanced = enhanced.replace(/([^\n])\n(References?:)/gi, '$1\n\n$2');
+    // Ensure blank line before "References:" or "Références:" if not already present
+    enhanced = enhanced.replace(/([^\n])\n(Références?:)/gi, '$1\n\n$2');
+
+    // Remove duplicate reference headers (Gemini sometimes adds both "Références:" and "References:")
+    // Keep only the first one (French if present, otherwise English)
+    const hasFrenchRef = /Références:/i.test(enhanced);
+    const hasEnglishRef = /References:/i.test(enhanced);
+    if (hasFrenchRef && hasEnglishRef) {
+      // Remove the English "References:" line if both exist
+      enhanced = enhanced.replace(/\n\n?References:\n/gi, '\n');
+    }
 
     // Final trim
     enhanced = enhanced.trim();
