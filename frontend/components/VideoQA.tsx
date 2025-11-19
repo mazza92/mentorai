@@ -20,6 +20,7 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
   const [messages, setMessages] = useState<QAMessage[]>([])
   const [input, setInput] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [retryAttempt, setRetryAttempt] = useState(0) // Track retry attempts for UI feedback
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Initialize messages on client side only
@@ -47,6 +48,18 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Helper: Sleep for exponential backoff
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+  // Helper: Check if error is retryable (503, timeout, network errors)
+  const isRetryableError = (error: any): boolean => {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') return true
+    if (error.response?.status === 503) return true
+    if (error.message?.includes('timeout')) return true
+    if (error.message?.includes('network')) return true
+    return false
+  }
+
   const handleSend = async () => {
     if (!input.trim() || processing) return
 
@@ -60,36 +73,85 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
     const question = input
     setInput('')
     setProcessing(true)
+    setRetryAttempt(0)
 
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-      const response = await axios.post(`${apiUrl}/api/qa`, {
-        projectId,
-        question,
-        userId,
-      })
+    const maxRetries = 3
+    let lastError: any = null
 
-      if (response.data.success) {
-        const assistantMessage: QAMessage = {
-          role: 'assistant',
-          content: response.data.answer,
-          citations: response.data.citations || [],
-          timestamp: new Date(),
+    // Retry loop with exponential backoff
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Get current language from i18n
+        const currentLanguage = typeof window !== 'undefined'
+          ? (localStorage.getItem('wandermind_language') || navigator.language.split('-')[0] || 'en')
+          : 'en'
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+        // Configure axios with timeout
+        const response = await axios.post(
+          `${apiUrl}/api/qa`,
+          {
+            projectId,
+            question,
+            userId,
+            language: currentLanguage,
+          },
+          {
+            timeout: 60000, // 60 second timeout per attempt
+          }
+        )
+
+        if (response.data.success) {
+          const assistantMessage: QAMessage = {
+            role: 'assistant',
+            content: response.data.answer,
+            citations: response.data.citations || [],
+            timestamp: new Date(),
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+          setProcessing(false)
+          setRetryAttempt(0)
+          return // Success! Exit retry loop
         }
-        setMessages((prev) => [...prev, assistantMessage])
+      } catch (error: any) {
+        lastError = error
+        console.error(`Q&A attempt ${attempt + 1}/${maxRetries + 1} failed:`, error.message)
+
+        // Check if we should retry
+        if (isRetryableError(error) && attempt < maxRetries) {
+          // Calculate exponential backoff: 2s, 4s, 8s
+          const backoffMs = Math.pow(2, attempt + 1) * 1000
+          const jitter = Math.random() * 500 // Add 0-500ms jitter
+          const waitTime = backoffMs + jitter
+
+          console.log(`Retrying in ${Math.floor(waitTime / 1000)}s... (attempt ${attempt + 1}/${maxRetries})`)
+          setRetryAttempt(attempt + 1) // Update UI with retry count
+
+          await sleep(waitTime)
+          continue // Retry
+        } else {
+          // Not retryable or max retries reached - fail permanently
+          break
+        }
       }
-    } catch (error: any) {
-      console.error('Q&A error:', error)
-      const errorDetails = error.response?.data?.error || error.message || 'Failed to answer your question. Please try again.'
-      const errorMessage: QAMessage = {
-        role: 'assistant',
-        content: `❌ Error: ${errorDetails}`,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setProcessing(false)
     }
+
+    // All retries exhausted - show error
+    setProcessing(false)
+    setRetryAttempt(0)
+
+    const errorDetails = lastError?.response?.data?.error || lastError?.message || 'Failed to answer your question.'
+    const isServiceBusy = lastError?.response?.status === 503
+
+    const errorMessage: QAMessage = {
+      role: 'assistant',
+      content: isServiceBusy
+        ? `⚠️ **Service Busy**\n\nThe AI service is currently experiencing high demand. We tried ${maxRetries} times but couldn't get through.\n\nPlease wait a moment and try again.`
+        : `❌ **Error**\n\n${errorDetails}\n\nPlease try again or rephrase your question.`,
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, errorMessage])
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -145,7 +207,11 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
             <div className="bg-gray-100 rounded-lg p-3">
               <div className="flex items-center space-x-2">
                 <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
-                <span className="text-sm text-gray-600">Analyzing video and preparing answer...</span>
+                <span className="text-sm text-gray-600">
+                  {retryAttempt > 0
+                    ? `Service busy, retrying... (${retryAttempt}/3)`
+                    : 'Analyzing video and preparing answer...'}
+                </span>
               </div>
             </div>
           </div>
