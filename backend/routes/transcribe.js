@@ -109,7 +109,111 @@ try {
   }
 }
 
-// Helper function to transcribe with Gemini
+// Helper function to chunk audio file using FFmpeg
+async function chunkAudioFile(audioFilePath, chunkDurationSeconds = 600) {
+  const { execSync } = require('child_process');
+  const audioDir = path.dirname(audioFilePath);
+  const audioBasename = path.basename(audioFilePath, path.extname(audioFilePath));
+  const chunkPattern = path.join(audioDir, `${audioBasename}_chunk_%03d.mp3`);
+
+  console.log(`🔪 Chunking audio into ${chunkDurationSeconds}s segments...`);
+
+  try {
+    // Use FFmpeg to split audio into chunks
+    execSync(`ffmpeg -i "${audioFilePath}" -f segment -segment_time ${chunkDurationSeconds} -c copy "${chunkPattern}" -y`, {
+      stdio: 'pipe'
+    });
+
+    // Find all chunk files
+    const chunkFiles = [];
+    let chunkIndex = 0;
+    while (true) {
+      const chunkPath = path.join(audioDir, `${audioBasename}_chunk_${String(chunkIndex).padStart(3, '0')}.mp3`);
+      if (fs.existsSync(chunkPath)) {
+        chunkFiles.push(chunkPath);
+        chunkIndex++;
+      } else {
+        break;
+      }
+    }
+
+    console.log(`✅ Created ${chunkFiles.length} audio chunks`);
+    return chunkFiles;
+  } catch (error) {
+    console.error('❌ Failed to chunk audio:', error.message);
+    throw new Error('Audio chunking failed');
+  }
+}
+
+// Helper function to transcribe with Google Cloud Speech-to-Text (best for long audio)
+async function transcribeWithGoogleCloud(audioFilePath, duration) {
+  if (!speechClient) {
+    throw new Error('Google Cloud Speech-to-Text not configured');
+  }
+
+  console.log('🎙️  Using Google Cloud Speech-to-Text for reliable transcription...');
+
+  // Read audio file
+  const audioBytes = fs.readFileSync(audioFilePath);
+
+  const audio = {
+    content: audioBytes.toString('base64'),
+  };
+
+  const config = {
+    encoding: 'MP3',
+    sampleRateHertz: 44100,
+    languageCode: 'en-US',
+    enableAutomaticPunctuation: true,
+    enableWordTimeOffsets: true,
+    model: 'video',
+    useEnhanced: true, // Use enhanced model for better accuracy
+  };
+
+  const request = {
+    audio: audio,
+    config: config,
+  };
+
+  // Use longRunningRecognize for files > 60 seconds
+  if (duration > 60) {
+    const [operation] = await speechClient.longRunningRecognize(request);
+    const [response] = await operation.promise();
+    return formatGoogleCloudTranscript(response);
+  } else {
+    const [response] = await speechClient.recognize(request);
+    return formatGoogleCloudTranscript(response);
+  }
+}
+
+// Format Google Cloud transcript response
+function formatGoogleCloudTranscript(response) {
+  const transcript = {
+    text: '',
+    words: [],
+    segments: [],
+  };
+
+  response.results.forEach((result) => {
+    const alternative = result.alternatives[0];
+    transcript.text += alternative.transcript + ' ';
+
+    if (alternative.words) {
+      alternative.words.forEach((wordInfo) => {
+        transcript.words.push({
+          word: wordInfo.word,
+          startTime: parseFloat(wordInfo.startTime.seconds || 0) + (wordInfo.startTime.nanos || 0) / 1e9,
+          endTime: parseFloat(wordInfo.endTime.seconds || 0) + (wordInfo.endTime.nanos || 0) / 1e9,
+          confidence: wordInfo.confidence || 0.9,
+        });
+      });
+    }
+  });
+
+  return transcript;
+}
+
+// Helper function to transcribe with Gemini (best for shorter audio < 15 min)
 async function transcribeWithGemini(audioFilePath) {
   console.log('Using Gemini for audio transcription...');
 
@@ -130,11 +234,10 @@ async function transcribeWithGemini(audioFilePath) {
   // Use Gemini 2.5 Flash (same as rest of codebase - videoQAService, topics, etc.)
   const model = geminiAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // Retry logic for Gemini transcription with optimized delays
-  const maxRetries = 8; // Increased to 8 attempts for better success rate
+  // Retry logic for Gemini transcription - REDUCED retries since it should only handle short audio
+  const maxRetries = 3;
   let retryCount = 0;
   let lastError;
-  let consecutive503Errors = 0; // Track consecutive 503 errors for circuit breaker
 
   while (retryCount < maxRetries) {
     try {
@@ -159,8 +262,6 @@ async function transcribeWithGemini(audioFilePath) {
       const response = await result.response;
       const transcriptionText = response.text();
 
-      // Success! Reset error counters
-      consecutive503Errors = 0;
       console.log('✅ Gemini transcription complete');
       console.log('📊 Transcript length:', transcriptionText.length, 'characters');
 
@@ -184,56 +285,19 @@ async function transcribeWithGemini(audioFilePath) {
       const is503Error = error.message?.includes('503') || error.message?.includes('overloaded');
       const isRateLimit = error.message?.includes('rate limit') || error.message?.includes('429');
 
-      if (is503Error) {
-        consecutive503Errors++;
-      } else {
-        consecutive503Errors = 0; // Reset if not 503
-      }
-
-      // Circuit breaker: If we get 3+ consecutive 503 errors, use longer delays
-      const isInfrastructureOverload = consecutive503Errors >= 3;
-
-      // Check if we should retry
       const shouldRetry = (is503Error || isRateLimit) && retryCount < maxRetries - 1;
 
       if (shouldRetry) {
         retryCount++;
-        
-        // Optimized delay strategy:
-        // - Infrastructure overload (503): Much longer delays
-        // - Rate limits (429): Moderate delays
-        // - Use exponential backoff with jitter
-        let baseDelay;
-        if (isInfrastructureOverload) {
-          // For infrastructure overload, use very long delays
-          // Delays: 30s, 60s, 120s, 240s, 480s, 960s, 1920s, 3840s
-          baseDelay = Math.pow(2, retryCount) * 15000; // Start at 30s
-        } else if (isRateLimit) {
-          // For rate limits, use moderate delays
-          // Delays: 10s, 20s, 40s, 80s, 160s, 320s, 640s, 1280s
-          baseDelay = Math.pow(2, retryCount) * 5000; // Start at 10s
-        } else {
-          // Default: moderate delays
-          baseDelay = Math.pow(2, retryCount) * 5000;
-        }
-
-        // Add jitter (20-30% of base delay) to avoid synchronized retries
-        const jitterPercent = 0.2 + Math.random() * 0.1; // 20-30%
-        const jitter = baseDelay * jitterPercent;
-        const waitTime = Math.floor(baseDelay + jitter);
-
-        const errorType = is503Error ? '503 overloaded' : 'rate limit';
-        console.log(`⚠️  Gemini transcription failed (${errorType}). Retrying in ${Math.floor(waitTime/1000)}s... (attempt ${retryCount}/${maxRetries})`);
-        if (isInfrastructureOverload) {
-          console.log(`⏳ Infrastructure overload detected. Using extended delays to allow API recovery...`);
-        }
-        
+        // Simple exponential backoff: 5s, 10s, 20s
+        const waitTime = Math.pow(2, retryCount) * 2500 + Math.random() * 1000;
+        console.log(`⚠️  Gemini failed (${is503Error ? '503' : '429'}). Retrying in ${Math.floor(waitTime/1000)}s... (${retryCount}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
 
-      // Max retries reached or non-retryable error
-      console.error(`❌ Transcription failed after ${retryCount} retries. Error:`, error.message);
+      // Max retries or non-retryable error
+      console.error(`❌ Gemini transcription failed: ${error.message}`);
       throw error;
     }
   }
@@ -241,6 +305,117 @@ async function transcribeWithGemini(audioFilePath) {
   // If we get here, all retries failed
   console.error(`❌ All ${maxRetries} transcription attempts failed`);
   throw lastError;
+}
+
+// Smart transcription function - chooses best strategy based on video duration
+async function transcribeAudioSmart(audioFilePath, videoDuration) {
+  const durationMinutes = videoDuration / 60;
+  console.log(`📊 Video duration: ${durationMinutes.toFixed(1)} minutes`);
+
+  // Strategy 1: Short videos (< 15 min) - Use Gemini directly (fast & free)
+  if (durationMinutes < 15 && useGemini && geminiAI) {
+    console.log('✨ Strategy: Gemini direct (short video, < 15 min)');
+    try {
+      return await transcribeWithGemini(audioFilePath);
+    } catch (geminiError) {
+      console.log('⚠️  Gemini failed, falling back to Google Cloud...');
+      if (speechClient) {
+        return await transcribeWithGoogleCloud(audioFilePath, videoDuration);
+      }
+      throw geminiError;
+    }
+  }
+
+  // Strategy 2: Medium videos (15-30 min) - Use Google Cloud directly (reliable)
+  if (durationMinutes < 30 && speechClient) {
+    console.log('✨ Strategy: Google Cloud direct (medium video, 15-30 min)');
+    return await transcribeWithGoogleCloud(audioFilePath, videoDuration);
+  }
+
+  // Strategy 3: Long videos (30+ min) - Chunk + process in parallel
+  console.log('✨ Strategy: Chunking + parallel processing (long video, 30+ min)');
+
+  // Step 1: Chunk audio into 10-minute segments
+  const chunkFiles = await chunkAudioFile(audioFilePath, 600);
+  console.log(`Processing ${chunkFiles.length} chunks in parallel...`);
+
+  // Step 2: Process chunks in parallel (2 at a time to avoid overload)
+  const chunkTranscripts = [];
+  const PARALLEL_LIMIT = 2;
+
+  for (let i = 0; i < chunkFiles.length; i += PARALLEL_LIMIT) {
+    const batch = chunkFiles.slice(i, i + PARALLEL_LIMIT);
+    console.log(`📦 Processing batch ${Math.floor(i/PARALLEL_LIMIT) + 1}/${Math.ceil(chunkFiles.length/PARALLEL_LIMIT)} (chunks ${i + 1}-${Math.min(i + PARALLEL_LIMIT, chunkFiles.length)})`);
+
+    const batchPromises = batch.map(async (chunkPath, batchIndex) => {
+      const chunkNumber = i + batchIndex;
+      const chunkDuration = 600; // 10 minutes per chunk
+
+      try {
+        // Prefer Google Cloud for reliability, fallback to Gemini
+        if (speechClient) {
+          const transcript = await transcribeWithGoogleCloud(chunkPath, chunkDuration);
+          // Adjust timestamps for chunk position
+          transcript.words = transcript.words.map(w => ({
+            ...w,
+            startTime: w.startTime + (chunkNumber * chunkDuration),
+            endTime: w.endTime + (chunkNumber * chunkDuration),
+          }));
+          return transcript;
+        } else if (useGemini && geminiAI) {
+          const transcript = await transcribeWithGemini(chunkPath);
+          // Adjust timestamps for chunk position
+          transcript.words = transcript.words.map(w => ({
+            ...w,
+            startTime: w.startTime + (chunkNumber * chunkDuration),
+            endTime: w.endTime + (chunkNumber * chunkDuration),
+          }));
+          return transcript;
+        } else {
+          throw new Error('No transcription service available');
+        }
+      } catch (chunkError) {
+        console.error(`❌ Chunk ${chunkNumber + 1} failed:`, chunkError.message);
+        // Return partial transcript to avoid losing all progress
+        return {
+          text: `[Transcription failed for this segment]`,
+          words: [],
+          segments: [],
+        };
+      }
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    chunkTranscripts.push(...batchResults);
+
+    // Small delay between batches to avoid API overload
+    if (i + PARALLEL_LIMIT < chunkFiles.length) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
+  // Step 3: Merge all chunk transcripts
+  const mergedTranscript = {
+    text: chunkTranscripts.map(t => t.text).join(' '),
+    words: chunkTranscripts.flatMap(t => t.words),
+    segments: chunkTranscripts.flatMap(t => t.segments || []),
+  };
+
+  // Step 4: Clean up chunk files
+  chunkFiles.forEach(chunkPath => {
+    try {
+      if (fs.existsSync(chunkPath)) {
+        fs.unlinkSync(chunkPath);
+      }
+    } catch (cleanupError) {
+      console.warn(`Failed to delete chunk ${chunkPath}:`, cleanupError.message);
+    }
+  });
+
+  console.log('✅ All chunks transcribed and merged successfully');
+  console.log(`📊 Total words: ${mergedTranscript.words.length}`);
+
+  return mergedTranscript;
 }
 
 // Helper function to generate suggested prompts asynchronously
@@ -326,8 +501,9 @@ async function processTranscriptionQueue() {
       throw new Error('No audio file found for transcription');
     }
 
-    console.log('Starting Gemini transcription for project:', projectId);
-    const transcript = await transcribeWithGemini(project.localAudioPath);
+    console.log('Starting smart transcription for project:', projectId);
+    console.log('Video duration:', project.duration, 'seconds');
+    const transcript = await transcribeAudioSmart(project.localAudioPath, project.duration || 600);
 
     // Update project
     if (!useMockMode && firestore) {
