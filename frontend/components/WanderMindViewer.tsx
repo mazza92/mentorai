@@ -1243,13 +1243,13 @@ const QnAPanel = ({
                 <Zap className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                WanderMind Q&A
+                Lurnia Q&A
               </h1>
             </div>
 
             {history.length === 0 && (
               <div className="text-slate-600 space-y-3 lg:space-y-4 p-4 lg:p-6 border-2 border-dashed border-slate-200 rounded-xl lg:rounded-2xl bg-gradient-to-br from-blue-50/50 to-purple-50/30">
-                <p className="font-semibold text-slate-900 text-base lg:text-lg">Hi! I'm WanderMind, your AI tutor for this video.</p>
+                <p className="font-semibold text-slate-900 text-base lg:text-lg">Hi! I'm Lurnia, your AI tutor for this video.</p>
                 <p className="text-xs lg:text-sm text-slate-600">Here are some questions to get you started:</p>
                 <div className="flex flex-wrap gap-2">
                   {suggestedPrompts.map(prompt => (
@@ -1317,7 +1317,7 @@ const QnAPanel = ({
                     handleQuery(query)
                   }
                 }}
-                placeholder="Ask WanderMind..."
+                placeholder="Ask Lurnia..."
                 className="flex-grow p-3 lg:p-3.5 text-sm lg:text-base bg-slate-50 border border-slate-200 text-slate-900 rounded-xl lg:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder-slate-400 shadow-sm"
                 disabled={isLoading}
               />

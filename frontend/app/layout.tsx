@@ -4,7 +4,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 
 export const metadata: Metadata = {
-  title: 'WanderMind - Your AI Learning Companion',
+  title: 'Lurnia - Your AI Learning Companion',
   description: 'Transform any YouTube video into an interactive learning experience with AI-powered Q&A',
 }
 
