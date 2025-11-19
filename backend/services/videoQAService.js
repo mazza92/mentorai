@@ -358,8 +358,9 @@ class VideoQAService {
     enhanced = enhanced.replace(/([^\n])\n(#{1,3}\s+.+)/g, '$1\n\n$2');
     enhanced = enhanced.replace(/(#{1,3}\s+.+)\n([^\n#])/g, '$1\n\n$2');
 
-    // CRITICAL: Blank line before emoji section headers (⚡, 🎯, ✅, 💡, 🚫, ⚠️, etc.)
-    enhanced = enhanced.replace(/([^\n])\n([🎯⚡💰🚀⚠️✅❌💡🔥🚫]\s*\*\*)/g, '$1\n\n$2');
+    // CRITICAL: Blank line before emoji section headers (with or without bold)
+    // Matches: "text\n⚡ **Title**" OR "text\n⚡ Title"
+    enhanced = enhanced.replace(/([^\n])\n([🎯⚡💰🚀⚠️✅❌💡🔥🚫]\s+)/g, '$1\n\n$2');
 
     // Blank line before numbered and bullet lists (but ONLY before first item)
     enhanced = enhanced.replace(/([^\n])\n(\d+\.\s+)/g, '$1\n\n$2');
@@ -382,8 +383,8 @@ class VideoQAService {
           trimmed.match(/^#{1,3}\s+/) ||
           trimmed.match(/^\d+\.\s+/) ||
           trimmed.match(/^[-\*]\s+/) ||
-          trimmed.match(/^References?:/i) ||
-          trimmed.match(/^[🎯⚡💰🚀⚠️✅❌💡🔥]\s*\*\*/)) {  // Skip emoji-prefixed headings
+          trimmed.match(/^Références?:/i) ||
+          trimmed.match(/^[🎯⚡💰🚀⚠️✅❌💡🔥🚫]\s+/)) {  // Skip emoji-prefixed sections (with or without bold)
         return para;
       }
 
@@ -427,8 +428,10 @@ class VideoQAService {
     const hasFrenchRef = /Références:/i.test(enhanced);
     const hasEnglishRef = /References:/i.test(enhanced);
     if (hasFrenchRef && hasEnglishRef) {
-      // Remove the English "References:" line if both exist
-      enhanced = enhanced.replace(/\n\n?References:\n/gi, '\n');
+      // Remove ALL "References:" lines (keep "Références:" for French)
+      enhanced = enhanced.replace(/\n+References:\s*/gi, '\n');
+      // Clean up any double newlines created
+      enhanced = enhanced.replace(/\n{3,}/g, '\n\n');
     }
 
     // Final trim
