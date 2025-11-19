@@ -713,10 +713,10 @@ You are an expert teacher sharing knowledge, NOT someone describing a video.
 
 Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nContinuez la conversation naturellement, en développant les explications précédentes.' : '\n\nContinue the conversation naturally, building on previous explanations.') : ''}`;
 
-        const promptInstruction = isFrench 
-          ? 'Répondez naturellement et de manière conversationnelle. Commencez par une réponse claire et directe à la question.'
-          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question.';
-        
+        const promptInstruction = isFrench
+          ? 'Répondez naturellement et de manière conversationnelle. Commencez par une réponse claire et directe à la question. IMPORTANT: Ajoutez une ligne vide entre chaque paragraphe et liste.'
+          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question. IMPORTANT: Add a blank line between each paragraph and list section.';
+
         const prompt = `${systemInstruction}\n\nQUESTION: ${userQuestion}\n\n${promptInstruction}`;
 
         console.log('Sending Q&A query to Gemini...');
