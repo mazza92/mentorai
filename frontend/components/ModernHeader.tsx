@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus, Crown } from 'lucide-react'
+import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus, Crown, Globe } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useLanguage } from '@/contexts/LanguageContext'
 import ConversationHistory from '@/components/ConversationHistory'
 import { Conversation } from '@/lib/conversationStorage'
 import UsageDashboard from '@/components/UsageDashboard'
@@ -19,10 +20,15 @@ interface ModernHeaderProps {
 export default function ModernHeader({ onNewProject, userId, currentProjectId, onSelectConversation }: ModernHeaderProps) {
   const router = useRouter()
   const { user, signOut } = useAuth()
+  const { language, setLanguage, t } = useLanguage()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [subscriptionTier, setSubscriptionTier] = useState<string>('free')
   const userMenuRef = useRef<HTMLDivElement>(null)
+
+  const toggleLanguage = () => {
+    setLanguage(language === 'en' ? 'fr' : 'en')
+  }
 
   // Fetch subscription status
   useEffect(() => {
@@ -123,13 +129,23 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
 
           {/* Right: User Menu & Mobile Menu Button */}
           <div className="flex items-center space-x-2">
+            {/* Language Switcher */}
+            <button
+              onClick={toggleLanguage}
+              className="hidden md:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700"
+              title={language === 'en' ? 'Switch to French' : 'Passer à l\'anglais'}
+            >
+              <Globe className="w-4 h-4" />
+              <span className="text-xs uppercase font-semibold">{language}</span>
+            </button>
+
             {/* Desktop Pricing Link (always visible) */}
             <button
               onClick={handlePricing}
               className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700"
             >
               <CreditCard className="w-4 h-4" />
-              <span>Pricing</span>
+              <span>{t('header.pricing')}</span>
             </button>
 
             {/* Desktop User Menu */}
@@ -156,7 +172,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                       <div className="flex items-center space-x-1 mt-0.5">
                         {subscriptionTier === 'pro' && <Crown className="w-3 h-3 text-yellow-500" />}
                         <p className="text-xs text-slate-500">
-                          {subscriptionTier === 'pro' ? 'Pro Tier' : 'Free Tier'}
+                          {subscriptionTier === 'pro' ? t('settings.pro_tier') : t('settings.free_tier')}
                         </p>
                       </div>
                     </div>
@@ -176,7 +192,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                       className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <CreditCard className="w-4 h-4" />
-                      <span>Pricing</span>
+                      <span>{t('header.pricing')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -186,7 +202,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                       className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <Settings className="w-4 h-4" />
-                      <span>Settings</span>
+                      <span>{t('header.settings')}</span>
                     </button>
                     <div className="border-t border-slate-100 my-1" />
                     <button
@@ -194,7 +210,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                       className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      <span>Sign out</span>
+                      <span>{t('auth.sign_out')}</span>
                     </button>
                   </div>
                 )}
@@ -240,7 +256,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                     <div className="flex items-center space-x-1">
                       {subscriptionTier === 'pro' && <Crown className="w-3 h-3 text-yellow-500" />}
                       <p className="text-xs text-slate-500">
-                        {subscriptionTier === 'pro' ? 'Pro Tier' : 'Free Tier'}
+                        {subscriptionTier === 'pro' ? t('settings.pro_tier') : t('settings.free_tier')}
                       </p>
                     </div>
                   </div>
@@ -255,12 +271,12 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <MessageSquare className="w-5 h-5 text-slate-600" />
-                      <h3 className="text-base font-semibold text-slate-900">Conversations</h3>
+                      <h3 className="text-base font-semibold text-slate-900">{t('header.conversations')}</h3>
                     </div>
                     <button
                       onClick={handleNewProjectClick}
                       className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="New conversation"
+                      title={t('header.new_conversation')}
                     >
                       <Plus className="w-4 h-4 text-blue-500" />
                     </button>
@@ -290,12 +306,22 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
 
             {/* Navigation Links */}
             <div className="px-4 py-4 space-y-1 border-t border-slate-200 bg-white">
+              {/* Language Switcher (Mobile) */}
+              <button
+                onClick={toggleLanguage}
+                className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                <Globe className="w-5 h-5 text-blue-500" />
+                <span>{language === 'en' ? 'English' : 'Français'}</span>
+                <span className="ml-auto text-xs uppercase font-semibold text-slate-500">{language}</span>
+              </button>
+
               <button
                 onClick={handlePricing}
                 className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
               >
                 <CreditCard className="w-5 h-5 text-purple-500" />
-                <span>Pricing</span>
+                <span>{t('header.pricing')}</span>
               </button>
 
               {isSupabaseConfigured && user && (
@@ -309,7 +335,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                     className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                   >
                     <CreditCard className="w-5 h-5 text-slate-500" />
-                    <span>Upgrade to Pro</span>
+                    <span>{t('header.upgrade_to_pro')}</span>
                   </button>
                   <button
                     onClick={() => {
@@ -319,7 +345,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                     className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                   >
                     <Settings className="w-5 h-5 text-slate-500" />
-                    <span>Settings</span>
+                    <span>{t('header.settings')}</span>
                   </button>
                   <div className="border-t border-slate-200 my-2" />
                   <button
@@ -327,7 +353,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                     className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <LogOut className="w-5 h-5" />
-                    <span>Sign out</span>
+                    <span>{t('auth.sign_out')}</span>
                   </button>
                 </>
               )}

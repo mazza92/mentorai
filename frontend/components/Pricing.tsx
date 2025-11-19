@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Check, Zap, Crown, Rocket, Loader2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 
 interface PricingPlan {
@@ -15,43 +16,46 @@ interface PricingPlan {
   popular?: boolean
 }
 
-const plans: PricingPlan[] = [
-  {
-    name: 'Free',
-    price: '$0',
-    priceId: '',
-    description: 'Perfect for trying out WanderMind',
-    features: [
-      '3 videos per month',
-      '15 questions per month',
-      'All AI features',
-      'Community support',
-    ],
-    icon: <Zap className="w-6 h-6" />,
-  },
-  {
-    name: 'Pro',
-    price: '$19',
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
-    description: 'For serious learners',
-    features: [
-      '50 videos per month',
-      'Unlimited questions',
-      'All AI features',
-      'Priority support',
-      'Export transcripts',
-      'Early access to new features',
-    ],
-    icon: <Crown className="w-6 h-6" />,
-    popular: true,
-  },
-]
+// Plans will be defined inside component to access translations
 
 export default function Pricing() {
+  const { t } = useTranslation('common')
   const { user, loading: authLoading } = useAuth()
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+
+  const plans: PricingPlan[] = [
+    {
+      name: t('pricing.free_tier'),
+      price: '$0',
+      priceId: '',
+      description: t('pricing.free_description'),
+      features: [
+        t('pricing.features.videos_per_month', { count: 3 }),
+        t('pricing.features.questions_per_month', { count: 15 }),
+        t('pricing.features.all_ai_features'),
+        t('pricing.features.community_support'),
+      ],
+      icon: <Zap className="w-6 h-6" />,
+    },
+    {
+      name: t('pricing.pro_tier'),
+      price: '$19',
+      priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
+      description: t('pricing.pro_description'),
+      features: [
+        t('pricing.features.videos_per_month', { count: 50 }),
+        t('pricing.features.unlimited_questions'),
+        t('pricing.features.all_ai_features'),
+        t('pricing.features.priority_support'),
+        t('pricing.features.export_transcripts'),
+        t('pricing.features.early_access'),
+      ],
+      icon: <Crown className="w-6 h-6" />,
+      popular: true,
+    },
+  ]
 
   useEffect(() => {
     if (user) {
@@ -73,7 +77,7 @@ export default function Pricing() {
 
   const handleSubscribe = async (priceId: string, planName: string) => {
     if (!user) {
-      alert('Please sign in to subscribe')
+      alert(t('auth.please_sign_in'))
       return
     }
 
@@ -139,13 +143,14 @@ export default function Pricing() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">Choose Your Plan</h1>
-          <p className="text-lg text-slate-600">Unlock the full potential of WanderMind AI</p>
+          <h1 className="text-4xl font-bold text-slate-900 mb-4">{t('pricing.title')}</h1>
+          <p className="text-lg text-slate-600">{t('pricing.subtitle')}</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {plans.map((plan) => {
-            const isCurrentPlan = plan.name.toLowerCase() === currentTier.toLowerCase()
+          {plans.map((plan, index) => {
+            const planTier = index === 0 ? 'free' : 'pro'
+            const isCurrentPlan = planTier === currentTier
 
             return (
               <div
@@ -157,7 +162,7 @@ export default function Pricing() {
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                     <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                      Most Popular
+                      {t('pricing.most_popular')}
                     </span>
                   </div>
                 )}
@@ -191,14 +196,14 @@ export default function Pricing() {
                     disabled
                     className="w-full py-3 px-4 bg-slate-200 text-slate-600 rounded-lg font-semibold cursor-not-allowed"
                   >
-                    Current Plan
+                    {t('pricing.current_plan')}
                   </button>
-                ) : plan.name === 'Free' ? (
+                ) : planTier === 'free' ? (
                   <button
                     disabled
                     className="w-full py-3 px-4 bg-slate-200 text-slate-600 rounded-lg font-semibold cursor-not-allowed"
                   >
-                    Free Plan
+                    {t('pricing.free_tier')}
                   </button>
                 ) : (
                   <button
@@ -209,7 +214,7 @@ export default function Pricing() {
                     {checkoutLoading === plan.priceId ? (
                       <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                     ) : (
-                      `Upgrade to ${plan.name}`
+                      t('pricing.upgrade_to', { plan: plan.name })
                     )}
                   </button>
                 )}
@@ -225,7 +230,7 @@ export default function Pricing() {
               disabled={loading}
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              {loading ? 'Loading...' : 'Manage your subscription'}
+              {loading ? t('common.loading') : t('pricing.manage_subscription')}
             </button>
           </div>
         )}

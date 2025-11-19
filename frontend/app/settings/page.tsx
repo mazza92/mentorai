@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Crown, Zap, CreditCard, LogOut, ArrowLeft } from 'lucide-react'
 import axios from 'axios'
 import UsageDashboard from '@/components/UsageDashboard'
 
 export default function SettingsPage() {
+  const { t } = useTranslation('common')
   const { user, signOut } = useAuth()
   const router = useRouter()
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null)
@@ -79,7 +81,7 @@ export default function SettingsPage() {
               className="flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
+              <span>{t('common.back')}</span>
             </button>
             <button
               onClick={() => router.push('/')}
@@ -99,23 +101,23 @@ export default function SettingsPage() {
       <div className="py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-2xl shadow-xl p-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-8">Settings</h1>
+            <h1 className="text-3xl font-bold text-slate-900 mb-8">{t('settings.title')}</h1>
 
             {/* Subscription Section */}
             <div className="mb-8 pb-8 border-b border-slate-200">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900 mb-2">Subscription</h2>
+                  <h2 className="text-xl font-semibold text-slate-900 mb-2">{t('settings.subscription')}</h2>
                   <div className="flex items-center space-x-2">
                     {isPro ? (
                       <>
                         <Crown className="w-5 h-5 text-yellow-500" />
-                        <span className="text-slate-700">Pro Tier</span>
+                        <span className="text-slate-700">{t('settings.pro_tier')}</span>
                       </>
                     ) : (
                       <>
                         <Zap className="w-5 h-5 text-slate-400" />
-                        <span className="text-slate-700">Free Tier</span>
+                        <span className="text-slate-700">{t('settings.free_tier')}</span>
                       </>
                     )}
                   </div>
@@ -131,7 +133,7 @@ export default function SettingsPage() {
                     ) : (
                       <>
                         <CreditCard className="w-4 h-4 mr-2" />
-                        Manage Subscription
+                        {t('pricing.manage_subscription')}
                       </>
                     )}
                   </button>
@@ -140,7 +142,7 @@ export default function SettingsPage() {
                     onClick={() => router.push('/pricing')}
                     className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all"
                   >
-                    Upgrade to Pro
+                    {t('header.upgrade_to_pro')}
                   </button>
                 )}
               </div>
@@ -148,17 +150,17 @@ export default function SettingsPage() {
               {subscriptionStatus?.subscription && (
                 <div className="mt-4 p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm text-slate-600">
-                    <strong>Status:</strong> {subscriptionStatus.subscription.status}
+                    <strong>{t('settings.status')}:</strong> {subscriptionStatus.subscription.status}
                   </p>
                   {subscriptionStatus.subscription.currentPeriodEnd && (
                     <p className="text-sm text-slate-600 mt-1">
-                      <strong>Renews:</strong>{' '}
+                      <strong>{t('settings.renews')}:</strong>{' '}
                       {new Date(subscriptionStatus.subscription.currentPeriodEnd * 1000).toLocaleDateString()}
                     </p>
                   )}
                   {subscriptionStatus.subscription.cancelAtPeriodEnd && (
                     <p className="text-sm text-orange-600 mt-1">
-                      Subscription will cancel at the end of the billing period
+                      {t('settings.cancel_notice')}
                     </p>
                   )}
                 </div>
@@ -167,19 +169,20 @@ export default function SettingsPage() {
 
             {/* Account Section */}
             <div className="mb-8 pb-8 border-b border-slate-200">
-              <h2 className="text-xl font-semibold text-slate-900 mb-4">Account</h2>
+              <h2 className="text-xl font-semibold text-slate-900 mb-4">{t('settings.account')}</h2>
               <div className="space-y-2">
                 <p className="text-slate-700">
                   <strong>Email:</strong> {user?.email}
                 </p>
                 <p className="text-slate-700">
-                  <strong>User ID:</strong> {user?.id}
+                  <strong>{t('settings.user_id')}:</strong> {user?.id}
                 </p>
               </div>
             </div>
 
             {/* Usage Section - Comprehensive Dashboard */}
             <div className="mb-8">
+              <h2 className="text-xl font-semibold text-slate-900 mb-4">{t('settings.usage')}</h2>
               {user && <UsageDashboard userId={user.id} />}
             </div>
 
@@ -193,7 +196,7 @@ export default function SettingsPage() {
                 className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center"
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
+                {t('auth.sign_out')}
               </button>
             </div>
           </div>
