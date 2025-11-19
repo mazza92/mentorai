@@ -140,16 +140,39 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const prompt = `You are an expert at analyzing long-form video content and creating structured tables of contents.
+    // Detect language from transcript
+    const detectLanguage = (transcriptText) => {
+      const text = transcriptText.toLowerCase();
+
+      // French indicators
+      const frenchContractions = /c'est|c'était|qu'est-ce|qu'il|qu'elle|qu'on|d'accord|d'ailleurs|j'ai|j'avais|l'on|l'autre|n'est|n'ont|s'il/gi;
+      const frenchQuestionWords = /\b(quoi|pourquoi|comment|combien|où|quand)\b/gi;
+      const frenchCommonWords = /\b(le|la|les|un|une|des|de|du|dans|sur|avec|pour|par|est|sont|être|avoir|faire|aller|venir|voir|savoir|pouvoir|vouloir|devoir)\b/gi;
+
+      let frenchScore = 0;
+      frenchScore += (text.match(frenchContractions) || []).length * 3;
+      frenchScore += (text.match(frenchQuestionWords) || []).length * 2;
+      frenchScore += (text.match(frenchCommonWords) || []).length;
+
+      return frenchScore > 5 ? 'fr' : 'en';
+    };
+
+    const detectedLanguage = detectLanguage(transcript.text);
+    console.log('Detected language for TOC:', detectedLanguage);
+
+    // Language-specific prompts
+    const prompts = {
+      en: {
+        instruction: `You are an expert at analyzing long-form video content and creating structured tables of contents.
 
 TASK: Analyze this video transcript and create a comprehensive table of contents that helps viewers quickly navigate to specific topics.
 
 REQUIREMENTS:
 1. Identify 5-15 major topics/sections in the video
 2. For each topic, provide:
-   - A clear, descriptive title (3-8 words)
+   - A clear, descriptive title (3-8 words) IN ENGLISH
    - The start timestamp [MM:SS]
-   - A brief 1-sentence description of what's covered
+   - A brief 1-sentence description of what's covered IN ENGLISH
 3. Topics should be ordered chronologically
 4. Focus on substantive topic changes, not minor tangents
 5. Use the timestamps from the transcript
@@ -170,12 +193,52 @@ OUTPUT FORMAT (JSON):
       "description": "How to allocate your budget effectively across campaigns"
     }
   ]
-}
+}`,
+        closing: 'Generate the table of contents as JSON:'
+      },
+      fr: {
+        instruction: `Vous êtes un expert en analyse de contenu vidéo long format et en création de tables des matières structurées.
+
+TÂCHE: Analysez cette transcription vidéo et créez une table des matières complète qui aide les spectateurs à naviguer rapidement vers des sujets spécifiques.
+
+EXIGENCES:
+1. Identifiez 5-15 sujets/sections majeurs dans la vidéo
+2. Pour chaque sujet, fournissez:
+   - Un titre clair et descriptif (3-8 mots) EN FRANÇAIS
+   - L'horodatage de début [MM:SS]
+   - Une brève description en 1 phrase de ce qui est couvert EN FRANÇAIS
+3. Les sujets doivent être ordonnés chronologiquement
+4. Concentrez-vous sur les changements de sujet substantiels, pas les digressions mineures
+5. Utilisez les horodatages de la transcription
+
+FORMAT DE SORTIE (JSON):
+{
+  "chapters": [
+    {
+      "title": "Introduction et Définition du Problème",
+      "startTime": "0:00",
+      "startTimeSeconds": 0,
+      "description": "Aperçu des principaux défis et de ce que la vidéo va couvrir"
+    },
+    {
+      "title": "Stratégie Principale 1: Optimisation du Budget",
+      "startTime": "3:45",
+      "startTimeSeconds": 225,
+      "description": "Comment allouer efficacement votre budget entre les campagnes"
+    }
+  ]
+}`,
+        closing: 'Générez la table des matières au format JSON:'
+      }
+    };
+
+    const promptConfig = prompts[detectedLanguage];
+    const prompt = `${promptConfig.instruction}
 
 VIDEO TRANSCRIPT:
 ${context}
 
-Generate the table of contents as JSON:`;
+${promptConfig.closing}`;
 
     console.log('Generating TOC with Gemini...');
     
