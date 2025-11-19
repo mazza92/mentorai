@@ -343,6 +343,15 @@ class VideoQAService {
   enhanceReadability(answer, userQuestion) {
     let enhanced = answer;
 
+    // --- PHASE 0: NORMALIZE SPACING ---
+    // Remove spaces before punctuation (Gemini sometimes adds " ." instead of ".")
+    enhanced = enhanced.replace(/\s+([\.!?,;:])/g, '$1');
+
+    // REMOVE BLANK LINES BETWEEN CONSECUTIVE BULLETS
+    // Gemini sometimes adds blank lines between bullets - remove them to keep bullets grouped
+    enhanced = enhanced.replace(/([-\*]\s+.+)\n\n+([-\*]\s+)/g, '$1\n$2');
+    enhanced = enhanced.replace(/(\d+\.\s+.+)\n\n+(\d+\.\s+)/g, '$1\n$2');
+
     // --- PHASE 1: ENSURE SPACING AROUND STRUCTURAL ELEMENTS ---
 
     // Blank line before and after headings
@@ -715,7 +724,7 @@ Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nCo
 
         const promptInstruction = isFrench
           ? 'Répondez naturellement et de manière conversationnelle. Commencez par une réponse claire et directe à la question. IMPORTANT: Ajoutez une ligne vide entre chaque paragraphe et liste.'
-          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question. IMPORTANT: Add a blank line between each paragraph and list section.';
+          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question. CRITICAL FORMATTING: Write SHORT paragraphs (1-2 sentences each) with a BLANK LINE between each paragraph. Example:\n\nParagraph one is short.\n\nParagraph two is also short.\n\nUse this format!';
 
         const prompt = `${systemInstruction}\n\nQUESTION: ${userQuestion}\n\n${promptInstruction}`;
 
