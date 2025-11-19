@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { LanguageProvider } from '@/contexts/LanguageContext'
 
 export const metadata: Metadata = {
-  title: 'WanderCut - AI Video Editor for Travel Creators',
-  description: 'Conversational AI video editor that transforms raw travel footage into viral short-form clips',
+  title: 'WanderMind - Your AI Learning Companion',
+  description: 'Transform any YouTube video into an interactive learning experience with AI-powered Q&A',
 }
 
 export default function RootLayout({
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   )
