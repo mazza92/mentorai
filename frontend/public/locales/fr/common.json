@@ -14,7 +14,26 @@
     "dont_have_account": "Vous n'avez pas de compte ?",
     "success_check_email": "Succès ! Vérifiez votre email pour confirmer votre compte. N'oubliez pas de vérifier vos spams.",
     "error_email_exists": "Cet email est déjà enregistré. Veuillez vous connecter ou vérifier votre email pour le lien de vérification.",
-    "please_sign_in": "Veuillez vous connecter pour vous abonner"
+    "please_sign_in": "Veuillez vous connecter pour vous abonner",
+    "get_started": "Commencer",
+    "welcome_back": "Bienvenue",
+    "create_account_to_start": "Créez votre compte pour commencer à apprendre",
+    "sign_in_to_continue": "Connectez-vous pour continuer votre parcours",
+    "continue_with_google": "Continuer avec Google",
+    "continue_with_email": "Ou continuer avec l'email",
+    "features": {
+      "upload_video": "Téléchargez n'importe quelle vidéo YouTube",
+      "ask_questions": "Posez des questions avec l'IA",
+      "instant_answers": "Obtenez des réponses instantanées"
+    },
+    "trust": {
+      "free_to_start": "Gratuit pour commencer",
+      "no_credit_card": "Pas de carte de crédit",
+      "secure": "Sécurisé"
+    },
+    "terms_notice": "En continuant, vous acceptez nos Conditions d'utilisation et notre Politique de confidentialité",
+    "error_google_not_enabled": "La connexion Google n'est pas activée. Veuillez contacter le support ou utiliser l'email/mot de passe pour vous connecter.",
+    "error_google_failed": "Échec de la connexion avec Google. Veuillez réessayer."
   },
 
   "pricing": {
@@ -79,7 +98,35 @@
     "youtube_placeholder": "Collez l'URL YouTube ici",
     "process": "Traiter la vidéo",
     "processing": "Traitement de la vidéo...",
-    "supported_formats": "Formats supportés : MP4, MOV, AVI, MKV (max {{size}}MB)"
+    "supported_formats": "Formats supportés : MP4, MOV, AVI, MKV (max {{size}}MB)",
+    "enter_youtube_url": "Entrez l'URL YouTube",
+    "video_length_limit": "Fonctionne avec des vidéos jusqu'à 3 heures",
+    "downloading": "Téléchargement de la vidéo depuis YouTube...",
+    "video_ready": "Vidéo prête ! Traitement en arrière-plan...",
+    "transcribing": "Transcription de la vidéo (cela peut prendre plusieurs minutes)...",
+    "analyzing": "Analyse des images de la vidéo...",
+    "transcription_background": "Transcription en cours (continuation en arrière-plan)...",
+    "processing_time": "Cela peut prendre plusieurs minutes pour les longues vidéos...",
+    "example": "Exemple : Collez un lien vers une vidéo éducative, un tutoriel ou tout contenu YouTube",
+    "success": "Vidéo traitée avec succès !",
+    "ready": "Prêt à répondre à vos questions...",
+    "error_enter_url": "Veuillez entrer une URL YouTube",
+    "error_invalid_url": "Veuillez entrer une URL YouTube valide (ex. : https://www.youtube.com/watch?v=...)",
+    "error_timeout": "Le téléchargement prend plus de temps que prévu. La vidéo est peut-être encore en cours de traitement. Veuillez attendre quelques minutes et vérifier vos conversations.",
+    "error_download_failed": "Échec du téléchargement de la vidéo YouTube. Veuillez vérifier l'URL et réessayer."
+  },
+
+  "conversations": {
+    "empty_state": "Aucune conversation pour le moment",
+    "empty_hint": "Ajouter une nouvelle vidéo pour commencer",
+    "start_new": "Nouvelle conversation",
+    "delete_confirm": "Supprimer cette conversation ?",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "days_ago": "Il y a {{count}} jour",
+    "days_ago_plural": "Il y a {{count}} jours",
+    "message_count": "{{count}} message",
+    "message_count_plural": "{{count}} messages"
   },
 
   "common": {

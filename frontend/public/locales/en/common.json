@@ -14,7 +14,26 @@
     "dont_have_account": "Don't have an account?",
     "success_check_email": "Success! Check your email to confirm your account. Make sure to check your spam folder.",
     "error_email_exists": "This email is already registered. Please sign in instead, or check your email for the verification link.",
-    "please_sign_in": "Please sign in to subscribe"
+    "please_sign_in": "Please sign in to subscribe",
+    "get_started": "Get started",
+    "welcome_back": "Welcome back",
+    "create_account_to_start": "Create your account to start learning",
+    "sign_in_to_continue": "Sign in to continue your journey",
+    "continue_with_google": "Continue with Google",
+    "continue_with_email": "Or continue with email",
+    "features": {
+      "upload_video": "Upload any YouTube video",
+      "ask_questions": "Ask questions with AI",
+      "instant_answers": "Get instant answers"
+    },
+    "trust": {
+      "free_to_start": "Free to start",
+      "no_credit_card": "No credit card",
+      "secure": "Secure"
+    },
+    "terms_notice": "By continuing, you agree to our Terms of Service and Privacy Policy",
+    "error_google_not_enabled": "Google sign-in is not enabled. Please contact support or use email/password to sign in.",
+    "error_google_failed": "Failed to sign in with Google. Please try again."
   },
 
   "pricing": {
@@ -79,7 +98,34 @@
     "youtube_placeholder": "Paste YouTube URL here",
     "process": "Process Video",
     "processing": "Processing video...",
-    "supported_formats": "Supported formats: MP4, MOV, AVI, MKV (max {{size}}MB)"
+    "supported_formats": "Supported formats: MP4, MOV, AVI, MKV (max {{size}}MB)",
+    "enter_youtube_url": "Enter YouTube URL",
+    "video_length_limit": "Works with videos up to 3 hours long",
+    "downloading": "Downloading video from YouTube...",
+    "video_ready": "Video ready! Processing in background...",
+    "transcribing": "Transcribing video (this may take several minutes)...",
+    "analyzing": "Analyzing video frames...",
+    "transcription_background": "Transcription in progress (continuing in background)...",
+    "processing_time": "This may take several minutes for long videos...",
+    "example": "Example: Paste a link to an educational video, tutorial, or any YouTube content",
+    "success": "Video processed successfully!",
+    "ready": "Ready to answer your questions...",
+    "error_enter_url": "Please enter a YouTube URL",
+    "error_invalid_url": "Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=...)",
+    "error_timeout": "Download is taking longer than expected. The video may still be processing. Please wait a few minutes and check your conversations.",
+    "error_download_failed": "Failed to download YouTube video. Please check the URL and try again."
+  },
+
+  "conversations": {
+    "empty_state": "No conversations yet",
+    "empty_hint": "Start a new video to begin",
+    "start_new": "Start New Chat",
+    "delete_confirm": "Delete this conversation?",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "days_ago_plural": "{{count}} days ago",
+    "message_count": "{{count}} message",
+    "message_count_plural": "{{count}} messages"
   },
 
   "common": {

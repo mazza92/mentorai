@@ -3,6 +3,7 @@ const { SpeechClient } = require('@google-cloud/speech');
 const { Firestore } = require('@google-cloud/firestore');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { AssemblyAI } = require('assemblyai');
 const fs = require('fs');
 const path = require('path');
 const { mockProjects } = require('../utils/mockStorage');
@@ -21,9 +22,11 @@ let speechClient;
 let firestore;
 let openai;
 let geminiAI;
+let assemblyai;
 let useMockMode = false;
 let useOpenAI = false;
 let useGemini = false;
+let useAssemblyAI = false;
 
 // Check environment configuration flags (USE_OPENAI_WHISPER, USE_GEMINI)
 const useOpenAIFlag = process.env.USE_OPENAI_WHISPER !== 'false'; // Default to true if not set
@@ -42,6 +45,19 @@ if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_ap
     }
   } catch (error) {
     console.error('❌ Gemini initialization failed:', error.message);
+  }
+}
+
+// Initialize AssemblyAI if API key is available (BEST for long videos - fast & reliable)
+if (process.env.ASSEMBLYAI_API_KEY && process.env.ASSEMBLYAI_API_KEY !== 'your_assemblyai_api_key_here') {
+  try {
+    assemblyai = new AssemblyAI({
+      apiKey: process.env.ASSEMBLYAI_API_KEY,
+    });
+    useAssemblyAI = true;
+    console.log('✅ AssemblyAI enabled for transcription (PRIMARY - fastest & most reliable)');
+  } catch (error) {
+    console.error('❌ AssemblyAI initialization failed:', error.message);
   }
 }
 
@@ -92,14 +108,15 @@ try {
 }
 
 // Check if we have at least one transcription service
-if (!useOpenAI && !useGemini && !speechClient) {
+if (!useAssemblyAI && !useOpenAI && !useGemini && !speechClient) {
   useMockMode = true;
   console.log('⚠️  No transcription service configured, using mock transcription for development');
-  console.log('⚠️  To enable transcription, set one of: OPENAI_API_KEY, GEMINI_API_KEY, or GOOGLE_CLOUD_PROJECT_ID');
+  console.log('⚠️  To enable transcription, set one of: ASSEMBLYAI_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or GOOGLE_CLOUD_PROJECT_ID');
 } else {
   // Log enabled services summary
   const enabledServices = [];
-  if (useOpenAI) enabledServices.push('OpenAI Whisper (primary)');
+  if (useAssemblyAI) enabledServices.push('AssemblyAI (primary - fastest)');
+  if (useOpenAI) enabledServices.push('OpenAI Whisper');
   if (useGemini) enabledServices.push('Gemini (short videos)');
   if (speechClient) enabledServices.push('Google Cloud (fallback)');
   console.log('📋 Transcription services enabled:', enabledServices.join(', '));
@@ -257,6 +274,48 @@ function formatGoogleCloudTranscript(response) {
   });
 
   return transcript;
+}
+
+// Helper function to transcribe with AssemblyAI (FASTEST - 2-3 min for 60-min video)
+async function transcribeWithAssemblyAI(audioFilePath) {
+  if (!assemblyai) {
+    throw new Error('AssemblyAI not configured');
+  }
+
+  console.log('🚀 Using AssemblyAI for ultra-fast transcription...');
+
+  try {
+    // Upload file and start transcription
+    const transcript = await assemblyai.transcripts.transcribe({
+      audio: audioFilePath,
+      speech_model: 'best', // Use best quality model
+    });
+
+    if (transcript.status === 'error') {
+      throw new Error(transcript.error);
+    }
+
+    console.log('✅ AssemblyAI transcription complete');
+    console.log('📊 Transcript length:', transcript.text.length, 'characters');
+
+    // Format transcript with word-level timestamps
+    const formattedTranscript = {
+      text: transcript.text,
+      words: (transcript.words || []).map(w => ({
+        word: w.text,
+        startTime: w.start / 1000, // Convert ms to seconds
+        endTime: w.end / 1000,
+        confidence: w.confidence,
+      })),
+      segments: [],
+    };
+
+    console.log('📊 Word count:', formattedTranscript.words.length);
+    return formattedTranscript;
+  } catch (error) {
+    console.error('❌ AssemblyAI transcription failed:', error.message);
+    throw error;
+  }
 }
 
 // Helper function to transcribe with OpenAI Whisper (production-grade, fast)
@@ -487,8 +546,10 @@ async function transcribeAudioSmart(audioFilePath, videoDuration, projectId) {
     try {
       return await transcribeWithGemini(audioFilePath);
     } catch (geminiError) {
-      console.log('⚠️  Gemini failed, falling back to OpenAI Whisper...');
-      if (useOpenAI && openai) {
+      console.log('⚠️  Gemini failed, falling back to AssemblyAI...');
+      if (useAssemblyAI && assemblyai) {
+        return await transcribeWithAssemblyAI(audioFilePath);
+      } else if (useOpenAI && openai) {
         return await transcribeWithOpenAIWhisper(audioFilePath);
       } else if (speechClient && projectId) {
         return await transcribeWithGoogleCloudLongRunning(audioFilePath, videoDuration, projectId);
@@ -497,8 +558,38 @@ async function transcribeAudioSmart(audioFilePath, videoDuration, projectId) {
     }
   }
 
-  // Strategy 2: ALL videos >= 10 min - Use OpenAI Whisper (FAST - 5-8 min for 60-min video)
-  // This is 2-3x faster than Google Cloud Long Running API while maintaining quality
+  // Strategy 2: ALL videos >= 10 min - Use AssemblyAI (FASTEST - 2-3 min for 60-min video)
+  // This is the BEST option for production: fast, reliable, no file size limits
+  if (useAssemblyAI && assemblyai) {
+    console.log('✨ Strategy: AssemblyAI (ultra-fast production transcription, 5x faster than Google Cloud)');
+    try {
+      return await transcribeWithAssemblyAI(audioFilePath);
+    } catch (assemblyError) {
+      console.error('⚠️  AssemblyAI failed, falling back to OpenAI Whisper...');
+      console.error('Error details:', assemblyError.message);
+
+      // Fallback to OpenAI Whisper
+      if (useOpenAI && openai) {
+        try {
+          return await transcribeWithOpenAIWhisper(audioFilePath);
+        } catch (whisperError) {
+          console.error('⚠️  OpenAI Whisper also failed, falling back to Google Cloud...');
+          if (speechClient && projectId) {
+            return await transcribeWithGoogleCloudLongRunning(audioFilePath, videoDuration, projectId);
+          }
+          throw whisperError;
+        }
+      }
+
+      // Fallback to Google Cloud if no OpenAI
+      if (speechClient && projectId) {
+        return await transcribeWithGoogleCloudLongRunning(audioFilePath, videoDuration, projectId);
+      }
+      throw assemblyError;
+    }
+  }
+
+  // Strategy 3: Fallback to OpenAI Whisper if AssemblyAI not available
   if (useOpenAI && openai) {
     console.log('✨ Strategy: OpenAI Whisper (fast production-grade transcription, 2-3x faster than Google Cloud)');
     try {
@@ -515,14 +606,14 @@ async function transcribeAudioSmart(audioFilePath, videoDuration, projectId) {
     }
   }
 
-  // Strategy 3: Fallback to Google Cloud Long Running API if OpenAI not available
+  // Strategy 4: Fallback to Google Cloud Long Running API if nothing else available
   if (speechClient && projectId) {
     console.log('✨ Strategy: Google Cloud Long Running API (fallback - slower but reliable)');
     return await transcribeWithGoogleCloudLongRunning(audioFilePath, videoDuration, projectId);
   }
 
   // No transcription service configured
-  throw new Error('No transcription service configured for videos >= 10 minutes. Configure OpenAI Whisper (recommended) or Google Cloud Speech-to-Text.');
+  throw new Error('No transcription service configured for videos >= 10 minutes. Configure AssemblyAI (recommended), OpenAI Whisper, or Google Cloud Speech-to-Text.');
 }
 
 // Helper function to generate suggested prompts asynchronously
