@@ -444,15 +444,43 @@ class VideoQAService {
 
     // Simple language detection based on common French words/patterns
     const textToAnalyze = (transcript?.text || userQuestion || '').toLowerCase();
-    
-    // French indicators
+
+    // French contractions (very strong indicators)
+    const frenchContractions = [
+      /c'est|c'était|qu'est-ce|qu'il|qu'elle|qu'on|d'accord|d'ailleurs|j'ai|j'avais|l'on|l'autre|n'est|n'ont|s'il/gi
+    ];
+
+    // French question words and common short phrases (strong indicators for short queries)
+    const frenchQuestionWords = [
+      /\b(quoi|pourquoi|comment|combien|où|quand)\b/gi
+    ];
+
+    // French indicators (general words)
     const frenchIndicators = [
-      /\b(le|la|les|un|une|des|de|du|dans|sur|avec|pour|par|est|sont|être|avoir|faire|aller|venir|voir|savoir|pouvoir|vouloir|devoir|il|elle|nous|vous|ils|elles|ce|que|qui|quoi|comment|pourquoi|où|quand|combien)\b/gi,
-      /\b(et|ou|mais|donc|car|parce|que|si|alors|mais|cependant|toutefois|ainsi|aussi|même|très|plus|moins|beaucoup|peu|tout|tous|toutes|chaque|aucun|aucune|rien|personne)\b/gi,
+      /\b(le|la|les|un|une|des|de|du|dans|sur|avec|pour|par|est|sont|être|avoir|faire|aller|venir|voir|savoir|pouvoir|vouloir|devoir|il|elle|nous|vous|ils|elles|ce|que|qui)\b/gi,
+      /\b(et|ou|mais|donc|car|parce|si|alors|cependant|toutefois|ainsi|aussi|même|très|plus|moins|beaucoup|peu|tout|tous|toutes|chaque|aucun|aucune|rien|personne)\b/gi,
       /\b(je|tu|il|elle|nous|vous|ils|elles|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|votre|leur|leurs)\b/gi
     ];
 
     let frenchScore = 0;
+
+    // Check contractions (worth 3 points each - very strong signal)
+    frenchContractions.forEach(pattern => {
+      const matches = textToAnalyze.match(pattern);
+      if (matches) {
+        frenchScore += matches.length * 3;
+      }
+    });
+
+    // Check question words (worth 2 points each - strong signal for short queries)
+    frenchQuestionWords.forEach(pattern => {
+      const matches = textToAnalyze.match(pattern);
+      if (matches) {
+        frenchScore += matches.length * 2;
+      }
+    });
+
+    // Check general French words (worth 1 point each)
     frenchIndicators.forEach(pattern => {
       const matches = textToAnalyze.match(pattern);
       if (matches) {
@@ -460,8 +488,10 @@ class VideoQAService {
       }
     });
 
-    // If we find significant French indicators, return 'fr'
-    if (frenchScore > 5 || (textToAnalyze.length < 100 && frenchScore > 2)) {
+    // Adjusted thresholds for better detection:
+    // - Long text (>= 100 chars): needs score > 5 (multiple French words)
+    // - Short text (< 100 chars): needs score >= 2 (just one French question word or contraction)
+    if (frenchScore > 5 || (textToAnalyze.length < 100 && frenchScore >= 2)) {
       return 'fr';
     }
 
