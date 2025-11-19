@@ -1,0 +1,97 @@
+{
+  "app_name": "WanderMind",
+  "tagline": "Votre compagnon d'apprentissage IA",
+
+  "auth": {
+    "sign_in": "Se connecter",
+    "sign_up": "S'inscrire",
+    "email": "Email",
+    "password": "Mot de passe",
+    "sign_in_button": "Se connecter",
+    "sign_up_button": "Créer un compte",
+    "sign_out": "Se déconnecter",
+    "already_have_account": "Vous avez déjà un compte ?",
+    "dont_have_account": "Vous n'avez pas de compte ?",
+    "success_check_email": "Succès ! Vérifiez votre email pour confirmer votre compte. N'oubliez pas de vérifier vos spams.",
+    "error_email_exists": "Cet email est déjà enregistré. Veuillez vous connecter ou vérifier votre email pour le lien de vérification.",
+    "please_sign_in": "Veuillez vous connecter pour vous abonner"
+  },
+
+  "pricing": {
+    "title": "Choisissez votre formule",
+    "subtitle": "Libérez tout le potentiel de WanderMind IA",
+    "free_tier": "Gratuit",
+    "free_description": "Parfait pour essayer WanderMind",
+    "pro_tier": "Pro",
+    "pro_description": "Pour les apprenants sérieux",
+    "most_popular": "Le plus populaire",
+    "current_plan": "Formule actuelle",
+    "upgrade_to": "Passer à {{plan}}",
+    "manage_subscription": "Gérer votre abonnement",
+    "features": {
+      "videos_per_month": "{{count}} vidéos par mois",
+      "questions_per_month": "{{count}} questions par mois",
+      "unlimited_questions": "Questions illimitées",
+      "all_ai_features": "Toutes les fonctionnalités IA",
+      "community_support": "Support communautaire",
+      "priority_support": "Support prioritaire",
+      "export_transcripts": "Exporter les transcriptions",
+      "early_access": "Accès anticipé aux nouvelles fonctionnalités"
+    }
+  },
+
+  "settings": {
+    "title": "Paramètres",
+    "subscription": "Abonnement",
+    "account": "Compte",
+    "usage": "Utilisation",
+    "free_tier": "Formule gratuite",
+    "pro_tier": "Formule Pro",
+    "user_id": "ID utilisateur",
+    "status": "Statut",
+    "renews": "Renouvellement",
+    "cancel_notice": "L'abonnement sera annulé à la fin de la période de facturation"
+  },
+
+  "header": {
+    "pricing": "Tarifs",
+    "settings": "Paramètres",
+    "conversations": "Conversations",
+    "new_conversation": "Nouvelle conversation",
+    "upgrade_to_pro": "Passer à Pro"
+  },
+
+  "qa": {
+    "ask_question": "Posez une question sur cette vidéo",
+    "type_question": "Tapez votre question ici...",
+    "send": "Envoyer",
+    "processing": "Traitement en cours...",
+    "questions_remaining": "{{count}} questions restantes ce mois-ci",
+    "upgrade_for_more": "Passez à Pro pour des questions illimitées",
+    "limit_reached": "Limite de questions atteinte",
+    "limit_message": "Vous avez atteint votre limite mensuelle de questions. Passez à Pro pour des questions illimitées."
+  },
+
+  "upload": {
+    "title": "Télécharger ou coller un lien YouTube",
+    "drag_drop": "Glissez-déposez un fichier vidéo ici, ou cliquez pour sélectionner",
+    "or": "OU",
+    "youtube_placeholder": "Collez l'URL YouTube ici",
+    "process": "Traiter la vidéo",
+    "processing": "Traitement de la vidéo...",
+    "supported_formats": "Formats supportés : MP4, MOV, AVI, MKV (max {{size}}MB)"
+  },
+
+  "common": {
+    "loading": "Chargement...",
+    "back": "Retour",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "close": "Fermer",
+    "language": "Langue",
+    "english": "Anglais",
+    "french": "Français"
+  }
+}
