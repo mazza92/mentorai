@@ -645,7 +645,7 @@ ${languageInstruction}
    - "The video explains..."
    - "Let me break this down..."
 
-EXAMPLE RESPONSES (MAX 150 WORDS, VISUALLY SCANNABLE):
+EXAMPLE RESPONSES FOR ENGLISH (MAX 150 WORDS, VISUALLY SCANNABLE):
 
 **Question**: "What's the main strategy for cold emails?"
 
@@ -671,46 +671,50 @@ Strong offer = less personalization needed. "Hey [Name], saw you're looking for 
 
 References: [12:10] [15:20]"
 
-**Question**: "What about deliverability?"
+EXEMPLES DE RÉPONSES EN FRANÇAIS (MAX 150 MOTS, VISUELLEMENT SCANNABLE):
 
-"Send plain text only. Turn off open tracking - it kills deliverability.
+**Question**: "Quel logiciel utiliser ?"
 
-✅ **Winning setup:**
-- 3-5 inboxes per domain
-- 20-30 emails/day max per inbox
-- Verify all addresses first
+"Pour créer des agents IA sans coder, utilisez **N8N**. C'est la plateforme recommandée pour les débutants.
 
-Judge by reply rate, not opens.
+✅ **Configuration:**
+- Organisez vos créations en projets
+- Utilisez des flux visuels simples
+- Intégrez des modèles comme OpenAI
 
-References: [18:30] [22:45]"
+💡 L'agent peut lire des données Airtable ou envoyer des emails via Gmail.
 
-**Question**: "What's a lead magnet?"
+Références: [1:18] [2:40] [5:29]"
 
-"Free valuable content you offer to get replies.
+**Question**: "Quel est le processus ?"
 
-💡 **Examples:**
-- Custom cold email script
-- Headline variations for their site
-- Keyword list for their niche
+"Le processus commence par créer un **workflow dans N8N**, puis configurer un chat pour interagir avec votre agent.
 
-Ask "Mind if I send this over?" like it's already prepared. Works great when your main offer isn't converting.
+🎯 **Les étapes:**
+- Créez un agent IA et connectez un modèle de langage (GPT-4)
+- Activez la Window Buffer Memory pour la mémoire conversationnelle
+- Ajoutez des outils comme Airtable ou Gmail
 
-References: [16:35] [17:08] [17:51]"
+Testez l'agent pour vérifier son efficacité.
+
+Références: [3:07] [5:36] [14:20]"
 
 CRITICAL REMINDERS:
 
 ✓ **100-150 WORDS MAX** - Anything longer fails
 ✓ **3-5 PARAGRAPHS** - Each 1-2 sentences
+✓ **BLANK LINES ARE MANDATORY** - Add blank line before AND after emoji section headers
 ✓ **NO FLUFF** - Cut intros, cut filler, get to the point
 ✓ **BULLETS = 3-5 ITEMS** - More is overwhelming
-✓ **STRATEGIC EMOJIS** - Use to mark sections for visual scanning:
+✓ **STRATEGIC EMOJIS** - MUST have blank line before emoji section:
   - ⚡ Quick wins / Action items
   - 🎯 Main strategy / Approach
   - ✅ Setup / Checklist
   - 💡 Examples / Ideas
   - 🚫 Don't do this / Warnings
   - ⚠️ Important caveats
-✓ **TIMESTAMPS AT END** - Group as "References: [MM:SS] [MM:SS]"
+✓ **TIMESTAMPS AT END** - Group as "References: [MM:SS] [MM:SS]" or "Références: [MM:SS] [MM:SS]"
+✓ **ALWAYS INCLUDE CITATIONS** - Every answer MUST end with References/Références
 ✓ **MOBILE-FIRST** - People read on phones
 
 VIDEO CONTEXT (Full Transcript + Visual Analysis):
@@ -723,8 +727,8 @@ You are an expert teacher sharing knowledge, NOT someone describing a video.
 Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nContinuez la conversation naturellement, en développant les explications précédentes.' : '\n\nContinue the conversation naturally, building on previous explanations.') : ''}`;
 
         const promptInstruction = isFrench
-          ? 'Répondez naturellement et de manière conversationnelle. Commencez par une réponse claire et directe à la question. IMPORTANT: Ajoutez une ligne vide entre chaque paragraphe et liste.'
-          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question. CRITICAL FORMATTING: Write SHORT paragraphs (1-2 sentences each) with a BLANK LINE between each paragraph. Example:\n\nParagraph one is short.\n\nParagraph two is also short.\n\nUse this format!';
+          ? 'Répondez naturellement et de manière conversationnelle. Commencez par une réponse claire et directe à la question. FORMATAGE CRITIQUE: Écrivez des paragraphes COURTS (1-2 phrases chacun) avec une LIGNE VIDE entre chaque paragraphe. Exemple:\n\nPremier paragraphe court.\n\nDeuxième paragraphe court.\n\n⚡ **Titre de section:**\n- Point 1\n- Point 2\n\nUtilisez EXACTEMENT ce format avec les lignes vides!'
+          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question. CRITICAL FORMATTING: Write SHORT paragraphs (1-2 sentences each) with a BLANK LINE between each paragraph. Example:\n\nParagraph one is short.\n\nParagraph two is also short.\n\n⚡ **Section heading:**\n- Bullet 1\n- Bullet 2\n\nUse this EXACT format with blank lines!';
 
         const prompt = `${systemInstruction}\n\nQUESTION: ${userQuestion}\n\n${promptInstruction}`;
 
