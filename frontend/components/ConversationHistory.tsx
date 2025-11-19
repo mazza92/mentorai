@@ -32,14 +32,16 @@ export default function ConversationHistory({
   // In mobile drawer, always show content
   const displayIsOpen = isMobileDrawer ? true : isOpen
 
-  // Load conversations on mount and when userId or project changes
+  // Load conversations on mount and when userId changes
+  // NOTE: Do NOT include currentConversationId or currentProjectId in dependencies
+  // as it causes race conditions (reloading conversations while navigating to one)
   useEffect(() => {
     const loadConversationsData = async () => {
       const loaded = await loadConversations(userId)
       setConversations(loaded)
     }
     loadConversationsData()
-  }, [userId, currentConversationId, currentProjectId]) // Reload when conversation or project changes
+  }, [userId]) // Only reload when userId changes
 
   const handleNewConversation = () => {
     onNewConversation() // This will trigger video upload flow
