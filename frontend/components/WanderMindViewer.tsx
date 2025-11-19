@@ -598,10 +598,10 @@ const QnAPanel = ({
           setHighlightedTime(citations[0])
         }
 
-        // Add AI response to history - prefer markdown, fallback to HTML
+        // Add AI response to history - prefer HTML for better formatting
         const aiEntry: QAMessage = {
           type: 'ai',
-          text: answer || answerHtml || '', // Use markdown if available, otherwise HTML
+          text: answerHtml || answer || '', // Use HTML if available for proper formatting
           citations: citations || [],
           timestamp: new Date()
         }
@@ -640,35 +640,19 @@ const QnAPanel = ({
   const formatAiAnswer = (text: string, citations?: number[]) => {
     if (!text) return null
 
+    // Check if text is HTML (backend sends HTML for better formatting)
+    const isHtml = text.includes('<p>') || text.includes('<ul>') || text.includes('<ol>') || text.includes('<li>')
+
     // Remove ALL cite tags as a safety measure (backend should have done this, but double-check)
     text = text.replace(/<cite[^>]*>[\s]*<\/cite>/gi, '')
     text = text.replace(/<cite[^>]*>/gi, '')
     text = text.replace(/<\/cite>/gi, '')
-    text = text.replace(/\s{2,}/g, ' ') // Clean up extra spaces
-    
-    // Remove bold markers from entire paragraphs (common AI mistake)
-    // If a paragraph (separated by double newlines) starts with ** and ends with **, remove outer markers
-    const paragraphs = text.split(/\n\n+/)
-    const cleanedParagraphs = paragraphs.map(para => {
-      const trimmed = para.trim()
-      // Check if paragraph starts with ** and ends with **
-      if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
-        // Remove outer ** markers
-        const withoutMarkers = trimmed.slice(2, -2).trim()
-        // Only remove if it's longer than 50 chars (likely a paragraph, not a phrase)
-        if (withoutMarkers.length > 50) {
-          return withoutMarkers
-        }
-      }
-      return para
-    })
-    text = cleanedParagraphs.join('\n\n')
 
     // Extract all citations from text and remove them from content
     const citationRegex = /\[(\d{1,2}):(\d{2})\]/g
     const foundCitations: Array<{time: number, original: string}> = []
     let match
-    
+
     // Collect all citations
     while ((match = citationRegex.exec(text)) !== null) {
       const minutes = parseInt(match[1], 10)
@@ -679,18 +663,61 @@ const QnAPanel = ({
         original: match[0]
       })
     }
-    
+
     // Remove citations from text for cleaner display
     const cleanedText = text.replace(/\[\d{1,2}:\d{2}\]/g, '').trim()
-    
-    // Process markdown and add citations at the end
-    const formattedContent = formatMarkdown(cleanedText, 'answer')
-    
+
     // Group citations by removing duplicates and sorting
     const uniqueCitations = Array.from(
       new Map(foundCitations.map(c => [c.time, c])).values()
     ).sort((a, b) => a.time - b.time)
-    
+
+    // Render HTML directly if available
+    if (isHtml) {
+      return (
+        <div className="space-y-3">
+          <div
+            className="qa-formatted-content"
+            dangerouslySetInnerHTML={{ __html: cleanedText }}
+          />
+          {uniqueCitations.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-200">
+              <span className="text-xs font-semibold text-slate-500 mr-1">References:</span>
+              {uniqueCitations.map((citation, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setHighlightedTime(citation.time)}
+                  className="text-xs px-2.5 py-1 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 text-blue-600 rounded-lg transition-all duration-150 border border-blue-200/60 hover:border-blue-300 hover:shadow-sm font-medium"
+                  title="Click to jump to this timestamp"
+                >
+                  {citation.original}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Otherwise, process as markdown (fallback for old format)
+    text = cleanedText.replace(/\s{2,}/g, ' ') // Clean up extra spaces
+
+    // Remove bold markers from entire paragraphs (common AI mistake)
+    const paragraphs = text.split(/\n\n+/)
+    const cleanedParagraphs = paragraphs.map(para => {
+      const trimmed = para.trim()
+      if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
+        const withoutMarkers = trimmed.slice(2, -2).trim()
+        if (withoutMarkers.length > 50) {
+          return withoutMarkers
+        }
+      }
+      return para
+    })
+    text = cleanedParagraphs.join('\n\n')
+
+    const formattedContent = formatMarkdown(text, 'answer')
+
     return (
       <div className="space-y-3">
         {formattedContent}
@@ -1710,8 +1737,54 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
                        loadingTopics
 
   return (
-    <div className="h-full bg-gradient-to-br from-white to-slate-50 text-slate-900 font-sans flex flex-col overflow-hidden relative">
-      {/* Loading Overlay */}
+    <>
+      <style dangerouslySetInnerHTML={{__html: `
+        .qa-formatted-content p {
+          margin: 0.75rem 0;
+          line-height: 1.6;
+          color: #475569;
+        }
+        .qa-formatted-content p:first-child {
+          margin-top: 0;
+        }
+        .qa-formatted-content p:last-child {
+          margin-bottom: 0;
+        }
+        .qa-formatted-content h1,
+        .qa-formatted-content h2,
+        .qa-formatted-content h3 {
+          font-weight: 600;
+          margin: 1.25rem 0 0.5rem 0;
+          line-height: 1.3;
+          color: #1e293b;
+        }
+        .qa-formatted-content h3 {
+          font-size: 1rem;
+        }
+        .qa-formatted-content ul,
+        .qa-formatted-content ol {
+          margin: 0.75rem 0;
+          padding-left: 1.5rem;
+          line-height: 1.6;
+        }
+        .qa-formatted-content li {
+          margin: 0.35rem 0;
+          color: #475569;
+        }
+        .qa-formatted-content strong {
+          font-weight: 600;
+          color: #1e293b;
+        }
+        .qa-formatted-content code {
+          background: #f1f5f9;
+          padding: 0.125rem 0.375rem;
+          border-radius: 0.25rem;
+          font-size: 0.875em;
+          font-family: monospace;
+        }
+      `}} />
+      <div className="h-full bg-gradient-to-br from-white to-slate-50 text-slate-900 font-sans flex flex-col overflow-hidden relative">
+        {/* Loading Overlay */}
       {isProcessing && (
         <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-slate-200/80">
@@ -1843,6 +1916,7 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
         />
       </div>
     </div>
+    </>
   )
 }
 
