@@ -1,0 +1,97 @@
+{
+  "app_name": "WanderMind",
+  "tagline": "Your AI Learning Companion",
+
+  "auth": {
+    "sign_in": "Sign In",
+    "sign_up": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "sign_in_button": "Sign in",
+    "sign_up_button": "Create account",
+    "sign_out": "Sign out",
+    "already_have_account": "Already have an account?",
+    "dont_have_account": "Don't have an account?",
+    "success_check_email": "Success! Check your email to confirm your account. Make sure to check your spam folder.",
+    "error_email_exists": "This email is already registered. Please sign in instead, or check your email for the verification link.",
+    "please_sign_in": "Please sign in to subscribe"
+  },
+
+  "pricing": {
+    "title": "Choose Your Plan",
+    "subtitle": "Unlock the full potential of WanderMind AI",
+    "free_tier": "Free",
+    "free_description": "Perfect for trying out WanderMind",
+    "pro_tier": "Pro",
+    "pro_description": "For serious learners",
+    "most_popular": "Most Popular",
+    "current_plan": "Current Plan",
+    "upgrade_to": "Upgrade to {{plan}}",
+    "manage_subscription": "Manage your subscription",
+    "features": {
+      "videos_per_month": "{{count}} videos per month",
+      "questions_per_month": "{{count}} questions per month",
+      "unlimited_questions": "Unlimited questions",
+      "all_ai_features": "All AI features",
+      "community_support": "Community support",
+      "priority_support": "Priority support",
+      "export_transcripts": "Export transcripts",
+      "early_access": "Early access to new features"
+    }
+  },
+
+  "settings": {
+    "title": "Settings",
+    "subscription": "Subscription",
+    "account": "Account",
+    "usage": "Usage",
+    "free_tier": "Free Tier",
+    "pro_tier": "Pro Tier",
+    "user_id": "User ID",
+    "status": "Status",
+    "renews": "Renews",
+    "cancel_notice": "Subscription will cancel at the end of the billing period"
+  },
+
+  "header": {
+    "pricing": "Pricing",
+    "settings": "Settings",
+    "conversations": "Conversations",
+    "new_conversation": "New conversation",
+    "upgrade_to_pro": "Upgrade to Pro"
+  },
+
+  "qa": {
+    "ask_question": "Ask a question about this video",
+    "type_question": "Type your question here...",
+    "send": "Send",
+    "processing": "Processing...",
+    "questions_remaining": "{{count}} questions remaining this month",
+    "upgrade_for_more": "Upgrade to Pro for unlimited questions",
+    "limit_reached": "Question limit reached",
+    "limit_message": "You've reached your monthly question limit. Upgrade to Pro for unlimited questions."
+  },
+
+  "upload": {
+    "title": "Upload or paste YouTube link",
+    "drag_drop": "Drag & drop a video file here, or click to select",
+    "or": "OR",
+    "youtube_placeholder": "Paste YouTube URL here",
+    "process": "Process Video",
+    "processing": "Processing video...",
+    "supported_formats": "Supported formats: MP4, MOV, AVI, MKV (max {{size}}MB)"
+  },
+
+  "common": {
+    "loading": "Loading...",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "language": "Language",
+    "english": "English",
+    "french": "French"
+  }
+}
