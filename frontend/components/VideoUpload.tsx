@@ -150,14 +150,34 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
               {uploading ? (
                 <div className="space-y-5 py-4">
                   <div className="flex justify-center">
-                    <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 animate-pulse"></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-white animate-spin" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-base font-medium text-slate-800">
+                  <div className="space-y-3">
+                    <p className="text-base font-semibold text-slate-900">
                       {processingStage}
                     </p>
+
+                    {/* Progress indicator */}
+                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
+                      <p className="text-xs text-blue-900 font-medium">
+                        📥 What's happening:
+                      </p>
+                      <p className="text-xs text-blue-700 leading-relaxed">
+                        We're downloading your video from YouTube and extracting the audio. This typically takes 1-2 minutes depending on video length.
+                      </p>
+                    </div>
+
                     <p className="text-xs text-slate-500">
-                      {t('upload.processing_time')}
+                      💡 After download, transcription will start automatically (~1-3 min for most videos)
                     </p>
                   </div>
                 </div>
