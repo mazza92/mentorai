@@ -219,11 +219,11 @@ class VideoQAService {
 
   /**
    * Convert markdown to HTML for easy frontend rendering
-   * This is a simple converter - frontend should handle most markdown rendering
+   * CRITICAL: Must properly handle bullets, paragraphs, and formatting
    */
   markdownToHtml(markdown) {
     if (!markdown) return '';
-    
+
     let html = markdown;
 
     // Remove any remaining cite tags first
@@ -231,69 +231,107 @@ class VideoQAService {
     html = html.replace(/<cite[^>]*>/gi, '');
     html = html.replace(/<\/cite>/gi, '');
 
+    // Convert bold text BEFORE processing structure (**text**)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
     // Convert headers (must be at start of line)
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
 
-    // Convert bold text (**text**)
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-    // Convert numbered lists - handle multi-line items
-    // First, identify numbered list blocks
+    // Process line by line to handle lists properly
     const lines = html.split('\n');
     const processedLines = [];
+    let inBulletList = false;
     let inNumberedList = false;
-    let listItems = [];
-    
+    let bulletItems = [];
+    let numberedItems = [];
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const numberedMatch = line.match(/^(\d+\.\s+)(.+)$/);
-      
+      const trimmedLine = line.trim();
+
+      // Check for numbered list item (e.g., "1. Item")
+      const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
+      // Check for bullet list item (e.g., "- Item" or "* Item")
+      const bulletMatch = trimmedLine.match(/^[-\*]\s+(.+)$/);
+
       if (numberedMatch) {
+        // Close bullet list if we were in one
+        if (inBulletList) {
+          processedLines.push(`<ul>${bulletItems.join('')}</ul>`);
+          inBulletList = false;
+          bulletItems = [];
+        }
+
+        // Start or continue numbered list
         if (!inNumberedList) {
           inNumberedList = true;
-          listItems = [];
+          numberedItems = [];
         }
-        listItems.push(`<li>${numberedMatch[2].trim()}</li>`);
-      } else {
+        numberedItems.push(`<li>${numberedMatch[2]}</li>`);
+      } else if (bulletMatch) {
+        // Close numbered list if we were in one
         if (inNumberedList) {
-          processedLines.push(`<ol>${listItems.join('\n')}</ol>`);
+          processedLines.push(`<ol>${numberedItems.join('')}</ol>`);
           inNumberedList = false;
-          listItems = [];
+          numberedItems = [];
         }
+
+        // Start or continue bullet list
+        if (!inBulletList) {
+          inBulletList = true;
+          bulletItems = [];
+        }
+        bulletItems.push(`<li>${bulletMatch[1]}</li>`);
+      } else {
+        // Not a list item - close any open lists
+        if (inBulletList) {
+          processedLines.push(`<ul>${bulletItems.join('')}</ul>`);
+          inBulletList = false;
+          bulletItems = [];
+        }
+        if (inNumberedList) {
+          processedLines.push(`<ol>${numberedItems.join('')}</ol>`);
+          inNumberedList = false;
+          numberedItems = [];
+        }
+
+        // Add the regular line
         processedLines.push(line);
       }
     }
-    
-    if (inNumberedList && listItems.length > 0) {
-      processedLines.push(`<ol>${listItems.join('\n')}</ol>`);
+
+    // Close any remaining open lists
+    if (inBulletList) {
+      processedLines.push(`<ul>${bulletItems.join('')}</ul>`);
     }
-    
+    if (inNumberedList) {
+      processedLines.push(`<ol>${numberedItems.join('')}</ol>`);
+    }
+
     html = processedLines.join('\n');
 
-    // Convert bullet points
-    html = html.replace(/^[\*\-]\s+(.+)$/gm, '<li>$1</li>');
-    // Wrap consecutive bullet list items in <ul>
-    html = html.replace(/(<li>.*?<\/li>\n?)+/g, (match) => {
-      if (!match.includes('<ol>')) {
-        return `<ul>${match}</ul>`;
-      }
-      return match;
-    });
-
-    // Convert paragraphs (double newlines)
-    html = html.split(/\n\n+/).map(para => {
-      const trimmed = para.trim();
+    // Convert paragraphs (double newlines) - but NOT inside lists or headers
+    html = html.split(/\n\n+/).map(block => {
+      const trimmed = block.trim();
       if (!trimmed) return '';
-      // Don't wrap if it's already an HTML tag
-      if (trimmed.match(/^<(h[1-6]|ol|ul|li|p)/)) {
+
+      // Don't wrap if it's already an HTML tag or empty
+      if (trimmed.match(/^<(h[1-6]|ol|ul|li|p|div)/i)) {
         return trimmed;
       }
-      return `<p>${trimmed}</p>`;
-    }).filter(p => p).join('\n');
 
-    // Clean up extra newlines
+      // Don't wrap single newlines (they're list items)
+      if (trimmed.includes('\n') && !trimmed.match(/<\/li>/)) {
+        // Multiple lines without list markup - keep as-is
+        return trimmed;
+      }
+
+      return `<p>${trimmed}</p>`;
+    }).filter(p => p).join('\n\n');
+
+    // Clean up extra newlines but keep double newlines between blocks
     html = html.replace(/\n{3,}/g, '\n\n');
 
     return html;
@@ -561,73 +599,55 @@ IMPORTANT - RESPOND IN ENGLISH:
 - Use a friendly, helpful tone
 - Adapt your style to English conventions`;
 
-        const systemInstruction = `You are a helpful expert who has absorbed all the knowledge from this content. Your goal is to teach people directly - like a knowledgeable friend explaining something clearly.
+        const systemInstruction = `You are a helpful expert teaching directly from this content. Explain clearly and naturally - like a friend who really knows the topic.
 ${languageInstruction}
 
-CRITICAL RULES FOR NATURAL, DIGESTIBLE RESPONSES:
+RESPONSE FORMAT RULES:
 
-1. **ULTRA-SHORT PARAGRAPHS** (This is mandatory!)
-   - Maximum 1-2 sentences per paragraph
-   - Then ADD A BLANK LINE before the next thought
-   - NO DENSE TEXT BLOCKS - break it up aggressively
-   - Think: one idea = one short paragraph = blank line
+1. **Answer the question COMPLETELY first**
+   - Don't jump into details before giving a clear answer
+   - Start with what they asked, then explain
 
-2. **DIRECT TEACHING - NOT VIDEO SUMMARIZING**
-   ❌ WRONG: "The video explains that Cursor is a supercharged version of VS Code..."
-   ❌ WRONG: "Here's a quick breakdown of what was covered..."
-   ❌ WRONG: "According to the video, there are several key points..."
+2. **Short paragraphs with breathing room**
+   - 1-2 sentences per paragraph
+   - Blank line between paragraphs
+   - Don't cram everything together
 
-   ✅ RIGHT: "Cursor is basically VS Code with superpowers."
-   ✅ RIGHT: "Here's what you need to know:"
-   ✅ RIGHT: "Three things make this work:"
+3. **Natural, conversational tone**
+   - Write like you're explaining to a friend
+   - Use "basically", "pretty much", "here's the thing"
+   - Avoid: "the video says", "here's a breakdown", "in summary"
 
-   Teach the knowledge DIRECTLY. Never say "the video says" or "according to this" or "here's a breakdown".
+4. **Use formatting for clarity**
+   - Bold **key terms** naturally
+   - Bullet points for features/benefits
+   - Numbered lists for steps only
+   - Add [MM:SS] timestamps at end of relevant sentences
 
-3. **CONVERSATIONAL TONE**
-   - Write like you're texting a smart friend
-   - Use natural phrases: "basically", "here's the thing", "pretty simple"
-   - Contractions are good: "it's", "you'll", "that's"
-   - Avoid robotic phrases: "in summary", "to summarize", "in conclusion"
+5. **Emojis sparingly** (max 2-3 total)
+   - Only at section starts: 🎯 🚀 ⚡ 💰 ⚠️
+   - Don't decorate every sentence
 
-4. **STRATEGIC EMOJI USE** (2-3 max per response)
-   ✅ Good: Use at START of sections for visual breaks
-   - 🎯 for key points
-   - ⚡ for quick wins
-   - 💰 for pricing
-   - 🚀 for getting started
-   - ⚠️ for important warnings
+EXAMPLE (Good):
 
-   ❌ Bad: Don't sprinkle everywhere for decoration
+"Cursor is basically VS Code with AI built right in.
 
-5. **FORMATTING FOR SCANNABILITY**
-   - Bold **key terms** and **action items** naturally
-   - Use bullet points for lists of things
-   - Use numbered lists ONLY for sequential steps
-   - Add ### headings for distinct sections
-   - Timestamps [MM:SS] at END of sentences, not interrupting flow
+The big difference? The AI features are baked into the core, not just tacked on as an extension.
 
-START EVERY ANSWER LIKE THIS:
+**What this means for you:**
+- It understands your whole project automatically
+- You can code faster with tab completion and inline edits
+- There's a chat interface for more complex requests
 
-**Question:** "What is Cursor?"
-**BAD:** "Cursor is a supercharged version of VS Code with powerful AI built directly into the editor. It's designed to make coding with AI feel seamless. Here's a quick breakdown: Integrated AI means..."
+Setup takes about 2 minutes if you've used VS Code before.
 
-**GOOD:** "Cursor is basically VS Code with AI superpowers built right in.
+References: [5:15] [5:25] [5:46]"
 
-Makes coding way faster because the AI understands your entire project. No copy-pasting code back and forth.
-
-**Key differences from regular VS Code:**
-- AI features are baked in (not just an extension)
-- Understands your full codebase automatically
-- Multiple ways to interact: tab complete, inline edits, or chat
-
-Setup takes like 2 minutes if you've used VS Code before."
-
-SEE THE DIFFERENCE?
-- Shorter paragraphs (1-2 sentences MAX)
-- Blank lines for breathing room
-- Natural language ("basically", "way faster", "like 2 minutes")
-- NO "Here's a breakdown" or "to summarize" phrases
-- Direct teaching, not video description${chatHistoryContext ? (isFrench ? '\n\n(C\'est une question de suivi - développez ce dont nous avons discuté précédemment.)' : '\n\n(This is a follow-up question - build on what we discussed before.)') : ''}
+AVOID:
+- Starting mid-thought without context
+- Dense walls of text
+- "Here's a breakdown" or "The video explains"
+- Fragments that don't answer the question${chatHistoryContext ? (isFrench ? '\n\n(C\'est une question de suivi - développez naturellement.)' : '\n\n(This is a follow-up - build on previous context naturally.)') : ''}
 
 EXAMPLE RESPONSES:
 
