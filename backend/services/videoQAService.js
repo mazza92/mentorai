@@ -744,26 +744,40 @@ IMPORTANT - RESPOND IN ENGLISH:
 
         // Build format-specific instructions based on question type
         const formatInstructions = isEnumeration ? `
-🚨 ENUMERATION QUESTION DETECTED - SPECIAL FORMATTING RULES:
+🚨 ENUMERATION QUESTION DETECTED - CRITICAL NUMBERED LIST FORMATTING:
 
-The user is asking for a NUMBERED LIST (e.g., "top 10", "give me the 5", "list all"). You MUST:
+The user wants a NUMBERED LIST. You MUST number EVERY SINGLE ITEM from 1 to ${itemCount || 'N'}.
 
-1. **LIST ALL ITEMS COMPLETELY**
-   - If user asks for 10 items, list ALL 10 items with numbers
-   - Never say "and others include..." - list them explicitly
-   - Each item = 1 number + clear title + brief 1-sentence description
+⚠️ ABSOLUTE RULES - FAILURE = REJECTED RESPONSE:
 
-2. **STRICT NUMBERED FORMAT**
-   - Use: "1. **Title**: Description"
-   - Keep descriptions to 15-25 words each
-   - Total length: ${itemCount ? itemCount * 25 : 250}-${itemCount ? itemCount * 40 : 400} words (more items = more words allowed)
+1. **EVERY ITEM MUST BE NUMBERED**
+   - Item 1 starts with "1."
+   - Item 2 starts with "2."
+   - Item 3 starts with "3."
+   - Continue until ${itemCount || 'last item'}
+   - NEVER skip numbers or use bullet points
+
+2. **EXACT FORMAT FOR EACH ITEM**
+   Format: "NUMBER. **Title**: Description in 15-25 words."
+
+   Example:
+   1. **Agence d'automatisation**: Créer des agents IA pour automatiser...
+   2. **AI Drop Servicing**: Vendre des services réalisés par IA...
+   3. **E-commerce**: Développer une marque propre sur TikTok...
+
+   ❌ WRONG: Bold title without number
+   ❌ WRONG: Using bullets (-, *)
+   ✅ CORRECT: "1. **Title**: Description"
 
 3. **STRUCTURE**
-   - Start with 1-sentence intro (optional)
-   - Numbered list with ALL items
-   - End with "Références: [timestamps]"
+   - Optional: 1-sentence intro
+   - Then: Numbered list with ALL ${itemCount || ''} items (1., 2., 3., ...)
+   - End: "Références: [timestamps]"
 
-4. **NO PARAGRAPHS** - Just intro + numbered list + references` : `
+4. **TOTAL LENGTH**
+   - ${itemCount ? itemCount * 25 : 250}-${itemCount ? itemCount * 40 : 400} words allowed
+   - Descriptions: 15-25 words each
+   - NO paragraphs between items` : `
 🚨 EXPLANATION QUESTION - CONCISE FORMAT:
 
 1. **ANSWER IN 3-5 SHORT PARAGRAPHS MAX**
@@ -836,11 +850,19 @@ Here are the top 5 AI tools for content creation in 2026:
 
 References: [1:22] [4:15] [8:30] [12:45]`}
 
-KEY FOR ENUMERATION:
-- List ALL items requested (never skip any)
-- Format: "1. **Title**: Brief description"
-- Keep each description 15-25 words
-- End with references` : `
+🚨 CRITICAL REQUIREMENTS FOR ENUMERATION:
+- ✅ EVERY item MUST be numbered (1., 2., 3., ... ${itemCount || '10'})
+- ✅ Format: "NUMBER. **Title**: Brief description"
+- ✅ List ALL ${itemCount || ''} items - NO exceptions
+- ✅ Each description: 15-25 words
+- ✅ NO blank lines between numbered items
+- ✅ End with "Références:" or "References:"
+
+❌ ABSOLUTELY FORBIDDEN:
+- Using bold titles WITHOUT numbers
+- Skipping numbers (e.g., 1., 3., 5.)
+- Using bullets (-, *) instead of numbers
+- Listing only some items and saying "and others"` : `
 EXAMPLE EXPLANATION RESPONSES (MAX 150 WORDS):
 
 ${isFrench ? `**Question**: "Quel logiciel utiliser ?"
@@ -897,8 +919,30 @@ Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nCo
         // Build prompt instruction based on question type
         const promptInstruction = isEnumeration
           ? (isFrench
-              ? `QUESTION DE TYPE LISTE NUMÉROTÉE - Listez TOUS les ${itemCount || 'éléments'} demandés avec ce format exact:\n\n1. **Titre**: Description brève\n2. **Titre**: Description brève\n...\n\nTerminez par "Références: [timestamps]"`
-              : `ENUMERATION QUESTION - List ALL ${itemCount || 'items'} requested using this exact format:\n\n1. **Title**: Brief description\n2. **Title**: Brief description\n...\n\nEnd with "References: [timestamps]"`)
+              ? `🚨 CRITICAL: This is a NUMBERED LIST question. You MUST format like this:
+
+Optional intro sentence.
+
+1. **Premier business**: Description en 15-25 mots.
+2. **Deuxième business**: Description en 15-25 mots.
+3. **Troisième business**: Description en 15-25 mots.
+...continue jusqu'à ${itemCount || 'N'}...
+
+Références: [timestamps]
+
+⚠️ EVERY item MUST start with its NUMBER (1., 2., 3., etc.). DO NOT skip numbers!`
+              : `🚨 CRITICAL: This is a NUMBERED LIST question. You MUST format like this:
+
+Optional intro sentence.
+
+1. **First item**: Description in 15-25 words.
+2. **Second item**: Description in 15-25 words.
+3. **Third item**: Description in 15-25 words.
+...continue to ${itemCount || 'N'}...
+
+References: [timestamps]
+
+⚠️ EVERY item MUST start with its NUMBER (1., 2., 3., etc.). DO NOT skip numbers!`)
           : (isFrench
               ? 'Répondez naturellement et de manière conversationnelle. FORMATAGE: Paragraphes COURTS (1-2 phrases) avec une LIGNE VIDE entre chaque. Utilisez des emojis pour les sections. Terminez par "Références: [timestamps]"'
               : 'Answer naturally and conversationally. FORMATTING: SHORT paragraphs (1-2 sentences) with a BLANK LINE between each. Use emojis for sections. End with "References: [timestamps]"');
