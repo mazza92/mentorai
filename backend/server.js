@@ -117,7 +117,7 @@ if (process.env.NODE_ENV !== 'production') {
   app.use('/api/test', require('./routes/test-helpers'));
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 WanderCut Backend running on port ${PORT}`);
   console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔧 Google Cloud Project: ${process.env.GOOGLE_CLOUD_PROJECT_ID ? 'Configured' : 'Not configured'}`);
