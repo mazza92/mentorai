@@ -107,7 +107,13 @@ if (process.env.NODE_ENV !== 'production') {
   app.use('/api/test', require('./routes/test-helpers'));
 }
 
-// Health check
+// Health check endpoints
+// Root health check for Railway platform
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'WanderCut API is running' });
+});
+
+// API health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'WanderCut API is running' });
 });
