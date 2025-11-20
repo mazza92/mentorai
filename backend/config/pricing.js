@@ -10,6 +10,27 @@
  */
 
 const PRICING_TIERS = {
+  anonymous: {
+    id: 'anonymous',
+    name: 'Trial (No Signup)',
+    price: 0,
+    priceId: '',
+    features: {
+      videosPerMonth: 1,
+      questionsPerMonth: 3,
+      videoQuality: '720p',
+      features: [
+        '1 video upload',
+        '3 questions total',
+        'All AI features',
+        'No signup required'
+      ]
+    },
+    // Cost calculation: 1 video × $0.09 + 3 questions × $0.015 = $0.09 + $0.045 = $0.135
+    estimatedCost: 0.14,
+    margin: -100 // Validation/acquisition cost
+  },
+
   free: {
     id: 'free',
     name: 'Free',

@@ -4,6 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { Storage } = require('@google-cloud/storage');
 const { Firestore } = require('@google-cloud/firestore');
+const userService = require('../services/userService');
 
 const router = express.Router();
 
@@ -96,6 +97,35 @@ router.post('/', upload.single('video'), async (req, res) => {
     }
 
     const userId = req.body.userId || 'anonymous'; // In production, get from auth token
+
+    // Check video upload quota
+    try {
+      const quota = await userService.checkVideoQuota(userId);
+
+      if (!quota.canProcess) {
+        // Delete the uploaded file since we're rejecting it
+        const fs = require('fs');
+        fs.unlinkSync(req.file.path);
+
+        return res.status(403).json({
+          error: 'Upload limit reached',
+          message: quota.requiresSignup
+            ? `You've used your ${quota.limit} free upload${quota.limit > 1 ? 's' : ''}. Sign up to get ${quota.tier === 'anonymous' ? '3' : 'more'} uploads per month!`
+            : `You've reached your monthly upload limit. You've uploaded ${quota.videosThisMonth}/${quota.limit} videos this month.`,
+          tier: quota.tier,
+          videosThisMonth: quota.videosThisMonth,
+          limit: quota.limit,
+          requiresSignup: quota.requiresSignup, // Trigger signup wall
+          upgradeRequired: !quota.requiresSignup
+        });
+      }
+
+      console.log(`User ${userId} (${quota.tier}): ${quota.videosThisMonth + 1}/${quota.limit} uploads used`);
+    } catch (quotaError) {
+      console.error('Error checking upload quota:', quotaError.message);
+      // Continue with upload if quota check fails (graceful degradation)
+    }
+
     const projectId = uuidv4();
     const fileName = req.file.filename;
     const filePath = req.file.path;
@@ -120,9 +150,12 @@ router.post('/', upload.single('video'), async (req, res) => {
 
       // Store in memory for mock mode
       mockProjects.set(projectId, projectData);
-      
+
       console.log('Project saved after upload. Project ID:', projectId);
       console.log('All projects in storage after upload:', Array.from(mockProjects.keys()));
+
+      // Increment video count
+      await userService.incrementVideoCount(userId);
 
       return res.json({
         success: true,
@@ -159,6 +192,9 @@ router.post('/', upload.single('video'), async (req, res) => {
     };
 
     await firestore.collection('projects').doc(projectId).set(projectData);
+
+    // Increment video count
+    await userService.incrementVideoCount(userId);
 
     res.json({
       success: true,
