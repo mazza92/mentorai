@@ -463,6 +463,7 @@ const QnAPanel = ({
   onSelectConversation?: (conversation: Conversation) => void
   metadata?: VideoMetadata
 }) => {
+  const { t } = useTranslation('common')
   const [query, setQuery] = useState('')
   const [history, setHistory] = useState<QAMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
