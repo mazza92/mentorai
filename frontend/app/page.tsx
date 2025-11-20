@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslation } from 'react-i18next'
 import VideoUpload from '@/components/VideoUpload'
 import WanderMindViewer from '@/components/WanderMindViewer'
 import ModernHeader from '@/components/ModernHeader'
@@ -13,6 +14,7 @@ import axios from 'axios'
 import { Conversation } from '@/lib/conversationStorage'
 
 export default function Home() {
+  const { t } = useTranslation()
   const { user, loading: authLoading, signOut } = useAuth()
   const router = useRouter()
   const [currentProject, setCurrentProject] = useState<string | null>(null)
@@ -295,10 +297,10 @@ export default function Home() {
                   <Zap className="w-10 h-10 text-white" />
                 </div>
                 <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent mb-5">
-                  Lurnia
+                  {t('app_name')}
                 </h1>
                 <p className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-                  Turn video content into searchable knowledge. Ask questions and get instant answers with timestamp citations.
+                  {t('homepage_subtitle')}
                 </p>
               </div>
               
