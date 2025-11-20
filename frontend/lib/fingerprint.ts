@@ -39,14 +39,14 @@ function getCanvasFingerprint(): string {
 function getWebGLFingerprint(): string {
   try {
     const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl') as WebGLRenderingContext | null
     if (!gl) return 'no-webgl'
 
-    const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info')
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
     if (!debugInfo) return 'no-debug-info'
 
-    const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
-    const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+    const vendor = gl.getParameter((debugInfo as any).UNMASKED_VENDOR_WEBGL)
+    const renderer = gl.getParameter((debugInfo as any).UNMASKED_RENDERER_WEBGL)
 
     return `${vendor}~${renderer}`
   } catch {
