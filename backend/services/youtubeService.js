@@ -238,17 +238,43 @@ class YouTubeService {
       };
     } catch (error) {
       console.error('Error getting YouTube video info:', error);
-      
+
       // Check for bot detection error
       if (error.stderr && (error.stderr.includes('Sign in to confirm') || error.stderr.includes('bot'))) {
         console.error('YouTube bot detection triggered. This is a known issue with yt-dlp.');
-        console.error('Possible solutions:');
-        console.error('1. Wait a few minutes and try again');
-        console.error('2. Use cookies (requires manual setup)');
-        console.error('3. YouTube may be rate-limiting this IP');
-        throw new Error('YouTube is blocking automated access. Please try again in a few minutes or contact support if the issue persists.');
+
+        // Check if we're using cookies
+        if (process.env.YOUTUBE_COOKIES) {
+          console.error('⚠️  COOKIES ARE CONFIGURED BUT YOUTUBE IS REJECTING THEM');
+          console.error('⚠️  Your cookies are likely STALE (invalidated by YouTube server-side)');
+          console.error('');
+          console.error('🔧 SOLUTION: Refresh your YouTube cookies (takes 5 minutes)');
+          console.error('   1. Export fresh cookies from your browser while logged into YouTube');
+          console.error('   2. Convert to Base64 and update YOUTUBE_COOKIES environment variable');
+          console.error('   3. Redeploy the service');
+          console.error('');
+          console.error('📖 See YOUTUBE_COOKIE_REFRESH_GUIDE.md for detailed instructions');
+          console.error('');
+
+          throw new Error(
+            '🍪 YouTube cookies are stale and need refreshing.\n\n' +
+            'Your cookies are configured but YouTube is rejecting them (likely invalidated after ~7 days).\n\n' +
+            '✅ Quick Fix:\n' +
+            '1. Export fresh cookies from browser (5 min)\n' +
+            '2. Update YOUTUBE_COOKIES environment variable\n' +
+            '3. Redeploy\n\n' +
+            'See YOUTUBE_COOKIE_REFRESH_GUIDE.md for step-by-step instructions.'
+          );
+        } else {
+          console.error('Possible solutions:');
+          console.error('1. Wait a few minutes and try again');
+          console.error('2. Configure YouTube cookies (see YOUTUBE_COOKIES_GUIDE.md)');
+          console.error('3. YouTube may be rate-limiting this IP');
+
+          throw new Error('YouTube is blocking automated access. Please try again in a few minutes or configure YouTube cookies.');
+        }
       }
-      
+
       throw new Error('Failed to fetch video information from YouTube');
     }
   }
