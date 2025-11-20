@@ -6,6 +6,13 @@ import { LanguageProvider } from '@/contexts/LanguageContext'
 export const metadata: Metadata = {
   title: 'Lurnia - Your AI Learning Companion',
   description: 'Transform any YouTube video into an interactive learning experience with AI-powered Q&A',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 }
 
 export default function RootLayout({

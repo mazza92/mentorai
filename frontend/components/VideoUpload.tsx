@@ -5,6 +5,7 @@ import axios from 'axios'
 import { Youtube, Video, Loader2, CheckCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import UpgradeModal from './UpgradeModal'
+import SignupWall from './SignupWall'
 import { getApiUrl } from '@/lib/apiUrl'
 
 interface VideoUploadProps {
@@ -20,6 +21,7 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
   const [error, setError] = useState<string | null>(null)
   const [uploaded, setUploaded] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [showSignupWall, setShowSignupWall] = useState(false)
   const [quotaUsage, setQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
 
   const isValidYouTubeUrl = (url: string) => {
@@ -85,13 +87,30 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
       }
 
       // Handle quota exceeded error
-      if (err.response?.status === 403 && err.response?.data?.upgradeRequired) {
-        setQuotaUsage({
-          used: err.response.data.videosThisMonth,
-          limit: err.response.data.limit
-        })
-        setShowUpgradeModal(true)
-        setError(err.response.data.message || 'Video limit reached')
+      if (err.response?.status === 403) {
+        const errorData = err.response.data
+        
+        // Check if signup is required (anonymous user hit limit)
+        if (errorData.requiresSignup) {
+          setQuotaUsage({
+            used: errorData.videosThisMonth || 1,
+            limit: errorData.limit || 1
+          })
+          // Don't pass backend message - let SignupWall use proper translations
+          setShowSignupWall(true)
+          setError(errorData.message || 'Upload limit reached')
+        } 
+        // Check if upgrade is required (free user hit limit)
+        else if (errorData.upgradeRequired) {
+          setQuotaUsage({
+            used: errorData.videosThisMonth,
+            limit: errorData.limit
+          })
+          setShowUpgradeModal(true)
+          setError(errorData.message || 'Video limit reached')
+        } else {
+          setError(errorData.message || errorData.error || 'Upload failed')
+        }
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
         // Timeout error - the download might still be processing
         setError(t('upload.error_timeout'))
@@ -231,7 +250,15 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
         )}
       </div>
 
-      {/* Upgrade Modal */}
+      {/* Signup Wall (for anonymous users) */}
+      <SignupWall
+        isOpen={showSignupWall}
+        onClose={() => setShowSignupWall(false)}
+        reason="video"
+        currentUsage={quotaUsage}
+      />
+
+      {/* Upgrade Modal (for authenticated free users) */}
       <UpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}

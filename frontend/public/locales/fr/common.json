@@ -87,9 +87,10 @@
     "send": "Envoyer",
     "processing": "Traitement en cours...",
     "questions_remaining": "{{count}} questions restantes ce mois-ci",
-    "upgrade_for_more": "Passez à Pro pour des questions illimitées",
+    "questions_remaining_warning": "⚠️ {{count}} questions restantes ce mois-ci. Passez au forfait Pro pour des questions illimitées !",
+    "upgrade_for_more": "Passez au forfait Pro pour des questions illimitées",
     "limit_reached": "Limite de questions atteinte",
-    "limit_message": "Vous avez atteint votre limite mensuelle de questions. Passez à Pro pour des questions illimitées."
+    "limit_message": "Vous avez atteint votre limite mensuelle de questions. Passez au forfait Pro pour des questions illimitées."
   },
 
   "upload": {
@@ -151,6 +152,22 @@
     "days_ago_plural": "Il y a {{count}} jours",
     "message_count": "{{count}} message",
     "message_count_plural": "{{count}} messages"
+  },
+
+  "signup_wall": {
+    "video_title": "Essai gratuit terminé !",
+    "video_message": "Vous avez utilisé {{limit}} téléchargement gratuit. Inscrivez-vous pour obtenir 3 téléchargements par mois !",
+    "question_title": "Essai gratuit terminé !",
+    "question_message": "Vous avez utilisé vos {{limit}} questions gratuites. Inscrivez-vous pour obtenir 15 questions par mois !",
+    "uploads_used": "Téléchargements utilisés",
+    "questions_used": "Questions utilisées",
+    "what_you_get": "Ce que vous obtenez en vous inscrivant :",
+    "benefit_videos": "3 téléchargements par mois",
+    "benefit_questions": "15 questions par mois",
+    "benefit_ai": "Toutes les fonctionnalités IA",
+    "benefit_free": "Gratuit à vie",
+    "sign_up_button": "S'inscrire gratuitement",
+    "maybe_later": "Peut-être plus tard"
   },
 
   "common": {

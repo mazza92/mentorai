@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
 import axios from 'axios'
 import { Conversation } from '@/lib/conversationStorage'
+import { getSessionId, setUserId as setSessionUserId } from '@/lib/sessionManager'
 
 export default function Home() {
   const { t } = useTranslation()
@@ -19,6 +20,7 @@ export default function Home() {
   const router = useRouter()
   const [currentProject, setCurrentProject] = useState<string | null>(null)
   const [userId, setUserId] = useState<string>('anonymous')
+  const [isInitialized, setIsInitialized] = useState(false)
 
   // Function to check URL and update project
   const checkUrlAndSetProject = () => {
@@ -51,15 +53,9 @@ export default function Home() {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     
     if (!supabaseUrl || !supabaseAnonKey) {
-      // Supabase not configured - use fallback anonymous mode
-      const stored = localStorage.getItem('userId')
-      if (!stored) {
-        const newUserId = `user_${Date.now()}`
-        localStorage.setItem('userId', newUserId)
-        setUserId(newUserId)
-      } else {
-        setUserId(stored)
-      }
+      // Supabase not configured - use fallback anonymous mode with sessionManager
+      const sessionId = getSessionId()
+      setUserId(sessionId)
       
       // PRIORITY: Check URL params FIRST (for conversation switching)
       if (checkUrlAndSetProject()) {
@@ -77,22 +73,31 @@ export default function Home() {
           }
         }
       }
+      setIsInitialized(true)
       return
     }
 
-    // Supabase is configured - require authentication
-    if (!authLoading && !user) {
-      // Redirect to auth if not signed in
-      router.push('/auth')
-      return
+    // Supabase is configured - allow anonymous access with freemium
+    if (!authLoading) {
+      if (user) {
+        // Authenticated user - use their Supabase user ID
+        setSessionUserId(user.id) // Update sessionManager
+        setUserId(user.id)
+      } else {
+        // Anonymous user - use sessionId from sessionManager
+        const sessionId = getSessionId()
+        setUserId(sessionId)
+      }
     }
 
     if (user) {
-      // Use Supabase user ID
+      // Use Supabase user ID (already set above, but keep for consistency)
+      setSessionUserId(user.id) // Ensure sessionManager is updated
       setUserId(user.id)
 
       // PRIORITY: Check URL params FIRST (for conversation switching)
       if (checkUrlAndSetProject()) {
+        setIsInitialized(true)
         return // URL param takes priority
       }
 
@@ -108,7 +113,12 @@ export default function Home() {
         }
       }
     }
+    
+    setIsInitialized(true)
   }, [user, authLoading, router]) // Remove currentProject from dependencies to prevent loops
+
+  // No redirect needed - freemium allows anonymous access
+  // Signup wall will be shown when limits are reached (handled by backend API responses)
 
   // Listen for URL changes (popstate for back/forward buttons)
   useEffect(() => {
@@ -230,35 +240,21 @@ export default function Home() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   const isSupabaseConfigured = supabaseUrl && supabaseAnonKey
 
-  if (isSupabaseConfigured) {
-    // Supabase is configured - require authentication
-    if (authLoading) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-            <p className="text-slate-600">Loading...</p>
-          </div>
+  // Show loading until initialized
+  if (!isInitialized || authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-slate-600">Loading...</p>
         </div>
-      )
-    }
-
-    if (!user) {
-      return null // Will redirect to auth
-    }
-  } else {
-    // Supabase not configured - show warning but allow anonymous access
-    if (authLoading) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-            <p className="text-slate-600">Loading...</p>
-          </div>
-        </div>
-      )
-    }
+      </div>
+    )
   }
+
+  // Freemium model: Allow anonymous access
+  // No redirect needed - users can try the product without signup
+  // Signup wall will appear when they hit limits (1 upload, 3 questions)
 
   // Helper function for conversation selection
   const handleSelectConversation = (conversation: Conversation) => {

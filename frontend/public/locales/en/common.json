@@ -87,6 +87,7 @@
     "send": "Send",
     "processing": "Processing...",
     "questions_remaining": "{{count}} questions remaining this month",
+    "questions_remaining_warning": "⚠️ {{count}} questions remaining this month. Upgrade to Pro for unlimited questions!",
     "upgrade_for_more": "Upgrade to Pro for unlimited questions",
     "limit_reached": "Question limit reached",
     "limit_message": "You've reached your monthly question limit. Upgrade to Pro for unlimited questions."
@@ -150,6 +151,22 @@
     "days_ago_plural": "{{count}} days ago",
     "message_count": "{{count}} message",
     "message_count_plural": "{{count}} messages"
+  },
+
+  "signup_wall": {
+    "video_title": "Free Trial Complete!",
+    "video_message": "You've used your 1 free upload. Sign up to get 3 uploads per month!",
+    "question_title": "Free Trial Complete!",
+    "question_message": "You've used your 3 free questions. Sign up to get 15 questions per month!",
+    "uploads_used": "Uploads used",
+    "questions_used": "Questions used",
+    "what_you_get": "What you get when you sign up:",
+    "benefit_videos": "3 uploads per month",
+    "benefit_questions": "15 questions per month",
+    "benefit_ai": "All AI features",
+    "benefit_free": "Free forever",
+    "sign_up_button": "Sign Up Free",
+    "maybe_later": "Maybe later"
   },
 
   "common": {
