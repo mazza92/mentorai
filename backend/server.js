@@ -15,6 +15,16 @@ const PORT = process.env.PORT || 3001;
 // This allows express-rate-limit to correctly identify users by IP
 app.set('trust proxy', 1);
 
+// Health check endpoints - MUST be before all middleware to avoid being blocked
+// Railway health checks need immediate 200 OK response
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'WanderCut API is running' });
+});
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'WanderCut API is running' });
+});
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: false, // Disable for API, configure if serving HTML
@@ -106,17 +116,6 @@ app.use('/api/subscriptions', subscriptionsRouter); // Stripe subscriptions (web
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api/test', require('./routes/test-helpers'));
 }
-
-// Health check endpoints
-// Root health check for Railway platform
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'WanderCut API is running' });
-});
-
-// API health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'WanderCut API is running' });
-});
 
 app.listen(PORT, () => {
   console.log(`🚀 WanderCut Backend running on port ${PORT}`);
