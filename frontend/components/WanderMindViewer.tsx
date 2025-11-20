@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { Send, Clock, BookOpen, Loader2, Zap, Youtube, ThumbsUp, List, ChevronDown, ChevronUp, CheckCircle, AlertCircle, Menu, X, Video } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import ConversationHistory from './ConversationHistory'
 import ProcessingProgress from './ProcessingProgress'
 import SignupWall from './SignupWall'
@@ -1382,6 +1383,7 @@ const QnAPanel = ({
 
 // Main WanderMind Viewer Component
 export default function WanderMindViewer({ projectId, userId, onNewConversation }: WanderMindViewerProps) {
+  const { t } = useTranslation('common')
   const [project, setProject] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [projectNotFound, setProjectNotFound] = useState(false)
