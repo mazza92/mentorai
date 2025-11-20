@@ -60,8 +60,10 @@ const qaLimiter = rateLimit({
 });
 
 // Middleware
+// Strip trailing slashes from CORS origin to avoid mismatch issues
+const corsOrigin = (process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 app.use(cors({
-  origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
+  origin: corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
