@@ -419,8 +419,9 @@ analytics.track({
 
 ## Deployment
 
-**Commit:** `91b8c50`
-**Status:** ✅ Pushed to Railway
+**Commit:** `91b8c50` (initial implementation)
+**Latest Commit:** `32c4ddf` (documentation)
+**Status:** ✅ Pushed to GitHub, ready for Railway deployment
 
 **Railway will:**
 1. Build new code
