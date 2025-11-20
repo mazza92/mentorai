@@ -1,6 +1,7 @@
 {
   "app_name": "Lurnia",
   "tagline": "Votre compagnon d'apprentissage IA",
+  "homepage_subtitle": "Transformez vos vidéos en connaissances consultables. Posez des questions et obtenez des réponses instantanées avec citations horodatées.",
 
   "auth": {
     "sign_in": "Se connecter",

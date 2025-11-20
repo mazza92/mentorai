@@ -1,6 +1,7 @@
 {
   "app_name": "Lurnia",
   "tagline": "Your AI Learning Companion",
+  "homepage_subtitle": "Turn video content into searchable knowledge. Ask questions and get instant answers with timestamp citations.",
 
   "auth": {
     "sign_in": "Sign In",
