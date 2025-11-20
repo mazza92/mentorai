@@ -38,12 +38,14 @@ class YouTubeService {
   /**
    * Check if YouTube cookies are expired or expiring soon
    * @param {string} cookiesContent - Content of cookies.txt file
+   * @returns {Object} - { valid: boolean, message: string, criticalExpired: number }
    */
   checkCookieExpiry(cookiesContent) {
     try {
       const lines = cookiesContent.split('\n');
       const now = Math.floor(Date.now() / 1000); // Current Unix timestamp
       const oneDayFromNow = now + (24 * 60 * 60); // 24 hours from now
+      const oneWeekFromNow = now + (7 * 24 * 60 * 60); // 7 days from now
 
       // Critical cookies that must be valid for downloads to work
       const criticalCookies = ['VISITOR_INFO1_LIVE', 'LOGIN_INFO', 'PREF', 'CONSENT'];
@@ -52,6 +54,7 @@ class YouTubeService {
       let expiringSoonCount = 0;
       let criticalExpired = 0;
       let totalCookies = 0;
+      const expiredCritical = [];
 
       for (const line of lines) {
         // Skip comments and empty lines
@@ -70,6 +73,7 @@ class YouTubeService {
           expiredCount++;
           if (isCritical) {
             criticalExpired++;
+            expiredCritical.push(cookieName);
             console.error(`   ❌ CRITICAL cookie '${cookieName}' is EXPIRED!`);
           } else {
             console.log(`   ℹ️  Non-critical cookie '${cookieName}' is expired (okay)`);
@@ -78,24 +82,54 @@ class YouTubeService {
           expiringSoonCount++;
           const hoursLeft = Math.floor((expiration - now) / 3600);
           console.warn(`   ⚠️  Critical cookie '${cookieName}' expires in ${hoursLeft} hours`);
+        } else if (expiration < oneWeekFromNow && isCritical) {
+          const daysLeft = Math.floor((expiration - now) / 86400);
+          console.log(`   ℹ️  Cookie '${cookieName}' expires in ${daysLeft} days`);
         }
       }
 
-      // Only warn if critical cookies are expired
+      // FAIL FAST if critical cookies are expired
       if (criticalExpired > 0) {
         console.error(`   ❌ CRITICAL: ${criticalExpired} essential cookies have EXPIRED!`);
+        console.error(`   ❌ Expired cookies: ${expiredCritical.join(', ')}`);
         console.error(`   ❌ YouTube downloads WILL FAIL. Please refresh your cookies NOW.`);
         console.error(`   ❌ See YOUTUBE_COOKIES_GUIDE.md for instructions.`);
+        return {
+          valid: false,
+          message: `YouTube cookies expired (${expiredCritical.join(', ')}). Please refresh cookies to continue.`,
+          criticalExpired,
+          expiredCookies: expiredCritical
+        };
       } else if (expiringSoonCount > 0) {
         console.warn(`   ⚠️  ${expiringSoonCount} critical cookies expire within 24 hours`);
         console.warn(`   ⚠️  Refresh cookies soon to avoid interruptions`);
+        return {
+          valid: true,
+          message: `${expiringSoonCount} cookies expiring soon`,
+          criticalExpired: 0
+        };
       } else if (expiredCount > 0) {
         console.log(`   ✅ ${expiredCount} non-critical cookies expired (okay, ${totalCookies - expiredCount} valid)`);
+        return {
+          valid: true,
+          message: 'Cookies valid',
+          criticalExpired: 0
+        };
       } else {
         console.log(`   ✅ All ${totalCookies} cookies are valid`);
+        return {
+          valid: true,
+          message: 'All cookies valid',
+          criticalExpired: 0
+        };
       }
     } catch (error) {
       console.error('   Error checking cookie expiry:', error.message);
+      return {
+        valid: true, // Don't block if we can't check (might be a format issue)
+        message: `Cookie check failed: ${error.message}`,
+        criticalExpired: 0
+      };
     }
   }
 
@@ -145,9 +179,25 @@ class YouTubeService {
           console.log('   Cookie file saved to:', cookiesPath);
           console.log('   Cookie file size:', fs.statSync(cookiesPath).size, 'bytes');
 
-          // Check cookie expiry
-          this.checkCookieExpiry(cookiesContent);
+          // Check cookie expiry and FAIL FAST if critical cookies expired
+          const cookieCheck = this.checkCookieExpiry(cookiesContent);
+          if (!cookieCheck.valid) {
+            const expiredError = new Error(`❌ ${cookieCheck.message}\n\n` +
+              `Your YouTube cookies have expired and need to be refreshed.\n\n` +
+              `How to fix:\n` +
+              `1. Export fresh cookies from your browser (while logged into YouTube)\n` +
+              `2. Update the YOUTUBE_COOKIES environment variable\n` +
+              `3. Restart the service\n\n` +
+              `See YOUTUBE_COOKIES_GUIDE.md for detailed instructions.`);
+            expiredError.code = 'COOKIES_EXPIRED';
+            throw expiredError;
+          }
         } catch (error) {
+          // Rethrow if it's a cookies expired error (must be fixed by user)
+          if (error.code === 'COOKIES_EXPIRED') {
+            throw error;
+          }
+          // For other errors (e.g., file system issues), log and continue
           console.error('❌ Error loading YouTube cookies:', error.message);
           console.error('   Proceeding without cookies (may trigger bot detection)');
         }

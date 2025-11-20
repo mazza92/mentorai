@@ -311,13 +311,82 @@ ${promptConfig.closing}`;
     // 2. Fix single quotes to double quotes (only for property names)
     jsonString = jsonString.replace(/'([^']+)':/g, '"$1":');
 
+    // CRITICAL: Handle French apostrophes and special characters in strings
+    // This is a multi-pass approach to clean up malformed JSON from Gemini
     let tocData;
-    try {
-      tocData = JSON.parse(jsonString);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError.message);
-      console.error('Attempted to parse:', jsonString.substring(0, 500) + '...');
-      throw new Error(`Failed to parse TOC JSON: ${parseError.message}`);
+    let parseAttempts = 0;
+    const maxParseAttempts = 3;
+
+    while (parseAttempts < maxParseAttempts) {
+      try {
+        tocData = JSON.parse(jsonString);
+        break; // Success!
+      } catch (parseError) {
+        parseAttempts++;
+
+        if (parseAttempts >= maxParseAttempts) {
+          // Last attempt failed - log and throw
+          console.error('JSON parse error after', maxParseAttempts, 'attempts:', parseError.message);
+          console.error('Attempted to parse:', jsonString.substring(0, 500) + '...');
+          throw new Error(`Failed to parse TOC JSON: ${parseError.message}`);
+        }
+
+        // Try to fix the JSON based on the error
+        console.log(`JSON parse attempt ${parseAttempts} failed, trying to fix...`);
+
+        // Attempt 1: Fix unescaped quotes and apostrophes in string values
+        // This regex finds strings like "description": "L'agent est..." and escapes the apostrophe
+        if (parseAttempts === 1) {
+          jsonString = jsonString.replace(/"([^"]*)":\s*"([^"]*)"/g, (match, key, value) => {
+            // Don't escape if already escaped
+            const fixedValue = value.replace(/(?<!\\)'/g, "\\'").replace(/(?<!\\)"/g, '\\"');
+            return `"${key}": "${fixedValue}"`;
+          });
+        }
+
+        // Attempt 2: Try using a more aggressive fix - replace single quotes in values
+        if (parseAttempts === 2) {
+          // As last resort, try to extract chapters array and rebuild JSON manually
+          try {
+            const chaptersMatch = jsonString.match(/"chapters"\s*:\s*\[([\s\S]*)\]/);
+            if (chaptersMatch) {
+              // Rebuild with safer parsing
+              const chaptersStr = chaptersMatch[1];
+              const chapters = [];
+
+              // Extract each chapter object
+              const chapterMatches = [...chaptersStr.matchAll(/\{([^}]+)\}/g)];
+              for (const chapterMatch of chapterMatches) {
+                const chapterStr = chapterMatch[1];
+                const chapter = {};
+
+                // Extract fields safely
+                const titleMatch = chapterStr.match(/"title"\s*:\s*"([^"]+)"/);
+                const startTimeMatch = chapterStr.match(/"startTime"\s*:\s*"([^"]+)"/);
+                const startTimeSecondsMatch = chapterStr.match(/"startTimeSeconds"\s*:\s*(\d+)/);
+                const descriptionMatch = chapterStr.match(/"description"\s*:\s*"([^"]+)"/);
+
+                if (titleMatch) chapter.title = titleMatch[1];
+                if (startTimeMatch) chapter.startTime = startTimeMatch[1];
+                if (startTimeSecondsMatch) chapter.startTimeSeconds = parseInt(startTimeSecondsMatch[1], 10);
+                if (descriptionMatch) chapter.description = descriptionMatch[1];
+
+                if (chapter.title && chapter.startTime !== undefined) {
+                  chapters.push(chapter);
+                }
+              }
+
+              if (chapters.length > 0) {
+                tocData = { chapters };
+                console.log('✅ Rebuilt JSON manually from', chapters.length, 'chapters');
+                break;
+              }
+            }
+          } catch (rebuildError) {
+            console.error('Failed to rebuild JSON manually:', rebuildError.message);
+          }
+        }
+      }
     }
 
     console.log('TOC generated with', tocData.chapters.length, 'chapters');
