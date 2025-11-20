@@ -88,20 +88,23 @@ router.post('/', async (req, res) => {
 
     // Check question quota before processing
     try {
-      const { canAsk, limit, remaining, questionsThisMonth, tier } = await userService.checkQuestionQuota(userId);
+      const { canAsk, limit, remaining, questionsThisMonth, tier, requiresSignup } = await userService.checkQuestionQuota(userId);
 
       if (!canAsk) {
         return res.status(403).json({
           error: 'Question limit reached',
-          message: `You've reached your monthly question limit. You've asked ${questionsThisMonth}/${limit} questions this month.`,
+          message: requiresSignup
+            ? `You've used your ${limit} free question${limit > 1 ? 's' : ''}. Sign up to get ${tier === 'anonymous' ? '15' : 'more'} questions per month!`
+            : `You've reached your monthly question limit. You've asked ${questionsThisMonth}/${limit} questions this month.`,
           tier,
           questionsThisMonth,
           limit,
-          upgradeRequired: true
+          requiresSignup, // Trigger signup wall for anonymous users
+          upgradeRequired: !requiresSignup
         });
       }
 
-      console.log(`User ${userId} has ${remaining} questions remaining this month`);
+      console.log(`User ${userId} (${tier}) has ${remaining} questions remaining this month`);
     } catch (quotaError) {
       console.error('Error checking question quota:', quotaError.message);
       // Continue even if quota check fails (graceful degradation)

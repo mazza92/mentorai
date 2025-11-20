@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const youtubeService = require('../services/youtubeService');
 const videoAnalysisService = require('../services/videoAnalysisService');
 const { mockProjects } = require('../utils/mockStorage');
-const axios = require('axios');
+const userService = require('../services/userService');
 
 const router = express.Router();
 
@@ -114,23 +114,25 @@ router.post('/', async (req, res) => {
 
     // Check video quota before processing
     try {
-      const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
-      const quotaResponse = await axios.post(`${baseUrl}/api/user/${userId}/check-video`);
-      const { canProcess, limit, remaining, videosThisMonth } = quotaResponse.data;
+      const quota = await userService.checkVideoQuota(userId);
 
-      if (!canProcess) {
+      if (!quota.canProcess) {
         return res.status(403).json({
-          error: 'Video limit reached',
-          message: `You've reached your monthly video limit. You've processed ${videosThisMonth}/${limit} videos this month.`,
-          limit,
-          videosThisMonth,
-          upgradeRequired: true
+          error: 'Upload limit reached',
+          message: quota.requiresSignup
+            ? `You've used your ${quota.limit} free upload${quota.limit > 1 ? 's' : ''}. Sign up to get ${quota.tier === 'anonymous' ? '3' : 'more'} uploads per month!`
+            : `You've reached your monthly upload limit. You've uploaded ${quota.videosThisMonth}/${quota.limit} videos this month.`,
+          tier: quota.tier,
+          videosThisMonth: quota.videosThisMonth,
+          limit: quota.limit,
+          requiresSignup: quota.requiresSignup, // Trigger signup wall
+          upgradeRequired: !quota.requiresSignup
         });
       }
 
-      console.log(`User ${userId} has ${remaining} videos remaining this month`);
+      console.log(`User ${userId} (${quota.tier}): ${quota.videosThisMonth + 1}/${quota.limit} uploads used`);
     } catch (quotaError) {
-      console.error('Error checking video quota:', quotaError.message);
+      console.error('Error checking upload quota:', quotaError.message);
       // Continue even if quota check fails (graceful degradation)
     }
 
@@ -175,10 +177,9 @@ router.post('/', async (req, res) => {
     }
 
     // Increment video count for user (don't block response)
-    const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
-    axios.post(`${baseUrl}/api/user/${userId}/increment-video`)
-      .then(response => {
-        console.log(`Video count incremented for user ${userId}:`, response.data.videosThisMonth);
+    userService.incrementVideoCount(userId)
+      .then(() => {
+        console.log(`Video count incremented for user ${userId}`);
       })
       .catch(error => {
         console.error('Error incrementing video count:', error.message);
