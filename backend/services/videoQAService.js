@@ -657,6 +657,41 @@ class VideoQAService {
   }
 
   /**
+   * Detect if the question is asking for a numbered list/enumeration
+   */
+  isEnumerationQuestion(question) {
+    const lowerQuestion = question.toLowerCase();
+
+    // English patterns
+    const englishPatterns = [
+      /\b(list|give me|show me|what are)\s+(the\s+)?(\d+|all|top|best)\s+/i,
+      /\btop\s+\d+\b/i,
+      /\ball\s+\d+\b/i,
+      /\b\d+\s+(things|items|ways|steps|tips|strategies|businesses|ideas|points)\b/i,
+    ];
+
+    // French patterns
+    const frenchPatterns = [
+      /\b(donne|donnes|liste|montre|quels sont|quelles sont)\s+(moi\s+)?(les\s+)?(\d+|tous|toutes|meilleurs|meilleures)\s+/i,
+      /\btop\s+\d+\b/i,
+      /\b\d+\s+(choses|éléments|façons|étapes|conseils|stratégies|business|idées|points)\b/i,
+      /\bà\s+lancer\b/i, // "businesses to launch"
+    ];
+
+    const allPatterns = [...englishPatterns, ...frenchPatterns];
+
+    return allPatterns.some(pattern => pattern.test(lowerQuestion));
+  }
+
+  /**
+   * Extract the number of items requested (if any)
+   */
+  extractItemCount(question) {
+    const match = question.match(/\b(\d+)\s+/);
+    return match ? parseInt(match[1]) : null;
+  }
+
+  /**
    * Answer a question about the video using Gemini
    */
   async answerQuestion(userQuestion, videoAnalysis, transcript, chatHistory = null, personalizedContext = '', userLanguage = null) {
@@ -665,6 +700,11 @@ class VideoQAService {
     // Detect language from transcript, user question, or use provided language
     const detectedLanguage = userLanguage || this.detectLanguage(transcript, userQuestion);
     console.log('Detected language for Q&A:', detectedLanguage);
+
+    // Detect if this is an enumeration question
+    const isEnumeration = this.isEnumerationQuestion(userQuestion);
+    const itemCount = this.extractItemCount(userQuestion);
+    console.log('Question type:', isEnumeration ? `Enumeration (${itemCount || 'multiple'} items)` : 'Explanation');
 
     // Build context from video analysis
     const videoContext = this.buildVideoContext(videoAnalysis, transcript);
@@ -702,10 +742,29 @@ IMPORTANT - RESPOND IN ENGLISH:
 - Use a friendly, helpful tone
 - Adapt your style to English conventions`;
 
-        const systemInstruction = `You are a helpful expert teaching directly from this content. Be CONCISE and SCANNABLE - people read on phones.
-${languageInstruction}
+        // Build format-specific instructions based on question type
+        const formatInstructions = isEnumeration ? `
+🚨 ENUMERATION QUESTION DETECTED - SPECIAL FORMATTING RULES:
 
-🚨 CRITICAL RULES - YOU WILL BE PENALIZED FOR BREAKING THESE:
+The user is asking for a NUMBERED LIST (e.g., "top 10", "give me the 5", "list all"). You MUST:
+
+1. **LIST ALL ITEMS COMPLETELY**
+   - If user asks for 10 items, list ALL 10 items with numbers
+   - Never say "and others include..." - list them explicitly
+   - Each item = 1 number + clear title + brief 1-sentence description
+
+2. **STRICT NUMBERED FORMAT**
+   - Use: "1. **Title**: Description"
+   - Keep descriptions to 15-25 words each
+   - Total length: ${itemCount ? itemCount * 25 : 250}-${itemCount ? itemCount * 40 : 400} words (more items = more words allowed)
+
+3. **STRUCTURE**
+   - Start with 1-sentence intro (optional)
+   - Numbered list with ALL items
+   - End with "Références: [timestamps]"
+
+4. **NO PARAGRAPHS** - Just intro + numbered list + references` : `
+🚨 EXPLANATION QUESTION - CONCISE FORMAT:
 
 1. **ANSWER IN 3-5 SHORT PARAGRAPHS MAX**
    - Most answers should be 100-150 words total
@@ -731,39 +790,62 @@ ${languageInstruction}
    - "Here's the thing..."
    - "Basically..."
    - "The video explains..."
-   - "Let me break this down..."
+   - "Let me break this down..."`;
 
-EXAMPLE RESPONSES FOR ENGLISH (MAX 150 WORDS, VISUALLY SCANNABLE):
+        // Build examples based on question type
+        const exampleResponses = isEnumeration ? `
+EXAMPLE ENUMERATION RESPONSES:
 
-**Question**: "What's the main strategy for cold emails?"
+${isFrench ? `**Question**: "Donne moi les 10 business à lancer en 2026"
 
-"Cold emails aren't for selling - they're for starting conversations. Goal is a reply, not a sale.
+Voici les 10 meilleurs business à lancer en 2026 :
 
-⚡ **Quick wins:**
-- Use soft CTAs like "Would this interest you?"
-- Reply within 10 minutes when someone responds
-- Keep emails under 100 words
+1. **Agence d'automatisation (AAA)**: Créer des agents IA pour automatiser les tâches répétitives des entreprises, en forte demande.
 
-🚫 Never put links in first email (spam trigger).
+2. **AI Drop Servicing**: Vendre des services (sites web, logos, design) entièrement réalisés par des intelligences artificielles.
 
-References: [2:15] [5:30] [8:45]"
+3. **E-commerce de niche**: Développer une marque propre sur des plateformes comme TikTok Shop ou Shopify avec des produits ciblés.
 
-**Question**: "How do I optimize my offer?"
+4. **Closer/Commercial**: Vendre pour d'autres entreprises en prenant des commissions élevées sur les ventes closes.
 
-"Your offer determines results. Email is just delivery.
+5. **Coaching et formation**: Monétiser son expertise en créant des programmes de formation en ligne pour débutants.
 
-🎯 **The approach:**
-Test different versions for 2-3 weeks each. Most people quit too early.
+6. **Consultant indépendant**: Transformer son travail actuel en activité freelance avec des clients multiples pour plus de revenus.
 
-Strong offer = less personalization needed. "Hey [Name], saw you're looking for [topic]" works if the offer's good.
+7. **Application mobile SaaS**: Développer une app qui résout un problème spécifique et facture un abonnement mensuel.
 
-References: [12:10] [15:20]"
+8. **Création de contenu**: Monétiser une audience sur YouTube, TikTok ou Instagram via sponsorings et produits digitaux.
 
-EXEMPLES DE RÉPONSES EN FRANÇAIS (MAX 150 MOTS, VISUELLEMENT SCANNABLE):
+9. **Logiciel SaaS B2B**: Créer un outil logiciel pour entreprises avec un modèle d'abonnement récurrent.
 
-**Question**: "Quel logiciel utiliser ?"
+10. **Business physique local**: Ouvrir un commerce de proximité (café, service, boutique) dans un quartier en croissance.
 
-"Pour créer des agents IA sans coder, utilisez **N8N**. C'est la plateforme recommandée pour les débutants.
+Références: [0:45] [3:12] [7:28] [11:50]` : `**Question**: "Give me the top 5 AI tools for content creation"
+
+Here are the top 5 AI tools for content creation in 2026:
+
+1. **Jasper AI**: Best for long-form blog content and SEO-optimized articles with brand voice customization.
+
+2. **Midjourney v6**: Leading AI image generator for ultra-realistic visuals and creative artwork in seconds.
+
+3. **Descript**: All-in-one video editor with AI transcription, voice cloning, and automatic filler word removal.
+
+4. **ChatGPT Plus**: Most versatile for brainstorming, scripting, and research with real-time web access.
+
+5. **Eleven Labs**: Industry-leading voice synthesis for podcasts, audiobooks, and video voiceovers with natural emotion.
+
+References: [1:22] [4:15] [8:30] [12:45]`}
+
+KEY FOR ENUMERATION:
+- List ALL items requested (never skip any)
+- Format: "1. **Title**: Brief description"
+- Keep each description 15-25 words
+- End with references` : `
+EXAMPLE EXPLANATION RESPONSES (MAX 150 WORDS):
+
+${isFrench ? `**Question**: "Quel logiciel utiliser ?"
+
+Pour créer des agents IA sans coder, utilisez **N8N**. C'est la plateforme recommandée pour les débutants.
 
 ✅ **Configuration:**
 - Organisez vos créations en projets
@@ -772,38 +854,36 @@ EXEMPLES DE RÉPONSES EN FRANÇAIS (MAX 150 MOTS, VISUELLEMENT SCANNABLE):
 
 💡 L'agent peut lire des données Airtable ou envoyer des emails via Gmail.
 
-Références: [1:18] [2:40] [5:29]"
+Références: [1:18] [2:40] [5:29]` : `**Question**: "What's the main strategy for cold emails?"
 
-**Question**: "Quel est le processus ?"
+Cold emails aren't for selling - they're for starting conversations. Goal is a reply, not a sale.
 
-"Le processus commence par créer un **workflow dans N8N**, puis configurer un chat pour interagir avec votre agent.
+⚡ **Quick wins:**
+- Use soft CTAs like "Would this interest you?"
+- Reply within 10 minutes when someone responds
+- Keep emails under 100 words
 
-🎯 **Les étapes:**
-- Créez un agent IA et connectez un modèle de langage (GPT-4)
-- Activez la Window Buffer Memory pour la mémoire conversationnelle
-- Ajoutez des outils comme Airtable ou Gmail
+🚫 Never put links in first email (spam trigger).
 
-Testez l'agent pour vérifier son efficacité.
+References: [2:15] [5:30] [8:45]`}
 
-Références: [3:07] [5:36] [14:20]"
+KEY FOR EXPLANATIONS:
+- 100-150 words max
+- 3-5 short paragraphs
+- Use emojis for sections
+- Bullets only for 3-5 key points`;
 
-CRITICAL REMINDERS:
+        const systemInstruction = `You are a helpful expert teaching directly from this content. Be CONCISE and SCANNABLE - people read on phones.
+${languageInstruction}
 
-✓ **100-150 WORDS MAX** - Anything longer fails
-✓ **3-5 PARAGRAPHS** - Each 1-2 sentences
-✓ **BLANK LINES ARE MANDATORY** - Add blank line before AND after emoji section headers
-✓ **NO FLUFF** - Cut intros, cut filler, get to the point
-✓ **BULLETS = 3-5 ITEMS** - More is overwhelming
-✓ **STRATEGIC EMOJIS** - MUST have blank line before emoji section:
-  - ⚡ Quick wins / Action items
-  - 🎯 Main strategy / Approach
-  - ✅ Setup / Checklist
-  - 💡 Examples / Ideas
-  - 🚫 Don't do this / Warnings
-  - ⚠️ Important caveats
-✓ **TIMESTAMPS AT END** - Group as "References: [MM:SS] [MM:SS]" or "Références: [MM:SS] [MM:SS]"
+${formatInstructions}
+
+${exampleResponses}
+
+CRITICAL FINAL REMINDERS:
 ✓ **ALWAYS INCLUDE CITATIONS** - Every answer MUST end with References/Références
-✓ **MOBILE-FIRST** - People read on phones
+✓ **BLANK LINES** - Add blank line before and after emoji sections
+✓ **MOBILE-FIRST** - Keep it scannable
 
 VIDEO CONTEXT (Full Transcript + Visual Analysis):
 ${videoContext}
@@ -814,9 +894,14 @@ You are an expert teacher sharing knowledge, NOT someone describing a video.
 
 Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nContinuez la conversation naturellement, en développant les explications précédentes.' : '\n\nContinue the conversation naturally, building on previous explanations.') : ''}`;
 
-        const promptInstruction = isFrench
-          ? 'Répondez naturellement et de manière conversationnelle. Commencez par une réponse claire et directe à la question. FORMATAGE CRITIQUE: Écrivez des paragraphes COURTS (1-2 phrases chacun) avec une LIGNE VIDE entre chaque paragraphe. Exemple:\n\nPremier paragraphe court.\n\nDeuxième paragraphe court.\n\n⚡ **Titre de section:**\n- Point 1\n- Point 2\n\nUtilisez EXACTEMENT ce format avec les lignes vides!'
-          : 'Answer naturally and conversationally. Start with a clear, direct answer to the question. CRITICAL FORMATTING: Write SHORT paragraphs (1-2 sentences each) with a BLANK LINE between each paragraph. Example:\n\nParagraph one is short.\n\nParagraph two is also short.\n\n⚡ **Section heading:**\n- Bullet 1\n- Bullet 2\n\nUse this EXACT format with blank lines!';
+        // Build prompt instruction based on question type
+        const promptInstruction = isEnumeration
+          ? (isFrench
+              ? `QUESTION DE TYPE LISTE NUMÉROTÉE - Listez TOUS les ${itemCount || 'éléments'} demandés avec ce format exact:\n\n1. **Titre**: Description brève\n2. **Titre**: Description brève\n...\n\nTerminez par "Références: [timestamps]"`
+              : `ENUMERATION QUESTION - List ALL ${itemCount || 'items'} requested using this exact format:\n\n1. **Title**: Brief description\n2. **Title**: Brief description\n...\n\nEnd with "References: [timestamps]"`)
+          : (isFrench
+              ? 'Répondez naturellement et de manière conversationnelle. FORMATAGE: Paragraphes COURTS (1-2 phrases) avec une LIGNE VIDE entre chaque. Utilisez des emojis pour les sections. Terminez par "Références: [timestamps]"'
+              : 'Answer naturally and conversationally. FORMATTING: SHORT paragraphs (1-2 sentences) with a BLANK LINE between each. Use emojis for sections. End with "References: [timestamps]"');
 
         const prompt = `${systemInstruction}\n\nQUESTION: ${userQuestion}\n\n${promptInstruction}`;
 
