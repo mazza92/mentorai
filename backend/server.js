@@ -16,13 +16,13 @@ const PORT = process.env.PORT || 3001;
 app.set('trust proxy', 1);
 
 // Health check endpoints - MUST be before all middleware to avoid being blocked
-// Railway health checks need immediate 200 OK response
+// Railway health checks need immediate 200 OK response with no processing
 app.get('/', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'WanderCut API is running' });
+  res.status(200).send('OK');
 });
 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'WanderCut API is running' });
+  res.status(200).send('OK');
 });
 
 // Security headers
