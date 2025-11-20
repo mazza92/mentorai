@@ -1,6 +1,7 @@
 const express = require('express');
 const { Firestore } = require('@google-cloud/firestore');
 const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
 const youtubeService = require('../services/youtubeService');
 const videoAnalysisService = require('../services/videoAnalysisService');
 const { mockProjects } = require('../utils/mockStorage');
