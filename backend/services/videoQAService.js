@@ -607,17 +607,27 @@ class VideoQAService {
 
     const lowerText = text.toLowerCase().trim();
 
+    // ULTRA-PRIORITY: French question inversion pattern (100% French-specific)
+    // Patterns like "travaille-t-il", "est-ce", "a-t-il", etc.
+    if (/\w+-t-(il|elle|on)\b/gi.test(lowerText) || /est-ce\b/gi.test(lowerText)) {
+      return 'fr';
+    }
+
     // CRITICAL: French-specific words that are NEVER used in English
     // These are ultra-high confidence indicators
     const frenchExclusiveWords = [
       // Question words
       /\b(quel|quelle|quels|quelles|où|combien|pourquoi)\b/gi,
       // Common verbs (conjugated forms that don't exist in English)
-      /\b(sert|marche|démarrer|préféré|utiliser|dévoile|retirer)\b/gi,
+      /\b(sert|marche|démarrer|préféré|utiliser|dévoile|retirer|travaille|travaillé|commence|commencé|parle|parlé|donne|donné)\b/gi,
       // Possessives
       /\b(son|sa|ses|ton|ta|tes)\b/gi,
       // Articles with accents
-      /\b(à|ça|là)\b/gi
+      /\b(à|ça|là)\b/gi,
+      // Common French adverbs
+      /\b(actuellement|notamment|vraiment|surtout|également|particulièrement)\b/gi,
+      // Common French nouns
+      /\b(projet|travail|chose|monde|temps|fois|vie)\b/gi
     ];
 
     // Check for French-exclusive words (instant FR detection)
@@ -628,7 +638,7 @@ class VideoQAService {
     }
 
     // Check contractions (strong French indicator)
-    const frenchContractions = /c'est|c'était|qu'est|qu'il|qu'elle|qu'on|d'accord|j'ai|l'on|n'est|s'il/gi;
+    const frenchContractions = /c'est|c'était|qu'est|qu'il|qu'elle|qu'on|d'accord|d'ailleurs|j'ai|j'avais|l'on|l'autre|n'est|n'ont|s'il|t'as|m'a/gi;
     if (frenchContractions.test(lowerText)) {
       return 'fr';
     }
