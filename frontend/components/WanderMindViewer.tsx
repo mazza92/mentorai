@@ -5,6 +5,7 @@ import axios from 'axios'
 import { Send, Clock, BookOpen, Loader2, Zap, Youtube, ThumbsUp, List, ChevronDown, ChevronUp, CheckCircle, AlertCircle, Menu, X, Video } from 'lucide-react'
 import ConversationHistory from './ConversationHistory'
 import ProcessingProgress from './ProcessingProgress'
+import SignupWall from './SignupWall'
 import {
   Conversation,
   loadConversations,
@@ -466,6 +467,9 @@ const QnAPanel = ({
   const [isLoading, setIsLoading] = useState(false)
   const [questionsRemaining, setQuestionsRemaining] = useState<number | null>(null)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [showSignupWall, setShowSignupWall] = useState(false)
+  const [signupQuotaUsage, setSignupQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
+  const [signupMessage, setSignupMessage] = useState<string | undefined>(undefined)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   // Load conversation for this project on mount - only when projectId changes
@@ -618,13 +622,37 @@ const QnAPanel = ({
       console.error('Q&A error:', error)
 
       // Handle question limit reached
-      if (error.response?.status === 403 && error.response?.data?.error === 'Question limit reached') {
-        const errorEntry: QAMessage = {
-          type: 'ai',
-          text: `🚫 **Question Limit Reached**\n\n${error.response.data.message}\n\nYou've used ${error.response.data.questionsThisMonth}/${error.response.data.limit} questions this month.`,
-          timestamp: new Date()
+      if (error.response?.status === 403) {
+        const errorData = error.response.data
+        
+        // Check if signup is required (anonymous user hit limit)
+        if (errorData.requiresSignup) {
+          setSignupQuotaUsage({
+            used: errorData.questionsThisMonth || 3,
+            limit: errorData.limit || 3
+          })
+          setSignupMessage(errorData.message)
+          setShowSignupWall(true)
+          
+          // Remove the user message since it failed
+          setHistory(prev => prev.slice(0, -1))
         }
-        setHistory(prev => [...prev, errorEntry])
+        // Check if upgrade is required (free user hit limit)
+        else if (errorData.upgradeRequired || errorData.error === 'Question limit reached') {
+          const errorEntry: QAMessage = {
+            type: 'ai',
+            text: `🚫 **Question Limit Reached**\n\n${errorData.message}\n\nYou've used ${errorData.questionsThisMonth}/${errorData.limit} questions this month.`,
+            timestamp: new Date()
+          }
+          setHistory(prev => [...prev, errorEntry])
+        } else {
+          const errorEntry: QAMessage = {
+            type: 'ai',
+            text: `❌ Error: ${errorData.error || error.message || 'Failed to get answer. Please try again.'}`,
+            timestamp: new Date()
+          }
+          setHistory(prev => [...prev, errorEntry])
+        }
       } else {
         const errorEntry: QAMessage = {
           type: 'ai',
@@ -1301,7 +1329,10 @@ const QnAPanel = ({
             {questionsRemaining !== null && questionsRemaining <= 10 && questionsRemaining > 0 && (
               <div className="mb-2 lg:mb-3 p-2 lg:p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-xs lg:text-sm text-amber-800">
-                  ⚠️ <strong>{questionsRemaining} questions remaining</strong> this month. Upgrade to Creator Tier for unlimited questions!
+                  {t('qa.questions_remaining_warning', {
+                    count: questionsRemaining,
+                    defaultValue: '⚠️ {{count}} questions remaining this month. Upgrade to Pro for unlimited questions!'
+                  })}
                 </p>
               </div>
             )}
@@ -1336,6 +1367,15 @@ const QnAPanel = ({
           </div>
         </div>
       </div>
+      
+      {/* Signup Wall (for anonymous users) */}
+      <SignupWall
+        isOpen={showSignupWall}
+        onClose={() => setShowSignupWall(false)}
+        reason="question"
+        currentUsage={signupQuotaUsage}
+        message={signupMessage}
+      />
     </div>
   )
 }

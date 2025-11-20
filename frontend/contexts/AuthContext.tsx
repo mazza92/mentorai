@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { setUserId } from '@/lib/sessionManager'
 
 interface AuthContextType {
   user: User | null
@@ -53,6 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      // Update sessionManager when user signs in/out
+      if (session?.user) {
+        setUserId(session.user.id)
+      }
       setLoading(false)
     })
 
@@ -74,6 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data?.session && !error) {
       setSession(data.session)
       setUser(data.session.user)
+      // Update sessionManager with authenticated user ID
+      setUserId(data.session.user.id)
       setLoading(false)
     }
     
@@ -103,6 +110,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailRedirectTo: redirectUrl,
       },
     })
+
+    // If signup successful and user is immediately authenticated (no email confirmation)
+    if (data?.session?.user && !error) {
+      setUserId(data.session.user.id)
+      setSession(data.session)
+      setUser(data.session.user)
+    }
 
     // Return both error and data so we can check if confirmation email was sent
     return { error, data }
