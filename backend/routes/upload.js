@@ -237,7 +237,10 @@ router.post('/', upload.single('video'), async (req, res) => {
       });
     }
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Failed to upload video', details: error.message });
+    res.status(500).json({
+      error: 'Failed to upload video',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

@@ -174,7 +174,10 @@ router.post('/create-checkout-session', async (req, res) => {
     res.json({ sessionId: session.id, url: session.url });
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: 'Failed to create checkout session', details: error.message });
+    res.status(500).json({
+      error: 'Failed to create checkout session',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -216,7 +219,10 @@ router.post('/create-portal-session', async (req, res) => {
     res.json({ url: session.url });
   } catch (error) {
     console.error('Error creating portal session:', error);
-    res.status(500).json({ error: 'Failed to create portal session', details: error.message });
+    res.status(500).json({
+      error: 'Failed to create portal session',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -285,7 +291,10 @@ router.get('/status/:userId', async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting subscription status:', error);
-    res.status(500).json({ error: 'Failed to get subscription status', details: error.message });
+    res.status(500).json({
+      error: 'Failed to get subscription status',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
