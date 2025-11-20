@@ -3,15 +3,51 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for API, configure if serving HTML
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Rate limiters
+// General API rate limit - 100 requests per 15 minutes per IP
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: { error: 'Too many requests from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Strict rate limit for expensive upload operations - 10 per hour
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: { error: 'Upload limit exceeded. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limit for Q&A operations - 20 per minute
+const qaLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  message: { error: 'Too many questions. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL || '*',
+  origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -24,8 +60,9 @@ app.options('*', cors());
 const subscriptionsRouter = require('./routes/subscriptions');
 app.use('/api/subscriptions/webhook', express.raw({ type: 'application/json' }), subscriptionsRouter.webhookHandler);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// JSON body parser with size limits
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Serve uploaded files in development mode
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -43,12 +80,17 @@ const tempDir = path.join(__dirname, 'temp');
   }
 });
 
-// Routes
-app.use('/api/upload', require('./routes/upload'));
-app.use('/api/upload-youtube', require('./routes/uploadYoutube'));
+// Apply general rate limiter to all API routes
+app.use('/api/', apiLimiter);
+
+// Routes with specific rate limits
+app.use('/api/upload', uploadLimiter, require('./routes/upload'));
+app.use('/api/upload-youtube', uploadLimiter, require('./routes/uploadYoutube'));
+app.use('/api/qa', qaLimiter, require('./routes/qa'));
+
+// Routes with general rate limiting only
 app.use('/api/transcribe', require('./routes/transcribe'));
 app.use('/api/edit', require('./routes/edit'));
-app.use('/api/qa', require('./routes/qa'));
 app.use('/api/topics', require('./routes/topics')); // Topic clustering & table of contents
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/user', require('./routes/user'));

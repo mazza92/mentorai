@@ -323,10 +323,10 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('YouTube upload error:', error);
     console.error('Error stack:', error.stack);
-    
+
     // Provide more specific error messages
     let errorMessage = 'Failed to download YouTube video';
-    let errorDetails = error.message;
+    let errorDetails = process.env.NODE_ENV === 'development' ? error.message : undefined;
     
     // Check for specific error types
     if (error.message && error.message.includes('python3')) {
@@ -381,7 +381,10 @@ router.get('/status/:projectId', async (req, res) => {
     });
   } catch (error) {
     console.error('Status check error:', error);
-    res.status(500).json({ error: 'Failed to get project status' });
+    res.status(500).json({
+      error: 'Failed to get project status',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

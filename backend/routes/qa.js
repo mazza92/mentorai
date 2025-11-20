@@ -270,9 +270,9 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('Q&A error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to answer question',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -355,7 +355,7 @@ router.get('/suggested-prompts/:projectId', async (req, res) => {
     console.error('Suggested prompts error:', error);
     res.status(500).json({
       error: 'Failed to generate suggested prompts',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
