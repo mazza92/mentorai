@@ -168,7 +168,7 @@ Format as JSON with this structure:
       let result;
       let response;
       let text;
-      const maxRetries = 3;
+      const maxRetries = 5; // Increased from 3 to 5 for better reliability
       let retryCount = 0;
       
       while (retryCount < maxRetries) {

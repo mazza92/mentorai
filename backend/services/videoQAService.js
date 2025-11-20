@@ -519,6 +519,7 @@ class VideoQAService {
 
   /**
    * Detect language from transcript or user question
+   * CRITICAL: Prioritize user question over transcript for immediate language context
    */
   detectLanguage(transcript, userQuestion) {
     // Check if language is explicitly provided
@@ -526,8 +527,20 @@ class VideoQAService {
       return transcript.language;
     }
 
-    // Simple language detection based on common French words/patterns
-    const textToAnalyze = (transcript?.text || userQuestion || '').toLowerCase();
+    // PRIORITY 1: Analyze user question FIRST (most immediate indicator)
+    // If user asks in French, respond in French - regardless of transcript language
+    if (userQuestion && userQuestion.trim()) {
+      const questionLanguage = this._detectLanguageFromText(userQuestion);
+      // If French is detected in question with reasonable confidence, use it
+      if (questionLanguage === 'fr') {
+        return 'fr';
+      }
+    }
+
+    // PRIORITY 2: Fallback to transcript language if question is ambiguous/English
+    // Use first 500 words of transcript for faster detection
+    const transcriptSample = transcript?.text ? transcript.text.split(' ').slice(0, 500).join(' ') : '';
+    const textToAnalyze = (transcriptSample || userQuestion || '').toLowerCase();
 
     // French contractions (very strong indicators)
     const frenchContractions = [
@@ -580,6 +593,56 @@ class VideoQAService {
     }
 
     // Default to English
+    return 'en';
+  }
+
+  /**
+   * Helper: Detect language from a specific text string (used for user questions)
+   * This is MORE AGGRESSIVE than the main detectLanguage to catch French questions
+   */
+  _detectLanguageFromText(text) {
+    if (!text || !text.trim()) {
+      return 'en';
+    }
+
+    const lowerText = text.toLowerCase().trim();
+
+    // CRITICAL: French-specific words that are NEVER used in English
+    // These are ultra-high confidence indicators
+    const frenchExclusiveWords = [
+      // Question words
+      /\b(quel|quelle|quels|quelles|où|combien|pourquoi)\b/gi,
+      // Common verbs (conjugated forms that don't exist in English)
+      /\b(sert|marche|démarrer|préféré|utiliser|dévoile|retirer)\b/gi,
+      // Possessives
+      /\b(son|sa|ses|ton|ta|tes)\b/gi,
+      // Articles with accents
+      /\b(à|ça|là)\b/gi
+    ];
+
+    // Check for French-exclusive words (instant FR detection)
+    for (const pattern of frenchExclusiveWords) {
+      if (pattern.test(lowerText)) {
+        return 'fr';
+      }
+    }
+
+    // Check contractions (strong French indicator)
+    const frenchContractions = /c'est|c'était|qu'est|qu'il|qu'elle|qu'on|d'accord|j'ai|l'on|n'est|s'il/gi;
+    if (frenchContractions.test(lowerText)) {
+      return 'fr';
+    }
+
+    // For short texts (typical questions), check for ANY French indicators
+    if (lowerText.length < 100) {
+      const shortTextFrenchWords = /\b(le|la|les|un|une|des|est|sont|pour|dans|sur|avec|qui|que|quel|quoi|comment)\b/gi;
+      const matches = lowerText.match(shortTextFrenchWords);
+      // If we find 2+ French words in a short question, it's French
+      if (matches && matches.length >= 2) {
+        return 'fr';
+      }
+    }
+
     return 'en';
   }
 
