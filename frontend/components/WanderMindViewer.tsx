@@ -696,7 +696,8 @@ const QnAPanel = ({
     if (!text) return null
 
     // Check if text is HTML (backend sends HTML for better formatting)
-    const isHtml = text.includes('<p>') || text.includes('<ul>') || text.includes('<ol>') || text.includes('<li>')
+    const isHtml = text.includes('<p>') || text.includes('<ul>') || text.includes('<ol>') || text.includes('<li>') ||
+                   text.includes('<strong>') || text.includes('<em>') || text.includes('<b>') || text.includes('<i>')
 
     // Remove ALL cite tags as a safety measure (backend should have done this, but double-check)
     text = text.replace(/<cite[^>]*>[\s]*<\/cite>/gi, '')
