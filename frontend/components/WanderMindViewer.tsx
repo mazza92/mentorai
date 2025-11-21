@@ -1815,9 +1815,10 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
 
   // Check if transcription failed
   const transcriptionFailed = project.transcriptionStatus === 'failed'
-  
-  // Check if still processing (exclude failed status)
-  const isProcessing = !transcriptionFailed && (
+
+  // Check if still processing (exclude failed status and channel projects)
+  // Channel projects use instant captions, not transcription, so skip processing UI
+  const isProcessing = project.type !== 'channel' && !transcriptionFailed && (
                        !project.transcript ||
                        project.transcriptionStatus === 'pending' ||
                        project.transcriptionStatus === 'processing' ||
