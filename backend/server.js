@@ -59,6 +59,15 @@ const qaLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Rate limit for channel import operations - 5 per hour
+const channelLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { error: 'Channel import limit exceeded. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Middleware
 // Strip trailing slashes from CORS origin to avoid mismatch issues
 const corsOrigin = (process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -113,6 +122,7 @@ app.use('/api/user', require('./routes/user'));
 app.use('/api/conversations', require('./routes/conversations'));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/subscriptions', subscriptionsRouter); // Stripe subscriptions (webhook is registered above with raw body)
+app.use('/api/channel', channelLimiter, require('./routes/channel')); // YouTube channel import
 
 // Test helpers (DEVELOPMENT ONLY - disable in production)
 if (process.env.NODE_ENV !== 'production') {
