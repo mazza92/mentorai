@@ -1,4 +1,4 @@
-const videoDownloadService = require('./videoDownloadService');
+const youtubeService = require('./youtubeService');
 const transcriptionService = require('./transcriptionService');
 const { getFirestore } = require('../config/firebase');
 
@@ -85,15 +85,15 @@ class TranscriptionQueue {
     try {
       // 1. Download YouTube video audio
       const videoUrl = `https://www.youtube.com/watch?v=${job.videoId}`;
-      const downloadResult = await videoDownloadService.downloadYouTubeVideo(videoUrl, job.userId);
+      const downloadResult = await youtubeService.downloadVideo(videoUrl);
 
-      if (!downloadResult.success || !downloadResult.localAudioPath) {
+      if (!downloadResult.audioPath) {
         throw new Error('Failed to download video audio');
       }
 
       // 2. Transcribe using AssemblyAI (fastest)
       const transcriptResult = await transcriptionService.transcribe(
-        downloadResult.localAudioPath,
+        downloadResult.audioPath,
         'assemblyai' // Use AssemblyAI for speed
       );
 
@@ -111,14 +111,14 @@ class TranscriptionQueue {
         transcribedAt: new Date()
       });
 
-      // 4. Cleanup downloaded file
+      // 4. Cleanup downloaded files
       try {
         const fs = require('fs');
-        if (fs.existsSync(downloadResult.localAudioPath)) {
-          fs.unlinkSync(downloadResult.localAudioPath);
+        if (downloadResult.audioPath && fs.existsSync(downloadResult.audioPath)) {
+          fs.unlinkSync(downloadResult.audioPath);
         }
-        if (downloadResult.localVideoPath && fs.existsSync(downloadResult.localVideoPath)) {
-          fs.unlinkSync(downloadResult.localVideoPath);
+        if (downloadResult.videoPath && fs.existsSync(downloadResult.videoPath)) {
+          fs.unlinkSync(downloadResult.videoPath);
         }
       } catch (cleanupErr) {
         console.warn(`[TranscriptionQueue] Cleanup failed for ${job.videoId}:`, cleanupErr.message);
