@@ -154,6 +154,17 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
               <span>{t('header.pricing')}</span>
             </button>
 
+            {/* Desktop Login Button - Show for anonymous/non-authenticated users */}
+            {!hasValidSession && (
+              <button
+                onClick={() => router.push('/auth')}
+                className="hidden md:flex items-center space-x-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium text-sm hover:from-blue-600 hover:to-purple-600 transition-all shadow-sm hover:shadow-md"
+              >
+                <User className="w-4 h-4" />
+                <span>{t('auth.sign_in')}</span>
+              </button>
+            )}
+
             {/* Desktop User Menu - Show if user is authenticated via Supabase OR has valid session */}
             {hasValidSession && (
               <div className="hidden md:block relative" ref={userMenuRef}>
@@ -330,7 +341,21 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                 <span>{t('header.pricing')}</span>
               </button>
 
-              {isSupabaseConfigured && user && (
+              {/* Mobile Login Button - Show for anonymous/non-authenticated users */}
+              {!hasValidSession && (
+                <button
+                  onClick={() => {
+                    router.push('/auth')
+                    setMobileMenuOpen(false)
+                  }}
+                  className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 rounded-lg transition-all shadow-sm"
+                >
+                  <User className="w-5 h-5" />
+                  <span>{t('auth.sign_in')}</span>
+                </button>
+              )}
+
+              {hasValidSession && (
                 <>
                   <div className="border-t border-slate-200 my-2" />
                   <button
