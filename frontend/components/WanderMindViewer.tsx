@@ -1248,9 +1248,9 @@ const QnAPanel = ({
   // Generate contextual prompts from metadata if available (NotebookLM-style)
   const generateContextualPrompts = () => {
     // Get user's language preference
-    const userLanguage = typeof window !== 'undefined'
+    const userLanguage: 'en' | 'fr' = (typeof window !== 'undefined'
       ? (localStorage.getItem('wandermind_language') || 'en')
-      : 'en'
+      : 'en') as 'en' | 'fr'
 
     // Try to get title from multiple sources
     const title = metadata?.title || project?.title || project?.fileName || project?.originalFileName || ''
