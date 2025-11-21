@@ -57,7 +57,7 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
         channelUrl,
         userId
       }, {
-        timeout: 60 * 1000, // 1 minute timeout
+        timeout: 10 * 60 * 1000, // 10 minute timeout for large channels (300+ videos)
       })
 
       if (response.data.success) {
