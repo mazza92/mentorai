@@ -63,24 +63,37 @@ class ChannelService {
       await firestore.collection('channels').doc(channelId).set(channelDoc);
     }
 
-    // 6. Process videos (fetch captions for all) - async, don't wait
+    // 6. Generate suggested chat starters (NotebookLM-style instant value)
+    const chatStarters = await this.generateChatStarters(channelData, videos);
+
+    // 7. Process videos (fetch captions for all) - async, don't wait
     this.processChannelVideos(channelId, videos, userId).catch(err => {
       console.error(`[ChannelService] Error processing videos:`, err);
     });
 
-    // 7. Update user quota
+    // 8. Update user quota
     await this.incrementUserQuota(userId, 'channelImports');
 
-    // 8. Create project for this channel
-    const projectId = await this.createChannelProject(userId, channelId, channelData);
+    // 9. Create project for this channel (include chatStarters)
+    const projectId = await this.createChannelProject(userId, channelId, channelData, {
+      chatStarters,
+      sourceCount: videos.length,
+      videoCount: videos.length
+    });
 
+    // INSTANT RETURN with NotebookLM-style preview
     return {
       channelId,
       projectId,
       channelName: channelData.snippet.title,
+      channelDescription: channelData.snippet.description || '',
+      thumbnailUrl: channelData.snippet.thumbnails.high?.url || channelData.snippet.thumbnails.default?.url,
       videoCount: videos.length,
-      status: 'ready',
-      message: 'Channel imported successfully. You can start asking questions!'
+      processedCount: 0, // Processing starts in background
+      sourceCount: videos.length, // NotebookLM shows "X sources"
+      status: 'ready', // Instant ready state
+      chatStarters, // Auto-generated suggested questions
+      message: `Imported ${videos.length} videos. Enhancing quality with background transcription...`
     };
   }
 
@@ -139,6 +152,69 @@ class ChannelService {
 
     // After caption processing, queue top videos for transcription
     await this.queueTopVideosForTranscription(channelId, userId);
+  }
+
+  /**
+   * Generate NotebookLM-style chat starters from channel data
+   * Creates 3-4 suggested questions based on video titles and channel description
+   */
+  async generateChatStarters(channelData, videos) {
+    try {
+      // Get most popular/recent video titles for context (top 10)
+      const topVideos = videos
+        .sort((a, b) => {
+          const aViews = parseInt(a.statistics?.viewCount || 0);
+          const bViews = parseInt(b.statistics?.viewCount || 0);
+          return bViews - aViews;
+        })
+        .slice(0, 10)
+        .map(v => v.snippet.title);
+
+      // Use OpenAI to generate contextual questions
+      const OpenAI = require('openai');
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const prompt = `You are analyzing a YouTube channel to generate suggested starter questions for users.
+
+Channel: ${channelData.snippet.title}
+Description: ${channelData.snippet.description?.substring(0, 500) || 'No description'}
+
+Top Video Titles:
+${topVideos.map((title, i) => `${i + 1}. ${title}`).join('\n')}
+
+Generate exactly 3 concise, insightful questions that users would want to ask about this channel's content. Questions should:
+- Be specific to the channel's topic/niche
+- Reference key themes or topics from the video titles
+- Be actionable (ask "how", "what", "why")
+- Be 8-15 words long
+
+Return ONLY the 3 questions, one per line, no numbering or bullets.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 200
+      });
+
+      const response = completion.choices[0].message.content.trim();
+      const questions = response
+        .split('\n')
+        .filter(q => q.trim().length > 0)
+        .slice(0, 3);
+
+      console.log(`[ChannelService] Generated ${questions.length} chat starters`);
+      return questions;
+
+    } catch (error) {
+      console.error('[ChannelService] Error generating chat starters:', error.message);
+      // Fallback generic questions
+      return [
+        'What are the main topics covered in this channel?',
+        'What are the most popular videos and their key takeaways?',
+        'How has this creator\'s content evolved over time?'
+      ];
+    }
   }
 
   /**
@@ -495,7 +571,7 @@ class ChannelService {
   /**
    * Create project for channel
    */
-  async createChannelProject(userId, channelId, channelData) {
+  async createChannelProject(userId, channelId, channelData, additionalData = {}) {
     const projectId = `channel_${channelId}_${Date.now()}`;
     const { firestore, useMockMode } = getFirestore();
 
@@ -509,7 +585,9 @@ class ChannelService {
       thumbnail: channelData.snippet.thumbnails.high?.url || channelData.snippet.thumbnails.default?.url,
       createdAt: new Date(),
       updatedAt: new Date(),
-      status: 'ready'
+      status: 'ready',
+      // Include NotebookLM-style data
+      ...additionalData
     };
 
     if (useMockMode || !firestore) {
