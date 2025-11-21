@@ -32,10 +32,11 @@ app.use(helmet({
 }));
 
 // Rate limiters
-// General API rate limit - 100 requests per 15 minutes per IP
+// General API rate limit - 500 requests per 15 minutes per IP (increased from 100)
+// Allows ~33 requests/minute for normal app usage (multiple API calls per page load)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 500,
   message: { error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
