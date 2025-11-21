@@ -218,6 +218,27 @@ router.post('/create-portal-session', async (req, res) => {
 
     res.json({ url: session.url });
   } catch (error) {
+    // Check if this is an invalid/deleted customer error
+    if (error.code === 'resource_missing' && error.param === 'customer') {
+      console.warn(`⚠️ Invalid Stripe customer ID for user ${userId}: ${user.stripeCustomerId}`);
+
+      // Clear invalid customer ID from database
+      if (useMockMode || !firestore) {
+        user.stripeCustomerId = null;
+        mockUsers.set(userId, user);
+      } else {
+        try {
+          await firestore.collection('users').doc(userId).update({
+            stripeCustomerId: null,
+          });
+        } catch (updateError) {
+          console.error('Failed to clear invalid customer ID:', updateError.message);
+        }
+      }
+
+      return res.status(404).json({ error: 'No active subscription found. Please subscribe first.' });
+    }
+
     console.error('Error creating portal session:', error);
     res.status(500).json({
       error: 'Failed to create portal session',
@@ -279,7 +300,27 @@ router.get('/status/:userId', async (req, res) => {
           });
         }
       } catch (stripeError) {
-        console.error('Error fetching Stripe subscription:', stripeError);
+        // Check if this is an invalid/deleted customer error
+        if (stripeError.code === 'resource_missing' && stripeError.param === 'customer') {
+          console.warn(`⚠️ Invalid Stripe customer ID for user ${userId}: ${user.stripeCustomerId} - Clearing from database`);
+
+          // Clear invalid customer ID from database to prevent future errors
+          if (useMockMode || !firestore) {
+            user.stripeCustomerId = null;
+            mockUsers.set(userId, user);
+          } else {
+            try {
+              await firestore.collection('users').doc(userId).update({
+                stripeCustomerId: null,
+              });
+            } catch (updateError) {
+              console.error('Failed to clear invalid customer ID:', updateError.message);
+            }
+          }
+        } else {
+          // Other Stripe errors - log for investigation
+          console.error('Error fetching Stripe subscription:', stripeError);
+        }
       }
     }
 
