@@ -1248,7 +1248,6 @@ const QnAPanel = ({
   // Generate contextual prompts from metadata if available (NotebookLM-style)
   const generateContextualPrompts = () => {
     const title = metadata?.title || project?.title || ''
-    const description = metadata?.description || project?.description || ''
 
     // If we have specific content, generate contextual prompts
     if (title) {
