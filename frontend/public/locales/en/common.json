@@ -169,6 +169,28 @@
     "maybe_later": "Maybe later"
   },
 
+  "upload_mode": {
+    "single_video": "Single Video",
+    "full_channel": "Full Channel"
+  },
+
+  "channel": {
+    "import_title": "Import YouTube Channel",
+    "import_subtitle": "Turn a creator's entire library into your personalized mentor",
+    "import_button": "Import Channel",
+    "importing": "Importing Channel...",
+    "import_failed": "Import Failed",
+    "import_success": "Channel Imported!",
+    "redirecting": "Redirecting to your channel...",
+    "error_enter_url": "Please enter a valid YouTube channel URL",
+    "error_invalid_url": "Please enter a valid YouTube channel URL (e.g., youtube.com/@channelname)",
+    "how_it_works": "How it works:",
+    "step_1": "We analyze the entire channel (3-5 seconds)",
+    "step_2": "You can start asking questions immediately",
+    "step_3": "AI synthesizes answers across all videos",
+    "example_channels": "Example channels:"
+  },
+
   "common": {
     "loading": "Loading...",
     "back": "Back",
