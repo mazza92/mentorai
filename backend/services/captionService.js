@@ -8,6 +8,7 @@ class CaptionService {
 
   /**
    * Fetch captions from YouTube (manual or auto-generated)
+   * youtube-transcript automatically finds the best available captions
    * @param {string} videoId - YouTube video ID
    * @returns {Promise<Object>} Caption data with segments
    */
@@ -15,10 +16,11 @@ class CaptionService {
     console.log(`[CaptionService] Fetching captions for video: ${videoId}`);
 
     try {
-      // youtube-transcript automatically tries manual captions first, then auto-generated
-      const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-        lang: 'en'
-      });
+      // youtube-transcript automatically tries:
+      // 1. Manual captions in requested language
+      // 2. Auto-generated captions in requested language
+      // 3. Available captions in other languages
+      const transcript = await YoutubeTranscript.fetchTranscript(videoId);
 
       if (!transcript || transcript.length === 0) {
         console.log(`[CaptionService] No captions available for ${videoId}`);
@@ -47,7 +49,7 @@ class CaptionService {
       };
 
     } catch (error) {
-      console.error(`[CaptionService] Error fetching captions:`, error.message);
+      console.error(`[CaptionService] Error fetching captions for ${videoId}:`, error.message);
       return {
         available: false,
         text: '',
@@ -58,35 +60,13 @@ class CaptionService {
   }
 
   /**
-   * Fetch captions with fallback languages
+   * Fetch captions with fallback (kept for backwards compatibility, just calls main method)
    * @param {string} videoId - YouTube video ID
    * @returns {Promise<Object>} Caption data
    */
   async fetchYouTubeCaptionsWithFallback(videoId) {
-    const languages = ['en', 'en-US', 'en-GB'];
-
-    for (const lang of languages) {
-      try {
-        const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-          lang: lang
-        });
-
-        if (transcript && transcript.length > 0) {
-          console.log(`[CaptionService] ✓ Captions found in language: ${lang}`);
-          return this.formatCaptions(transcript);
-        }
-      } catch (error) {
-        console.log(`[CaptionService] No captions in ${lang}, trying next language...`);
-        continue; // Try next language
-      }
-    }
-
-    console.log(`[CaptionService] No captions available in any supported language`);
-    return {
-      available: false,
-      text: '',
-      segments: []
-    };
+    // youtube-transcript already handles all fallbacks automatically
+    return this.fetchYouTubeCaptions(videoId);
   }
 
   /**
