@@ -8,6 +8,7 @@ import { useLanguage } from '@/contexts/LanguageContext'
 import ConversationHistory from '@/components/ConversationHistory'
 import { Conversation } from '@/lib/conversationStorage'
 import UsageDashboard from '@/components/UsageDashboard'
+import { getSessionInfo, isAnonymous } from '@/lib/sessionManager'
 import axios from 'axios'
 
 interface ModernHeaderProps {
@@ -30,14 +31,15 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
     setLanguage(language === 'en' ? 'fr' : 'en')
   }
 
-  // Fetch subscription status
+  // Fetch subscription status - use userId prop (from sessionManager) or Supabase user.id
   useEffect(() => {
     const fetchSubscription = async () => {
-      if (!user?.id) return
+      const effectiveUserId = userId || user?.id
+      if (!effectiveUserId) return
 
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-        const response = await axios.get(`${apiUrl}/api/subscriptions/status/${user.id}`)
+        const response = await axios.get(`${apiUrl}/api/subscriptions/status/${effectiveUserId}`)
         setSubscriptionTier(response.data.tier || 'free')
       } catch (error) {
         console.error('Error fetching subscription:', error)
@@ -45,7 +47,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
     }
 
     fetchSubscription()
-  }, [user?.id])
+  }, [userId, user?.id])
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -104,8 +106,12 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
     : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   const isSupabaseConfigured = supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_id' && !supabaseUrl.includes('placeholder')
 
+  // Check if user is authenticated (from either Supabase OR sessionManager)
+  const sessionInfo = typeof window !== 'undefined' ? getSessionInfo() : null
+  const hasValidSession = user || (sessionInfo && !isAnonymous())
+
   // Get user display name/email
-  const userDisplayName = user?.email?.split('@')[0] || user?.user_metadata?.name || 'User'
+  const userDisplayName = user?.email?.split('@')[0] || user?.user_metadata?.name || userId?.substring(0, 8) || 'User'
   const userInitials = userDisplayName.charAt(0).toUpperCase()
 
   return (
@@ -148,8 +154,8 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
               <span>{t('header.pricing')}</span>
             </button>
 
-            {/* Desktop User Menu */}
-            {isSupabaseConfigured && user && (
+            {/* Desktop User Menu - Show if user is authenticated via Supabase OR has valid session */}
+            {hasValidSession && (
               <div className="hidden md:block relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -168,7 +174,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-72 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
                     <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-sm font-medium text-slate-900">{user.email}</p>
+                      <p className="text-sm font-medium text-slate-900">{user?.email || (userId ? `User ${userId.substring(0, 8)}` : 'User')}</p>
                       <div className="flex items-center space-x-1 mt-0.5">
                         {subscriptionTier === 'pro' && <Crown className="w-3 h-3 text-yellow-500" />}
                         <p className="text-xs text-slate-500">
@@ -244,15 +250,15 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
 
           {/* Mobile Menu Drawer */}
           <div className="fixed top-14 left-0 right-0 bottom-0 bg-white z-40 md:hidden flex flex-col">
-            {/* User Info (if logged in) */}
-            {isSupabaseConfigured && user && (
+            {/* User Info (if logged in via Supabase OR has valid session) */}
+            {hasValidSession && (
               <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
                     {userInitials}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{user.email}</p>
+                    <p className="text-sm font-medium text-slate-900 truncate">{user?.email || (userId ? `User ${userId.substring(0, 8)}` : 'User')}</p>
                     <div className="flex items-center space-x-1">
                       {subscriptionTier === 'pro' && <Crown className="w-3 h-3 text-yellow-500" />}
                       <p className="text-xs text-slate-500">
