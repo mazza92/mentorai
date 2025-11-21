@@ -8,6 +8,7 @@ import ConversationHistory from './ConversationHistory'
 import ProcessingProgress from './ProcessingProgress'
 import SignupWall from './SignupWall'
 import ChannelViewer from './ChannelViewer'
+import ChatStarters from './ChatStarters'
 import {
   Conversation,
   loadConversations,
@@ -1214,7 +1215,10 @@ const QnAPanel = ({
     return text
   }
 
-  const suggestedPrompts = [
+  // Use backend-generated chat starters if available (channels), otherwise fallback to defaults
+  const chatStarters = project?.chatStarters || []
+  const sourceCount = project?.sourceCount || project?.videoCount
+  const suggestedPrompts = chatStarters.length > 0 ? chatStarters : [
     'Summarize the key points',
     'What are the main topics covered?',
     'What actionable tips are mentioned?',
@@ -1295,20 +1299,37 @@ const QnAPanel = ({
             </div>
 
             {history.length === 0 && (
-              <div className="text-slate-600 space-y-3 lg:space-y-4 p-4 lg:p-6 border-2 border-dashed border-slate-200 rounded-xl lg:rounded-2xl bg-gradient-to-br from-blue-50/50 to-purple-50/30">
-                <p className="font-semibold text-slate-900 text-base lg:text-lg">Hi! I'm Lurnia, your AI tutor for this video.</p>
-                <p className="text-xs lg:text-sm text-slate-600">Here are some questions to get you started:</p>
-                <div className="flex flex-wrap gap-2">
-                  {suggestedPrompts.map(prompt => (
-                    <button 
-                      key={prompt}
-                      onClick={() => handleSuggestedPrompt(prompt)}
-                      className="px-3 py-1.5 lg:px-4 lg:py-2 text-xs lg:text-sm bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-full transition-all duration-200 shadow-md hover:shadow-lg font-medium"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
+              <div className="space-y-4">
+                {/* Show ChatStarters component if available (NotebookLM style) */}
+                {chatStarters.length > 0 ? (
+                  <div className="p-4 lg:p-6 border border-slate-200 rounded-xl bg-gradient-to-br from-white to-slate-50">
+                    <div className="mb-4">
+                      <p className="font-semibold text-slate-900 text-base lg:text-lg">Hi! I'm Lurnia, your AI learning companion.</p>
+                      <p className="text-xs lg:text-sm text-slate-600 mt-1">Instant preview ready. Ask me anything about this content!</p>
+                    </div>
+                    <ChatStarters
+                      questions={suggestedPrompts}
+                      onQuestionClick={handleSuggestedPrompt}
+                      sourceCount={sourceCount}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-slate-600 space-y-3 lg:space-y-4 p-4 lg:p-6 border-2 border-dashed border-slate-200 rounded-xl lg:rounded-2xl bg-gradient-to-br from-blue-50/50 to-purple-50/30">
+                    <p className="font-semibold text-slate-900 text-base lg:text-lg">Hi! I'm Lurnia, your AI tutor for this video.</p>
+                    <p className="text-xs lg:text-sm text-slate-600">Here are some questions to get you started:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestedPrompts.map(prompt => (
+                        <button
+                          key={prompt}
+                          onClick={() => handleSuggestedPrompt(prompt)}
+                          className="px-3 py-1.5 lg:px-4 lg:py-2 text-xs lg:text-sm bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-full transition-all duration-200 shadow-md hover:shadow-lg font-medium"
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
