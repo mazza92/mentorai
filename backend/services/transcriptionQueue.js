@@ -1,6 +1,6 @@
 const youtubeService = require('./youtubeService');
 const transcriptionService = require('./transcriptionService');
-const { getFirestore } = require('../config/firebase');
+const { getFirestore } = require('../config/firestore');
 
 /**
  * Simple in-memory transcription queue for channel videos

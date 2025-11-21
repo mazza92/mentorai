@@ -45,15 +45,32 @@ class VideoQAService {
   buildVideoContext(videoAnalysis, transcript) {
     let context = '';
 
+    // Add video metadata first (always available, provides instant context)
+    if (videoAnalysis) {
+      context += 'VIDEO METADATA:\n';
+      if (videoAnalysis.title) context += `Title: ${videoAnalysis.title}\n`;
+      if (videoAnalysis.author) context += `Creator: ${videoAnalysis.author}\n`;
+      if (videoAnalysis.description) {
+        const desc = videoAnalysis.description.length > 500
+          ? videoAnalysis.description.substring(0, 500) + '...'
+          : videoAnalysis.description;
+        context += `Description: ${desc}\n`;
+      }
+      if (videoAnalysis.duration) context += `Duration: ${Math.floor(videoAnalysis.duration / 60)} minutes\n`;
+      if (videoAnalysis.views) context += `Views: ${parseInt(videoAnalysis.views).toLocaleString()}\n`;
+      if (videoAnalysis.likes) context += `Likes: ${parseInt(videoAnalysis.likes).toLocaleString()}\n`;
+      context += '\n';
+    }
+
     // PRIORITY 1: Full transcript with timestamps (most important for knowledge Q&A)
     if (transcript && transcript.words && transcript.words.length > 0) {
       context += 'FULL VIDEO TRANSCRIPT (with timestamps):\n';
       context += 'This is the PRIMARY source of information. Use this to answer questions about what was said, concepts discussed, instructions given, etc.\n\n';
-      
+
       // Group words into sentences/phrases with timestamps for better readability
       let currentSentence = '';
       let sentenceStartTime = transcript.words[0].startTime || 0;
-      
+
       transcript.words.forEach((word, index) => {
         if (index === 0) {
           currentSentence = word.word;
@@ -61,7 +78,7 @@ class VideoQAService {
         } else {
           const prevWord = transcript.words[index - 1];
           const timeDiff = (word.startTime || 0) - (prevWord.endTime || 0);
-          
+
           // Start new line if pause > 0.5s or sentence getting long (better for parsing)
           if (timeDiff > 0.5 || currentSentence.split(' ').length > 20) {
             const timestamp = this.secondsToTime(sentenceStartTime);
@@ -73,7 +90,7 @@ class VideoQAService {
           }
         }
       });
-      
+
       // Add last sentence
       if (currentSentence.trim()) {
         const timestamp = this.secondsToTime(sentenceStartTime);
@@ -86,7 +103,7 @@ class VideoQAService {
       context += 'This is the PRIMARY source of information.\n\n';
       context += `${transcript.text}\n\n`;
     } else {
-      context += 'NOTE: No transcript available. Answers will be limited to visual analysis only.\n\n';
+      context += 'NOTE: Full transcript is being processed. Answers based on video metadata, description, and visual analysis.\n\n';
     }
 
     // PRIORITY 2: Video summary (if available, provides high-level context)
@@ -1114,11 +1131,19 @@ References: [timestamps]
     // Use Gemini API if available
     if (this.model) {
       try {
-        // Build context - use first part of transcript for speed
+        // Build context - use metadata, transcript, and analysis
         let context = '';
 
+        // Add metadata first (always available for instant prompts)
+        if (videoAnalysis) {
+          if (videoAnalysis.title) context += `VIDEO TITLE: ${videoAnalysis.title}\n`;
+          if (videoAnalysis.description) {
+            context += `VIDEO DESCRIPTION: ${videoAnalysis.description.substring(0, 500)}\n`;
+          }
+        }
+
         if (transcript && transcript.text) {
-          context += 'VIDEO TRANSCRIPT (first 2000 characters):\n';
+          context += '\nVIDEO TRANSCRIPT (first 2000 characters):\n';
           context += transcript.text.substring(0, 2000);
         }
 
