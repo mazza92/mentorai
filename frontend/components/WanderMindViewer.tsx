@@ -1318,7 +1318,7 @@ const QnAPanel = ({
                     <p className="font-semibold text-slate-900 text-base lg:text-lg">Hi! I'm Lurnia, your AI tutor for this video.</p>
                     <p className="text-xs lg:text-sm text-slate-600">Here are some questions to get you started:</p>
                     <div className="flex flex-wrap gap-2">
-                      {suggestedPrompts.map(prompt => (
+                      {suggestedPrompts.map((prompt: string) => (
                         <button
                           key={prompt}
                           onClick={() => handleSuggestedPrompt(prompt)}
