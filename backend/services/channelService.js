@@ -64,7 +64,7 @@ class ChannelService {
     }
 
     // 6. Process videos (fetch captions for all) - async, don't wait
-    this.processChannelVideos(channelId, videos).catch(err => {
+    this.processChannelVideos(channelId, videos, userId).catch(err => {
       console.error(`[ChannelService] Error processing videos:`, err);
     });
 
@@ -87,7 +87,7 @@ class ChannelService {
   /**
    * Process all videos in channel (fetch captions)
    */
-  async processChannelVideos(channelId, videos) {
+  async processChannelVideos(channelId, videos, userId = null) {
     console.log(`[ChannelService] Processing ${videos.length} videos...`);
 
     const { firestore, useMockMode } = getFirestore();
@@ -136,6 +136,63 @@ class ChannelService {
     }
 
     console.log(`[ChannelService] All videos processed!`);
+
+    // After caption processing, queue top videos for transcription
+    await this.queueTopVideosForTranscription(channelId, userId);
+  }
+
+  /**
+   * Select and queue top videos for transcription
+   * Prioritizes recent, popular, long-form content
+   */
+  async queueTopVideosForTranscription(channelId, userId) {
+    const { firestore, useMockMode } = getFirestore();
+
+    try {
+      // Get all videos that need transcription
+      let videos;
+      if (useMockMode || !firestore) {
+        const channel = mockChannels.get(channelId);
+        videos = channel?.videos ? Array.from(channel.videos.values()) : [];
+      } else {
+        const snapshot = await firestore.collection('channels')
+          .doc(channelId)
+          .collection('videos')
+          .where('needsTranscription', '==', true)
+          .get();
+        videos = snapshot.docs.map(doc => doc.data());
+      }
+
+      // Sort by priority (highest first)
+      videos.sort((a, b) => b.priority - a.priority);
+
+      // Select top 20 videos
+      const TOP_COUNT = 20;
+      const topVideos = videos.slice(0, TOP_COUNT);
+
+      console.log(`[ChannelService] Selected ${topVideos.length} videos for transcription (out of ${videos.length} total)`);
+
+      // Queue each video for transcription (background job)
+      const { queueVideoTranscription } = require('./transcriptionQueue');
+      for (const video of topVideos) {
+        // Queue transcription (non-blocking)
+        queueVideoTranscription({
+          channelId,
+          videoId: video.videoId,
+          title: video.title,
+          duration: video.duration,
+          priority: video.priority,
+          userId
+        }).catch(err => {
+          console.error(`Failed to queue transcription for ${video.videoId}:`, err.message);
+        });
+      }
+
+      return topVideos.length;
+    } catch (error) {
+      console.error('[ChannelService] Error queuing transcriptions:', error);
+      return 0;
+    }
   }
 
   /**
@@ -153,7 +210,7 @@ class ChannelService {
       // 2. Assess caption quality
       const quality = this.assessCaptionQuality(captionData);
 
-      // 3. Store video document
+      // 3. Store video document with rich metadata
       const videoDoc = {
         videoId: video.id,
         title: video.snippet.title,
@@ -161,12 +218,21 @@ class ChannelService {
         duration: this.parseDuration(video.contentDetails.duration),
         publishedAt: new Date(video.snippet.publishedAt),
         thumbnailUrl: video.snippet.thumbnails.high?.url || video.snippet.thumbnails.default?.url,
+
+        // Statistics for ranking
         viewCount: parseInt(video.statistics?.viewCount || 0),
+        likeCount: parseInt(video.statistics?.likeCount || 0),
+        commentCount: parseInt(video.statistics?.commentCount || 0),
+
+        // Caption data (often unavailable)
         transcript: captionData.text,
         transcriptSegments: captionData.segments,
         transcriptSource: captionData.available ? 'youtube_captions' : 'none',
         transcriptQuality: quality.score,
+
+        // Status and priority
         status: captionData.available ? 'ready' : 'no_captions',
+        needsTranscription: !captionData.available && this.parseDuration(video.contentDetails.duration) >= 60, // Videos >= 1min
         processedAt: new Date(),
         priority: this.calculatePriority(video)
       };
@@ -361,15 +427,44 @@ class ChannelService {
   }
 
   /**
-   * Calculate priority for video processing
+   * Calculate priority for video transcription
+   * Higher priority = more likely to be asked about
    */
   calculatePriority(video) {
-    const views = parseInt(video.statistics?.viewCount || 0);
+    let score = 0;
+
+    // 1. Recency (most important - 40 points max)
     const recency = Date.now() - new Date(video.snippet.publishedAt).getTime();
     const recencyDays = recency / (1000 * 60 * 60 * 24);
+    if (recencyDays < 30) score += 40; // Last month
+    else if (recencyDays < 90) score += 30; // Last 3 months
+    else if (recencyDays < 180) score += 20; // Last 6 months
+    else if (recencyDays < 365) score += 10; // Last year
 
-    // Higher priority = more views + more recent
-    return views / (recencyDays + 1);
+    // 2. View count relative to channel (30 points max)
+    const views = parseInt(video.statistics?.viewCount || 0);
+    if (views > 100000) score += 30;
+    else if (views > 50000) score += 20;
+    else if (views > 10000) score += 10;
+    else if (views > 1000) score += 5;
+
+    // 3. Engagement (likes + comments = 20 points max)
+    const likes = parseInt(video.statistics?.likeCount || 0);
+    const comments = parseInt(video.statistics?.commentCount || 0);
+    const engagement = likes + comments * 2; // Comments worth 2x likes
+    if (engagement > 5000) score += 20;
+    else if (engagement > 1000) score += 15;
+    else if (engagement > 100) score += 10;
+    else if (engagement > 10) score += 5;
+
+    // 4. Video length (10 points max - prefer long-form content)
+    const duration = this.parseDuration(video.contentDetails.duration);
+    if (duration >= 900) score += 10; // 15+ min
+    else if (duration >= 600) score += 8; // 10+ min
+    else if (duration >= 300) score += 5; // 5+ min
+    else if (duration < 180) score -= 20; // Shorts penalty
+
+    return score;
   }
 
   /**
