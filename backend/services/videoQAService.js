@@ -1354,17 +1354,17 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
 
     let videos = [];
 
-    // Get all videos in channel
+    // Get all videos in channel (including those with metadata-only, no transcript yet)
     if (useMockMode || !firestore) {
       const channel = mockChannels.get(channelId);
       if (channel && channel.videos) {
         videos = Array.from(channel.videos.values());
       }
     } else {
+      // Get ALL videos (not just status='ready') since we support metadata-based Q&A
       const videosSnapshot = await firestore.collection('channels')
         .doc(channelId)
         .collection('videos')
-        .where('status', '==', 'ready')
         .get();
 
       videos = videosSnapshot.docs.map(doc => ({
@@ -1372,6 +1372,9 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
         ...doc.data()
       }));
     }
+
+    // Filter out error videos
+    videos = videos.filter(v => v.status !== 'error');
 
     // Simple keyword-based relevance scoring
     const scoredVideos = videos.map(video => ({
@@ -1401,7 +1404,7 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
 
     let score = 0;
 
-    // Check title (heavily weighted)
+    // Check title (heavily weighted - metadata always available)
     const titleLower = (video.title || '').toLowerCase();
     questionWords.forEach(word => {
       if (titleLower.includes(word)) {
@@ -1409,13 +1412,30 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       }
     });
 
-    // Check transcript
+    // Check description (medium weight - metadata always available)
+    if (video.description) {
+      const descriptionLower = video.description.toLowerCase();
+      questionWords.forEach(word => {
+        if (descriptionLower.includes(word)) {
+          score += 2; // Description matches are moderately weighted
+        }
+      });
+    }
+
+    // Check transcript (if available - bonus points)
     if (video.transcript) {
       const transcriptLower = video.transcript.toLowerCase();
       questionWords.forEach(word => {
         const matches = (transcriptLower.match(new RegExp(word, 'g')) || []).length;
         score += Math.min(matches, 10); // Cap at 10 matches per word
       });
+    }
+
+    // Boost popular videos (views, likes, comments)
+    if (video.viewCount) {
+      const views = parseInt(video.viewCount) || 0;
+      if (views > 100000) score += 2;
+      else if (views > 50000) score += 1;
     }
 
     // Boost recent videos slightly
@@ -1435,25 +1455,45 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
    */
   buildContextFromVideos(videos, question) {
     const contextParts = videos.map((video, index) => {
-      // Extract relevant segments from transcript
-      const relevantSegments = this.extractRelevantSegments(
-        video.transcript,
-        video.transcriptSegments,
-        question,
-        5 // Max 5 segments per video
-      );
-
       const publishDate = video.publishedAt?.toDate ? video.publishedAt.toDate() : new Date(video.publishedAt);
+      const stats = [];
 
-      return `
+      if (video.viewCount) stats.push(`${parseInt(video.viewCount).toLocaleString()} views`);
+      if (video.likeCount) stats.push(`${parseInt(video.likeCount).toLocaleString()} likes`);
+      if (video.commentCount) stats.push(`${parseInt(video.commentCount).toLocaleString()} comments`);
+
+      let contextPart = `
 VIDEO ${index + 1}: "${video.title}"
 Video ID: ${video.videoId}
 Published: ${publishDate.toLocaleDateString()}
 Duration: ${Math.floor(video.duration / 60)} minutes
+${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
 
-Relevant segments:
-${relevantSegments.map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`).join('\n')}
-`;
+      // Add description (always available metadata)
+      if (video.description) {
+        const descriptionPreview = video.description.length > 300
+          ? video.description.substring(0, 300) + '...'
+          : video.description;
+        contextPart += `\nDescription: ${descriptionPreview}`;
+      }
+
+      // Add transcript segments if available (optional enhancement)
+      if (video.transcript || video.transcriptSegments) {
+        const relevantSegments = this.extractRelevantSegments(
+          video.transcript,
+          video.transcriptSegments,
+          question,
+          5 // Max 5 segments per video
+        );
+
+        if (relevantSegments.length > 0) {
+          contextPart += `\n\nTranscript segments:\n${relevantSegments.map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`).join('\n')}`;
+        }
+      } else {
+        contextPart += `\n\n(Note: Full transcript pending. Answer based on title, description, and metadata)`;
+      }
+
+      return contextPart;
     });
 
     return contextParts.join('\n---\n');
@@ -1523,24 +1563,26 @@ ${relevantSegments.map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`).
       ).join('\n')}`
       : '';
 
-    return `You are an AI assistant helping users understand content from a YouTube channel. You have access to transcripts from multiple videos in the channel.
+    return `You are an AI assistant helping users understand content from a YouTube channel. You have access to video metadata (titles, descriptions, statistics) and transcripts when available.
 
 ${historyContext}
 
-Here are the most relevant videos and segments for the current question:
+Here are the most relevant videos for the current question:
 
 ${context}
 
 User question: ${question}
 
 Instructions:
-1. Answer the question based on the video content provided above
-2. Synthesize information across multiple videos when relevant
-3. Include specific citations in the format: [Video Title @ MM:SS]
-4. If information is found in multiple videos, mention the key videos
-5. If the question cannot be answered from the provided videos, say so clearly
-6. Be concise but comprehensive
-7. Always cite your sources with video titles and timestamps
+1. Answer based on the information provided above (metadata, descriptions, and transcript segments when available)
+2. For videos with full transcripts, synthesize detailed insights and include timestamps
+3. For videos with metadata only, provide insights based on titles, descriptions, and statistics
+4. Include citations in the format: [Video Title] or [Video Title @ MM:SS] when timestamps are available
+5. If a video has pending transcripts, acknowledge it but still provide value from available metadata
+6. Synthesize information across multiple videos when relevant
+7. If the question cannot be answered from the provided information, suggest related topics from the channel
+8. Be concise but comprehensive
+9. Always cite your sources with video titles
 
 Answer:`;
   }
