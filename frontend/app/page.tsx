@@ -168,45 +168,49 @@ export default function Home() {
     }
   }, [user, userId, currentProject]) // Re-setup listeners when user, userId, or currentProject changes
 
-  const handleProjectCreated = async (projectId: string) => {
+  const handleProjectCreated = async (projectIdOrChannelId: string, projectId?: string) => {
+    // If second parameter exists, use it (channel import case)
+    // Otherwise use first parameter (single video case)
+    const actualProjectId = projectId || projectIdOrChannelId
+
     // Clear upload flag first
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('isUploadingVideo')
     }
-    
+
     // Update URL to include project parameter (this will trigger useEffect to set currentProject)
     if (typeof window !== 'undefined') {
-      const newUrl = `/?project=${projectId}`
-      window.history.pushState({ projectId }, '', newUrl)
+      const newUrl = `/?project=${actualProjectId}`
+      window.history.pushState({ projectId: actualProjectId }, '', newUrl)
     }
-    
-    setCurrentProject(projectId)
+
+    setCurrentProject(actualProjectId)
     // Use userId (from sessionManager) if available, fallback to user.id
     const storageKey = userId && userId !== 'anonymous'
       ? `currentProject_${userId}`
       : (user ? `currentProject_${user.id}` : 'currentProject')
-    localStorage.setItem(storageKey, projectId)
+    localStorage.setItem(storageKey, actualProjectId)
     
     // Create conversation for this new project
     const { createConversation, saveConversation, loadConversations } = await import('@/lib/conversationStorage')
     const conversations = await loadConversations(userId)
     // Check if conversation already exists for this project
-    const existing = conversations.find(c => c.projectId === projectId)
+    const existing = conversations.find(c => c.projectId === actualProjectId)
     if (!existing) {
       // Create conversation immediately (metadata will be updated later when project loads)
-      const newConv = createConversation(projectId)
+      const newConv = createConversation(actualProjectId)
       newConv.title = 'New Video'
       await saveConversation(newConv, userId)
-      
+
       // Try to get video metadata for title (async, don't block)
       setTimeout(async () => {
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-          const response = await axios.get(`${apiUrl}/api/projects/project/${projectId}`)
+          const response = await axios.get(`${apiUrl}/api/projects/project/${actualProjectId}`)
           const projectData = response.data.project
           const videoTitle = projectData.title || projectData.originalFileName || 'New Video'
           const videoThumbnail = projectData.thumbnail || projectData.thumbnailUrl || projectData.thumbnails?.[0]?.url
-          
+
           const updatedConv = {
             ...newConv,
             videoTitle,
