@@ -1,12 +1,13 @@
-const { getSubtitles } = require('youtube-captions-scraper');
+const { YoutubeTranscript } = require('youtube-transcript');
 
 /**
  * Service for fetching YouTube video captions
+ * Now supports both manual AND auto-generated captions
  */
 class CaptionService {
 
   /**
-   * Fetch captions from YouTube
+   * Fetch captions from YouTube (manual or auto-generated)
    * @param {string} videoId - YouTube video ID
    * @returns {Promise<Object>} Caption data with segments
    */
@@ -14,13 +15,12 @@ class CaptionService {
     console.log(`[CaptionService] Fetching captions for video: ${videoId}`);
 
     try {
-      // Try to get English captions
-      const captions = await getSubtitles({
-        videoID: videoId,
-        lang: 'en' // Default to English
+      // youtube-transcript automatically tries manual captions first, then auto-generated
+      const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
+        lang: 'en'
       });
 
-      if (!captions || captions.length === 0) {
+      if (!transcript || transcript.length === 0) {
         console.log(`[CaptionService] No captions available for ${videoId}`);
         return {
           available: false,
@@ -29,11 +29,11 @@ class CaptionService {
         };
       }
 
-      // Format captions
-      const segments = captions.map(caption => ({
-        start: parseFloat(caption.start),
-        duration: parseFloat(caption.dur),
-        text: caption.text.replace(/\n/g, ' ').trim()
+      // Format captions (youtube-transcript returns: [{text, duration, offset}])
+      const segments = transcript.map(item => ({
+        start: item.offset / 1000, // Convert ms to seconds
+        duration: item.duration / 1000,
+        text: item.text.replace(/\n/g, ' ').trim()
       }));
 
       const fullText = segments.map(s => s.text).join(' ');
@@ -67,14 +67,13 @@ class CaptionService {
 
     for (const lang of languages) {
       try {
-        const captions = await getSubtitles({
-          videoID: videoId,
+        const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
           lang: lang
         });
 
-        if (captions && captions.length > 0) {
+        if (transcript && transcript.length > 0) {
           console.log(`[CaptionService] ✓ Captions found in language: ${lang}`);
-          return this.formatCaptions(captions);
+          return this.formatCaptions(transcript);
         }
       } catch (error) {
         console.log(`[CaptionService] No captions in ${lang}, trying next language...`);
@@ -92,14 +91,14 @@ class CaptionService {
 
   /**
    * Format caption data
-   * @param {Array} captions - Raw caption data
+   * @param {Array} transcript - Raw transcript data from youtube-transcript
    * @returns {Object} Formatted caption data
    */
-  formatCaptions(captions) {
-    const segments = captions.map(caption => ({
-      start: parseFloat(caption.start),
-      duration: parseFloat(caption.dur),
-      text: caption.text.replace(/\n/g, ' ').trim()
+  formatCaptions(transcript) {
+    const segments = transcript.map(item => ({
+      start: item.offset / 1000, // Convert ms to seconds
+      duration: item.duration / 1000,
+      text: item.text.replace(/\n/g, ' ').trim()
     }));
 
     const fullText = segments.map(s => s.text).join(' ');

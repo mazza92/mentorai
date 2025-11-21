@@ -119,13 +119,13 @@ router.post('/', async (req, res) => {
     console.log('Personalized context generated for user:', userId);
 
     let project;
-    
+
     // Get project from mock storage or Firestore
     if (useMockMode || !firestore) {
       project = mockProjects.get(projectId);
       if (!project) {
         console.error('Project not found in mock storage. Available IDs:', Array.from(mockProjects.keys()));
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: 'Project not found',
           debug: {
             requestedId: projectId,
@@ -141,6 +141,44 @@ router.post('/', async (req, res) => {
         return res.status(404).json({ error: 'Project not found' });
       }
       project = { id: projectId, ...projectDoc.data() };
+    }
+
+    // IMPORTANT: Channel projects need different Q&A handling
+    // They search across multiple videos, not a single video
+    if (project.type === 'channel') {
+      console.log('Detected channel project, using multi-video Q&A');
+
+      try {
+        const channelId = project.channelId;
+        const qaResult = await videoQAService.answerQuestionForChannel(
+          channelId,
+          question,
+          chatHistory || []
+        );
+
+        // Increment question count
+        await userService.incrementQuestionCount(userId);
+        console.log(`Question count incremented for user ${userId}`);
+
+        // Get remaining questions
+        const remainingInfo = await userService.getRemainingQuestions(userId);
+
+        return res.json({
+          success: true,
+          answer: qaResult.answer,
+          answerHtml: qaResult.answerHtml,
+          citations: qaResult.sources || [], // Channel Q&A returns 'sources' not 'citations'
+          videosAnalyzed: qaResult.videosAnalyzed,
+          projectId: projectId,
+          questionsRemaining: remainingInfo.remaining
+        });
+      } catch (channelQAError) {
+        console.error('Channel Q&A error:', channelQAError);
+        return res.status(500).json({
+          error: 'Failed to answer channel question',
+          details: process.env.NODE_ENV === 'development' ? channelQAError.message : undefined
+        });
+      }
     }
 
     // Get video analysis (or analyze if not available)
