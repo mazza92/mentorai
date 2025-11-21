@@ -1512,7 +1512,10 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
         );
 
         if (relevantSegments.length > 0) {
-          contextPart += `\n\nTranscript segments:\n${relevantSegments.map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`).join('\n')}`;
+          contextPart += `\n\nTranscript segments:\n${relevantSegments
+            .filter(seg => seg && seg.text)
+            .map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`)
+            .join('\n')}`;
         }
       } else {
         contextPart += `\n\n(Note: Full transcript pending. Answer based on title, description, and metadata)`;
@@ -1549,11 +1552,13 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
     const questionLower = question.toLowerCase();
     const questionWords = questionLower.split(/\s+/).filter(w => w.length > 3);
 
-    // Score each segment
-    const scoredSegments = segments.map(segment => ({
-      ...segment,
-      score: this.calculateSegmentRelevance(segment.text, questionWords)
-    }));
+    // Filter out invalid segments and score each segment
+    const scoredSegments = segments
+      .filter(segment => segment && segment.text && typeof segment.text === 'string')
+      .map(segment => ({
+        ...segment,
+        score: this.calculateSegmentRelevance(segment.text, questionWords)
+      }));
 
     // Return top segments
     return scoredSegments
@@ -1566,6 +1571,10 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
    * Calculate segment relevance
    */
   calculateSegmentRelevance(text, questionWords) {
+    if (!text || typeof text !== 'string') {
+      return 0;
+    }
+
     const textLower = text.toLowerCase();
     let score = 0;
 
