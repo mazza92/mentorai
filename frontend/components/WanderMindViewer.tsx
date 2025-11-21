@@ -485,12 +485,36 @@ const QnAPanel = ({
   const [query, setQuery] = useState('')
   const [history, setHistory] = useState<QAMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingMessage, setLoadingMessage] = useState('Thinking...')
   const [questionsRemaining, setQuestionsRemaining] = useState<number | null>(null)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [showSignupWall, setShowSignupWall] = useState(false)
   const [signupQuotaUsage, setSignupQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
   const [signupMessage, setSignupMessage] = useState<string | undefined>(undefined)
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Dynamic loading messages (NotebookLM/Claude-style)
+  const loadingMessages = [
+    'Thinking...',
+    'Analyzing content...',
+    'Searching through video...',
+    'Finding relevant insights...',
+    'Crafting your answer...',
+    'Almost there...',
+  ]
+
+  // Rotate loading messages
+  useEffect(() => {
+    if (!isLoading) return
+
+    let messageIndex = 0
+    const interval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % loadingMessages.length
+      setLoadingMessage(loadingMessages[messageIndex])
+    }, 2000) // Change message every 2 seconds
+
+    return () => clearInterval(interval)
+  }, [isLoading])
 
   // Load conversation for this project on mount - only when projectId changes
   useEffect(() => {
@@ -580,6 +604,7 @@ const QnAPanel = ({
     }
     setHistory(prev => [...prev, newUserEntry])
     setQuery('')
+    setLoadingMessage('Thinking...') // Reset to first message
     setIsLoading(true)
 
     try {
@@ -1216,14 +1241,50 @@ const QnAPanel = ({
     return text
   }
 
-  // Use backend-generated chat starters if available (channels), otherwise fallback to defaults
+  // Use backend-generated chat starters if available (channels), otherwise fallback to contextual prompts
   const chatStarters = project?.chatStarters || []
   const sourceCount = project?.sourceCount || project?.videoCount
-  const suggestedPrompts = chatStarters.length > 0 ? chatStarters : [
-    'Summarize the key points',
-    'What are the main topics covered?',
-    'What actionable tips are mentioned?',
-  ]
+
+  // Generate contextual prompts from metadata if available (NotebookLM-style)
+  const generateContextualPrompts = () => {
+    const title = metadata?.title || project?.title || ''
+    const description = metadata?.description || project?.description || ''
+
+    // If we have specific content, generate contextual prompts
+    if (title) {
+      const prompts = []
+
+      // Extract topic from title
+      const titleLower = title.toLowerCase()
+      if (titleLower.includes('how to') || titleLower.includes('guide')) {
+        prompts.push('Walk me through the step-by-step process')
+      } else {
+        prompts.push('What are the key insights from this video?')
+      }
+
+      // Common valuable questions
+      if (titleLower.includes('beginners') || titleLower.includes('start')) {
+        prompts.push('What do I need to get started?')
+      } else {
+        prompts.push('What actionable steps can I take?')
+      }
+
+      prompts.push('What are the common mistakes to avoid?')
+
+      return prompts
+    }
+
+    // Generic fallback only if no metadata
+    return [
+      'Summarize the key points',
+      'What are the main topics covered?',
+      'What actionable tips are mentioned?',
+    ]
+  }
+
+  const suggestedPrompts = chatStarters.length > 0 ? chatStarters :
+    (project?.suggestedPrompts && project.suggestedPrompts.length > 0) ? project.suggestedPrompts :
+    generateContextualPrompts()
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -1356,7 +1417,7 @@ const QnAPanel = ({
               <div className="flex justify-start">
                 <div className="bg-slate-50 text-slate-700 p-3 lg:p-4 rounded-2xl rounded-tl-sm lg:rounded-tl-none shadow-sm flex items-center border border-slate-200/80">
                   <Loader2 className="w-4 h-4 mr-2 animate-spin text-blue-500" />
-                  <span className="text-xs lg:text-sm text-slate-600">Synthesizing answer...</span>
+                  <span className="text-xs lg:text-sm text-slate-600">{loadingMessage}</span>
                 </div>
               </div>
             )}
