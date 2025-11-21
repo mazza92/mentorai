@@ -50,13 +50,16 @@ if (process.env.GEMINI_API_KEY) {
  */
 router.post('/', async (req, res) => {
   try {
-    const { projectId } = req.body;
+    const { projectId, language } = req.body;
 
     if (!projectId) {
       return res.status(400).json({ error: 'Project ID is required' });
     }
 
     console.log('Generating Table of Contents for project:', projectId);
+    if (language) {
+      console.log('User language preference:', language);
+    }
 
     // Get project from mock storage or Firestore
     let project;
@@ -157,8 +160,9 @@ router.post('/', async (req, res) => {
       return frenchScore > 5 ? 'fr' : 'en';
     };
 
-    const detectedLanguage = detectLanguage(transcript.text);
-    console.log('Detected language for TOC:', detectedLanguage);
+    // Use user's language preference if provided, otherwise auto-detect
+    const detectedLanguage = language || detectLanguage(transcript.text);
+    console.log('Detected language for TOC:', detectedLanguage, language ? '(from user preference)' : '(auto-detected)');
 
     // Language-specific prompts
     const prompts = {

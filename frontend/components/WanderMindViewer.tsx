@@ -1247,33 +1247,57 @@ const QnAPanel = ({
 
   // Generate contextual prompts from metadata if available (NotebookLM-style)
   const generateContextualPrompts = () => {
-    const title = metadata?.title || project?.title || ''
+    // Try to get title from multiple sources
+    const title = metadata?.title || project?.title || project?.fileName || project?.originalFileName || ''
+    const description = project?.description || ''
 
     // If we have specific content, generate contextual prompts
     if (title) {
       const prompts = []
-
-      // Extract topic from title
       const titleLower = title.toLowerCase()
-      if (titleLower.includes('how to') || titleLower.includes('guide')) {
+      const descLower = description.toLowerCase()
+      const combined = titleLower + ' ' + descLower
+
+      // Business/Marketing content
+      if (combined.includes('dropshipping') || combined.includes('ecommerce') || combined.includes('business')) {
+        prompts.push('What are the key strategies mentioned?')
+        prompts.push('How can I apply this to my business?')
+        prompts.push('What were the results achieved?')
+        return prompts
+      }
+
+      // How-to / Tutorial content
+      if (combined.includes('how to') || combined.includes('guide') || combined.includes('tutorial')) {
         prompts.push('Walk me through the step-by-step process')
-      } else {
-        prompts.push('What are the key insights from this video?')
+        prompts.push('What tools or resources do I need?')
+        prompts.push('What are common mistakes to avoid?')
+        return prompts
       }
 
-      // Common valuable questions
-      if (titleLower.includes('beginners') || titleLower.includes('start')) {
+      // Beginner content
+      if (combined.includes('beginners') || combined.includes('start') || combined.includes('getting started')) {
         prompts.push('What do I need to get started?')
-      } else {
-        prompts.push('What actionable steps can I take?')
+        prompts.push('What are the fundamentals I should know?')
+        prompts.push('What are the next steps after watching?')
+        return prompts
       }
 
-      prompts.push('What are the common mistakes to avoid?')
+      // Case study / Success story
+      if (combined.includes('case study') || combined.includes('success') || combined.includes('results')) {
+        prompts.push('What were the key tactics that worked?')
+        prompts.push('What were the biggest challenges?')
+        prompts.push('How can I replicate these results?')
+        return prompts
+      }
 
+      // Default contextual (better than generic)
+      prompts.push('What are the key insights from this video?')
+      prompts.push('What actionable steps can I take?')
+      prompts.push('What are the main takeaways?')
       return prompts
     }
 
-    // Generic fallback only if no metadata
+    // Generic fallback only if absolutely no metadata
     return [
       'Summarize the key points',
       'What are the main topics covered?',
@@ -1803,7 +1827,14 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
           // TOC not generated yet, try to generate it
           console.log('TOC not generated, attempting to generate...')
           try {
-            const generateResponse = await axios.post(`${apiUrl}/api/topics/`, { projectId })
+            // Get user's language preference
+            const userLanguage = typeof window !== 'undefined'
+              ? (localStorage.getItem('wandermind_language') || 'en')
+              : 'en'
+            const generateResponse = await axios.post(`${apiUrl}/api/topics/`, {
+              projectId,
+              language: userLanguage
+            })
             console.log('Generate TOC response:', generateResponse.data)
             
             if (generateResponse.data.success && generateResponse.data.toc?.chapters) {
