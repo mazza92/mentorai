@@ -1247,62 +1247,127 @@ const QnAPanel = ({
 
   // Generate contextual prompts from metadata if available (NotebookLM-style)
   const generateContextualPrompts = () => {
+    // Get user's language preference
+    const userLanguage = typeof window !== 'undefined'
+      ? (localStorage.getItem('wandermind_language') || 'en')
+      : 'en'
+
     // Try to get title from multiple sources
     const title = metadata?.title || project?.title || project?.fileName || project?.originalFileName || ''
     const description = project?.description || ''
 
+    // Multilingual prompt templates
+    const promptTemplates = {
+      business: {
+        en: [
+          'What are the key strategies mentioned?',
+          'How can I apply this to my business?',
+          'What were the results achieved?'
+        ],
+        fr: [
+          'Quelles sont les stratégies clés mentionnées ?',
+          'Comment puis-je appliquer cela à mon entreprise ?',
+          'Quels ont été les résultats obtenus ?'
+        ]
+      },
+      howto: {
+        en: [
+          'Walk me through the step-by-step process',
+          'What tools or resources do I need?',
+          'What are common mistakes to avoid?'
+        ],
+        fr: [
+          'Explique-moi le processus étape par étape',
+          'Quels outils ou ressources me faut-il ?',
+          'Quelles sont les erreurs courantes à éviter ?'
+        ]
+      },
+      beginner: {
+        en: [
+          'What do I need to get started?',
+          'What are the fundamentals I should know?',
+          'What are the next steps after watching?'
+        ],
+        fr: [
+          'De quoi ai-je besoin pour commencer ?',
+          'Quels sont les fondamentaux à connaître ?',
+          'Quelles sont les prochaines étapes après le visionnage ?'
+        ]
+      },
+      casestudy: {
+        en: [
+          'What were the key tactics that worked?',
+          'What were the biggest challenges?',
+          'How can I replicate these results?'
+        ],
+        fr: [
+          'Quelles ont été les tactiques clés qui ont fonctionné ?',
+          'Quels ont été les plus grands défis ?',
+          'Comment puis-je reproduire ces résultats ?'
+        ]
+      },
+      default: {
+        en: [
+          'What are the key insights from this video?',
+          'What actionable steps can I take?',
+          'What are the main takeaways?'
+        ],
+        fr: [
+          'Quels sont les points clés de cette vidéo ?',
+          'Quelles actions concrètes puis-je entreprendre ?',
+          'Quelles sont les principales leçons à retenir ?'
+        ]
+      },
+      generic: {
+        en: [
+          'Summarize the key points',
+          'What are the main topics covered?',
+          'What actionable tips are mentioned?'
+        ],
+        fr: [
+          'Résume les points clés',
+          'Quels sont les principaux sujets abordés ?',
+          'Quels conseils pratiques sont mentionnés ?'
+        ]
+      }
+    }
+
     // If we have specific content, generate contextual prompts
     if (title) {
-      const prompts = []
       const titleLower = title.toLowerCase()
       const descLower = description.toLowerCase()
       const combined = titleLower + ' ' + descLower
 
       // Business/Marketing content
-      if (combined.includes('dropshipping') || combined.includes('ecommerce') || combined.includes('business')) {
-        prompts.push('What are the key strategies mentioned?')
-        prompts.push('How can I apply this to my business?')
-        prompts.push('What were the results achieved?')
-        return prompts
+      if (combined.includes('dropshipping') || combined.includes('ecommerce') || combined.includes('business') ||
+          combined.includes('entreprise') || combined.includes('marketing')) {
+        return promptTemplates.business[userLanguage] || promptTemplates.business.en
       }
 
       // How-to / Tutorial content
-      if (combined.includes('how to') || combined.includes('guide') || combined.includes('tutorial')) {
-        prompts.push('Walk me through the step-by-step process')
-        prompts.push('What tools or resources do I need?')
-        prompts.push('What are common mistakes to avoid?')
-        return prompts
+      if (combined.includes('how to') || combined.includes('guide') || combined.includes('tutorial') ||
+          combined.includes('comment') || combined.includes('tutoriel')) {
+        return promptTemplates.howto[userLanguage] || promptTemplates.howto.en
       }
 
       // Beginner content
-      if (combined.includes('beginners') || combined.includes('start') || combined.includes('getting started')) {
-        prompts.push('What do I need to get started?')
-        prompts.push('What are the fundamentals I should know?')
-        prompts.push('What are the next steps after watching?')
-        return prompts
+      if (combined.includes('beginners') || combined.includes('start') || combined.includes('getting started') ||
+          combined.includes('débutant') || combined.includes('commencer')) {
+        return promptTemplates.beginner[userLanguage] || promptTemplates.beginner.en
       }
 
       // Case study / Success story
-      if (combined.includes('case study') || combined.includes('success') || combined.includes('results')) {
-        prompts.push('What were the key tactics that worked?')
-        prompts.push('What were the biggest challenges?')
-        prompts.push('How can I replicate these results?')
-        return prompts
+      if (combined.includes('case study') || combined.includes('success') || combined.includes('results') ||
+          combined.includes('étude de cas') || combined.includes('succès') || combined.includes('résultat')) {
+        return promptTemplates.casestudy[userLanguage] || promptTemplates.casestudy.en
       }
 
       // Default contextual (better than generic)
-      prompts.push('What are the key insights from this video?')
-      prompts.push('What actionable steps can I take?')
-      prompts.push('What are the main takeaways?')
-      return prompts
+      return promptTemplates.default[userLanguage] || promptTemplates.default.en
     }
 
     // Generic fallback only if absolutely no metadata
-    return [
-      'Summarize the key points',
-      'What are the main topics covered?',
-      'What actionable tips are mentioned?',
-    ]
+    return promptTemplates.generic[userLanguage] || promptTemplates.generic.en
   }
 
   const suggestedPrompts = chatStarters.length > 0 ? chatStarters :
