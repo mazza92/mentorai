@@ -23,22 +23,22 @@ export default function Home() {
   const [isInitialized, setIsInitialized] = useState(false)
 
   // Function to check URL and update project
-  const checkUrlAndSetProject = () => {
+  const checkUrlAndSetProject = (effectiveUserId?: string) => {
     if (typeof window === 'undefined') return
-    
+
     const urlParams = new URLSearchParams(window.location.search)
     const projectParam = urlParams.get('project')
-    
+
     if (projectParam) {
       // URL param always wins - update even if currentProject is already set
       if (currentProject !== projectParam) {
         console.log('URL project param detected:', projectParam, 'Current:', currentProject)
         setCurrentProject(projectParam)
-        if (user) {
-          localStorage.setItem(`currentProject_${user.id}`, projectParam)
-        } else {
-          localStorage.setItem('currentProject', projectParam)
-        }
+        // Use effectiveUserId (from sessionManager) if available, fallback to user.id
+        const storageKey = effectiveUserId && effectiveUserId !== 'anonymous'
+          ? `currentProject_${effectiveUserId}`
+          : (user ? `currentProject_${user.id}` : 'currentProject')
+        localStorage.setItem(storageKey, projectParam)
         // Clear upload flag when switching to a project via URL
         sessionStorage.removeItem('isUploadingVideo')
       }
@@ -58,7 +58,7 @@ export default function Home() {
       setUserId(sessionId)
       
       // PRIORITY: Check URL params FIRST (for conversation switching)
-      if (checkUrlAndSetProject()) {
+      if (checkUrlAndSetProject(sessionId)) {
         return // URL param takes priority
       }
       
@@ -67,7 +67,11 @@ export default function Home() {
       if (!currentProject && typeof window !== 'undefined') {
         const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
         if (!isUploading) {
-          const storedProject = localStorage.getItem('currentProject')
+          // Use sessionId-based key for consistency
+          const storageKey = sessionId && sessionId !== 'anonymous'
+            ? `currentProject_${sessionId}`
+            : 'currentProject'
+          const storedProject = localStorage.getItem(storageKey)
           if (storedProject) {
             setCurrentProject(storedProject)
           }
@@ -96,7 +100,7 @@ export default function Home() {
       setUserId(user.id)
 
       // PRIORITY: Check URL params FIRST (for conversation switching)
-      if (checkUrlAndSetProject()) {
+      if (checkUrlAndSetProject(user.id)) {
         setIsInitialized(true)
         return // URL param takes priority
       }
@@ -106,7 +110,11 @@ export default function Home() {
       if (!currentProject && typeof window !== 'undefined') {
         const isUploading = sessionStorage.getItem('isUploadingVideo') === 'true'
         if (!isUploading) {
-          const storedProject = localStorage.getItem(`currentProject_${user.id}`)
+          // Use userId for consistency (at this point userId === user.id)
+          const storageKey = userId && userId !== 'anonymous'
+            ? `currentProject_${userId}`
+            : 'currentProject'
+          const storedProject = localStorage.getItem(storageKey)
           if (storedProject) {
             setCurrentProject(storedProject)
           }
@@ -132,21 +140,21 @@ export default function Home() {
       if (projectParam && currentProject !== projectParam) {
         console.log('URL changed via popstate:', projectParam)
         setCurrentProject(projectParam)
-        if (user) {
-          localStorage.setItem(`currentProject_${user.id}`, projectParam)
-        } else {
-          localStorage.setItem('currentProject', projectParam)
-        }
+        // Use userId (from sessionManager) if available, fallback to user.id
+        const storageKey = userId && userId !== 'anonymous'
+          ? `currentProject_${userId}`
+          : (user ? `currentProject_${user.id}` : 'currentProject')
+        localStorage.setItem(storageKey, projectParam)
         sessionStorage.removeItem('isUploadingVideo')
       } else if (!projectParam && currentProject) {
         // URL param removed - go to upload screen
         console.log('URL param removed, clearing project')
         setCurrentProject(null)
-        if (user) {
-          localStorage.removeItem(`currentProject_${user.id}`)
-        } else {
-          localStorage.removeItem('currentProject')
-        }
+        // Use userId (from sessionManager) if available, fallback to user.id
+        const storageKey = userId && userId !== 'anonymous'
+          ? `currentProject_${userId}`
+          : (user ? `currentProject_${user.id}` : 'currentProject')
+        localStorage.removeItem(storageKey)
       }
     }
     
@@ -156,7 +164,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('popstate', handleUrlChange)
     }
-  }, [user, currentProject]) // Re-setup listeners when user or currentProject changes
+  }, [user, userId, currentProject]) // Re-setup listeners when user, userId, or currentProject changes
 
   const handleProjectCreated = async (projectId: string) => {
     // Clear upload flag first
@@ -171,12 +179,11 @@ export default function Home() {
     }
     
     setCurrentProject(projectId)
-    if (user) {
-      localStorage.setItem(`currentProject_${user.id}`, projectId)
-    } else {
-      // Anonymous mode - use regular localStorage key
-      localStorage.setItem('currentProject', projectId)
-    }
+    // Use userId (from sessionManager) if available, fallback to user.id
+    const storageKey = userId && userId !== 'anonymous'
+      ? `currentProject_${userId}`
+      : (user ? `currentProject_${user.id}` : 'currentProject')
+    localStorage.setItem(storageKey, projectId)
     
     // Create conversation for this new project
     const { createConversation, saveConversation, loadConversations } = await import('@/lib/conversationStorage')
