@@ -554,10 +554,11 @@ class ChannelService {
       }
       return Array.from(channel.videos.values());
     } else {
+      // Get all videos (frontend handles filtering/sorting)
+      // Simplified query to avoid composite index requirement
       const videosSnapshot = await firestore.collection('channels')
         .doc(channelId)
         .collection('videos')
-        .where('status', '==', 'ready')
         .orderBy('publishedAt', 'desc')
         .get();
 
