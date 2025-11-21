@@ -1287,6 +1287,320 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       videoContext: 'Mock mode - no real context available'
     };
   }
+
+  /**
+   * Answer question for full channel (NEW - for channel feature)
+   * @param {string} channelId - Channel ID
+   * @param {string} question - User question
+   * @param {Array} conversationHistory - Previous Q&A exchanges
+   * @returns {Promise<Object>} Answer with citations from multiple videos
+   */
+  async answerQuestionForChannel(channelId, question, conversationHistory = []) {
+    console.log(`[VideoQAService] Answering channel question: "${question}"`);
+
+    this.ensureInitialized();
+
+    // 1. Search relevant videos in channel
+    const relevantVideos = await this.searchRelevantVideos(channelId, question);
+
+    if (relevantVideos.length === 0) {
+      return {
+        answer: "I couldn't find any videos in this channel that discuss that topic. Could you try rephrasing your question?",
+        sources: [],
+        videosAnalyzed: 0
+      };
+    }
+
+    console.log(`[VideoQAService] Found ${relevantVideos.length} relevant videos`);
+
+    // 2. Build context from relevant videos
+    const context = this.buildContextFromVideos(relevantVideos, question);
+
+    // 3. Generate AI response
+    const prompt = this.buildChannelPrompt(question, context, conversationHistory);
+
+    try {
+      if (!this.model) {
+        return this.generateMockChannelResponse(question, relevantVideos);
+      }
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const answer = response.text();
+
+      // 4. Extract citations from answer
+      const citations = this.extractChannelCitations(answer, relevantVideos);
+
+      return {
+        answer: answer,
+        sources: citations,
+        videosAnalyzed: relevantVideos.length
+      };
+    } catch (error) {
+      console.error('[VideoQAService] Error generating channel answer:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search for relevant videos in channel
+   */
+  async searchRelevantVideos(channelId, question) {
+    const { getFirestore } = require('../config/firestore');
+    const { mockChannels } = require('./channelService');
+    const { firestore, useMockMode } = getFirestore();
+
+    console.log(`[VideoQAService] Searching videos for: "${question}"`);
+
+    let videos = [];
+
+    // Get all videos in channel
+    if (useMockMode || !firestore) {
+      const channel = mockChannels.get(channelId);
+      if (channel && channel.videos) {
+        videos = Array.from(channel.videos.values());
+      }
+    } else {
+      const videosSnapshot = await firestore.collection('channels')
+        .doc(channelId)
+        .collection('videos')
+        .where('status', '==', 'ready')
+        .get();
+
+      videos = videosSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    }
+
+    // Simple keyword-based relevance scoring
+    const scoredVideos = videos.map(video => ({
+      ...video,
+      relevanceScore: this.calculateVideoRelevance(video, question)
+    }));
+
+    // Sort by relevance and return top 10
+    const topVideos = scoredVideos
+      .filter(v => v.relevanceScore > 0)
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 10);
+
+    console.log(`[VideoQAService] Top videos:`,
+      topVideos.map(v => `${v.title} (score: ${v.relevanceScore})`)
+    );
+
+    return topVideos;
+  }
+
+  /**
+   * Calculate relevance score for video
+   */
+  calculateVideoRelevance(video, question) {
+    const questionLower = question.toLowerCase();
+    const questionWords = questionLower.split(/\s+/).filter(w => w.length > 3);
+
+    let score = 0;
+
+    // Check title (heavily weighted)
+    const titleLower = (video.title || '').toLowerCase();
+    questionWords.forEach(word => {
+      if (titleLower.includes(word)) {
+        score += 5; // Title matches are weighted heavily
+      }
+    });
+
+    // Check transcript
+    if (video.transcript) {
+      const transcriptLower = video.transcript.toLowerCase();
+      questionWords.forEach(word => {
+        const matches = (transcriptLower.match(new RegExp(word, 'g')) || []).length;
+        score += Math.min(matches, 10); // Cap at 10 matches per word
+      });
+    }
+
+    // Boost recent videos slightly
+    if (video.publishedAt) {
+      const publishDate = video.publishedAt.toDate ? video.publishedAt.toDate() : new Date(video.publishedAt);
+      const ageInDays = (Date.now() - publishDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (ageInDays < 90) {
+        score *= 1.2; // 20% boost for videos < 3 months old
+      }
+    }
+
+    return score;
+  }
+
+  /**
+   * Build context from relevant videos
+   */
+  buildContextFromVideos(videos, question) {
+    const contextParts = videos.map((video, index) => {
+      // Extract relevant segments from transcript
+      const relevantSegments = this.extractRelevantSegments(
+        video.transcript,
+        video.transcriptSegments,
+        question,
+        5 // Max 5 segments per video
+      );
+
+      const publishDate = video.publishedAt?.toDate ? video.publishedAt.toDate() : new Date(video.publishedAt);
+
+      return `
+VIDEO ${index + 1}: "${video.title}"
+Video ID: ${video.videoId}
+Published: ${publishDate.toLocaleDateString()}
+Duration: ${Math.floor(video.duration / 60)} minutes
+
+Relevant segments:
+${relevantSegments.map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`).join('\n')}
+`;
+    });
+
+    return contextParts.join('\n---\n');
+  }
+
+  /**
+   * Extract relevant segments from transcript
+   */
+  extractRelevantSegments(transcript, segments, question, maxSegments = 5) {
+    if (!segments || segments.length === 0) {
+      // Fallback: split transcript into chunks if no segments
+      if (transcript) {
+        const words = transcript.split(' ');
+        const chunkSize = 50;
+        const chunks = [];
+        for (let i = 0; i < words.length; i += chunkSize) {
+          chunks.push({
+            start: i * 2, // Approximate timing
+            text: words.slice(i, i + chunkSize).join(' ')
+          });
+        }
+        segments = chunks;
+      } else {
+        return [];
+      }
+    }
+
+    const questionLower = question.toLowerCase();
+    const questionWords = questionLower.split(/\s+/).filter(w => w.length > 3);
+
+    // Score each segment
+    const scoredSegments = segments.map(segment => ({
+      ...segment,
+      score: this.calculateSegmentRelevance(segment.text, questionWords)
+    }));
+
+    // Return top segments
+    return scoredSegments
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxSegments);
+  }
+
+  /**
+   * Calculate segment relevance
+   */
+  calculateSegmentRelevance(text, questionWords) {
+    const textLower = text.toLowerCase();
+    let score = 0;
+
+    questionWords.forEach(word => {
+      if (textLower.includes(word)) {
+        score += 1;
+      }
+    });
+
+    return score;
+  }
+
+  /**
+   * Build prompt for channel Q&A
+   */
+  buildChannelPrompt(question, context, conversationHistory) {
+    const historyContext = conversationHistory.length > 0
+      ? `\nPrevious conversation:\n${conversationHistory.map(msg =>
+        `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+      ).join('\n')}`
+      : '';
+
+    return `You are an AI assistant helping users understand content from a YouTube channel. You have access to transcripts from multiple videos in the channel.
+
+${historyContext}
+
+Here are the most relevant videos and segments for the current question:
+
+${context}
+
+User question: ${question}
+
+Instructions:
+1. Answer the question based on the video content provided above
+2. Synthesize information across multiple videos when relevant
+3. Include specific citations in the format: [Video Title @ MM:SS]
+4. If information is found in multiple videos, mention the key videos
+5. If the question cannot be answered from the provided videos, say so clearly
+6. Be concise but comprehensive
+7. Always cite your sources with video titles and timestamps
+
+Answer:`;
+  }
+
+  /**
+   * Extract citations from AI answer
+   */
+  extractChannelCitations(answer, videos) {
+    const citations = [];
+
+    // Look for timestamp patterns like [12:34] or (12:34)
+    const timestampPattern = /[\[\(](\d{1,2}):(\d{2})[\]\)]/g;
+    const matches = Array.from(answer.matchAll(timestampPattern));
+
+    for (const match of matches) {
+      const minutes = parseInt(match[1]);
+      const seconds = parseInt(match[2]);
+      const timestamp = minutes * 60 + seconds;
+
+      // Use first video as default (improve this with better matching)
+      const video = videos[0];
+
+      citations.push({
+        videoId: video.videoId,
+        videoTitle: video.title,
+        timestamp: timestamp,
+        formattedTimestamp: `${minutes}:${seconds.toString().padStart(2, '0')}`
+      });
+    }
+
+    return citations;
+  }
+
+  /**
+   * Generate mock response for channel Q&A (when no API key)
+   */
+  generateMockChannelResponse(question, relevantVideos) {
+    let answer = `Based on ${relevantVideos.length} videos in this channel, here's what I found:\n\n`;
+
+    relevantVideos.slice(0, 3).forEach((video, index) => {
+      answer += `${index + 1}. **${video.title}**\n`;
+      if (video.transcript) {
+        const snippet = video.transcript.substring(0, 150);
+        answer += `   ${snippet}...\n\n`;
+      }
+    });
+
+    answer += '\n(Note: This is a mock response. Configure GEMINI_API_KEY for intelligent multi-video Q&A.)';
+
+    return {
+      answer: answer,
+      sources: relevantVideos.slice(0, 3).map(v => ({
+        videoId: v.videoId,
+        videoTitle: v.title,
+        timestamp: 0,
+        formattedTimestamp: '0:00'
+      })),
+      videosAnalyzed: relevantVideos.length
+    };
+  }
 }
 
 
