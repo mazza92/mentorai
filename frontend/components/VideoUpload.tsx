@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Youtube, Video, Loader2, CheckCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +23,52 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showSignupWall, setShowSignupWall] = useState(false)
   const [quotaUsage, setQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
+  const [recoveredUpload, setRecoveredUpload] = useState<{projectId: string, youtubeUrl: string} | null>(null)
+
+  // Check for pending upload on mount (recovery from refresh/close)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const pendingUploadStr = localStorage.getItem('pendingUpload')
+    if (!pendingUploadStr) return
+
+    try {
+      const pendingUpload = JSON.parse(pendingUploadStr)
+
+      // Only recover if upload was recent (within last 30 minutes)
+      const timeSinceStart = Date.now() - (pendingUpload.startedAt || 0)
+      if (timeSinceStart > 30 * 60 * 1000) {
+        localStorage.removeItem('pendingUpload')
+        return
+      }
+
+      // If we have a projectId, upload completed - navigate to it
+      if (pendingUpload.projectId && pendingUpload.userId === userId) {
+        console.log('Recovering completed upload:', pendingUpload.projectId)
+        setRecoveredUpload({
+          projectId: pendingUpload.projectId,
+          youtubeUrl: pendingUpload.youtubeUrl
+        })
+        setUploaded(true)
+        setProcessingStage(t('upload.video_ready'))
+
+        // Auto-navigate after 2 seconds
+        setTimeout(() => {
+          onUploadComplete(pendingUpload.projectId)
+          localStorage.removeItem('pendingUpload')
+        }, 2000)
+      }
+      // If still uploading, show message (can't recover mid-upload)
+      else if (pendingUpload.status === 'uploading' && pendingUpload.userId === userId) {
+        console.log('Found pending upload, but cannot recover mid-process')
+        setError(t('upload.upload_in_progress_message') || 'Previous upload in progress. Please wait or try again.')
+        localStorage.removeItem('pendingUpload')
+      }
+    } catch (err) {
+      console.error('Error recovering upload:', err)
+      localStorage.removeItem('pendingUpload')
+    }
+  }, [userId, onUploadComplete, t])
 
   const isValidYouTubeUrl = (url: string) => {
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/
@@ -45,9 +91,16 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
     setError(null)
     setUploading(true)
     setProcessingStage(t('upload.downloading'))
-    
-    // Mark that we're uploading to prevent restoring old project
+
+    // Save upload state to localStorage (persistent across refreshes)
     if (typeof window !== 'undefined') {
+      const uploadState = {
+        youtubeUrl,
+        userId,
+        startedAt: Date.now(),
+        status: 'uploading'
+      }
+      localStorage.setItem('pendingUpload', JSON.stringify(uploadState))
       sessionStorage.setItem('isUploadingVideo', 'true')
     }
 
@@ -65,12 +118,28 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
       if (response.data.success) {
         const projectId = response.data.projectId
 
+        // Save projectId to localStorage for recovery
+        if (typeof window !== 'undefined') {
+          const uploadState = {
+            youtubeUrl,
+            userId,
+            projectId,
+            status: 'processing',
+            completedAt: Date.now()
+          }
+          localStorage.setItem('pendingUpload', JSON.stringify(uploadState))
+        }
+
         setUploaded(true)
         setProcessingStage(t('upload.video_ready'))
-        
-        // Clear upload flag
+
+        // Clear upload flags after successful completion
         if (typeof window !== 'undefined') {
           sessionStorage.removeItem('isUploadingVideo')
+          // Keep pendingUpload for a bit in case of navigation
+          setTimeout(() => {
+            localStorage.removeItem('pendingUpload')
+          }, 5000)
         }
 
         // Navigate to Q&A interface immediately (transcription auto-started by backend)
