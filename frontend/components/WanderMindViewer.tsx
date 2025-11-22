@@ -469,7 +469,9 @@ const QnAPanel = ({
   showMobileHeader = false,
   onMenuClick,
   onSelectConversation,
-  metadata
+  metadata,
+  mobileContextOpen,
+  setMobileContextOpen
 }: {
   projectId: string
   userId: string
@@ -480,6 +482,8 @@ const QnAPanel = ({
   onMenuClick?: () => void
   onSelectConversation?: (conversation: Conversation) => void
   metadata?: VideoMetadata
+  mobileContextOpen?: boolean
+  setMobileContextOpen?: (open: boolean) => void
 }) => {
   const { t } = useTranslation('common')
   const [query, setQuery] = useState('')
@@ -1379,7 +1383,10 @@ const QnAPanel = ({
       {/* Sticky Metadata Bar - Mobile Only */}
       {metadata && (
         <div className="lg:hidden fixed top-14 left-0 right-0 z-20 bg-white border-t-0 border-b border-slate-200/60">
-          <div className="px-3 py-2">
+          <button
+            onClick={() => setMobileContextOpen?.(!mobileContextOpen)}
+            className="w-full px-3 py-2 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+          >
             {/* Compact Horizontal Layout */}
             <div className="flex items-center gap-2.5">
               {/* Thumbnail */}
@@ -1426,11 +1433,19 @@ const QnAPanel = ({
                   )}
                 </div>
               </div>
+              {/* Expand/Collapse Indicator */}
+              <div className="flex-shrink-0">
+                {mobileContextOpen ? (
+                  <ChevronUp className="w-4 h-4 text-slate-600" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-slate-600" />
+                )}
+              </div>
             </div>
-          </div>
+          </button>
         </div>
       )}
-      
+
       {/* Chat Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Main Chat Area */}
@@ -2153,6 +2168,8 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
             onNewConversation={onNewConversation}
             onSelectConversation={handleSelectConversation}
             metadata={metadata}
+            mobileContextOpen={mobileContextOpen}
+            setMobileContextOpen={setMobileContextOpen}
           />
         </div>
       </div>
@@ -2168,8 +2185,41 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
           showMobileHeader={false}
           onSelectConversation={handleSelectConversation}
           metadata={metadata}
+          mobileContextOpen={mobileContextOpen}
+          setMobileContextOpen={setMobileContextOpen}
         />
       </div>
+
+      {/* Mobile Context Panel Modal */}
+      {mobileContextOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-white">
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">Video Details</h2>
+            <button
+              onClick={() => setMobileContextOpen(false)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-slate-600" />
+            </button>
+          </div>
+
+          {/* Context Panel Content */}
+          <div className="h-[calc(100vh-56px)] overflow-y-auto">
+            <ContextPanel
+              videoUrl={videoUrl}
+              transcript={transcript}
+              highlightedTime={highlightedTime}
+              setHighlightedTime={setHighlightedTime}
+              metadata={metadata}
+              topics={topics}
+              loadingTopics={loadingTopics}
+              isChannel={project.type === 'channel'}
+              channelId={project.channelId}
+            />
+          </div>
+        </div>
+      )}
     </div>
     </>
   )
