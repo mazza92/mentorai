@@ -28,11 +28,26 @@ export default function ProcessingProgress({
 }: ProcessingProgressProps) {
   const { t } = useTranslation('common')
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [stageStartTime, setStageStartTime] = useState<number>(Date.now())
 
-  // Calculate estimated times based on video duration
+  // Calculate estimated times based on video duration and actual measurements
   const durationMinutes = videoDuration / 60
-  const estimatedTranscriptionTime = Math.ceil(durationMinutes * 0.05) // ~5% of video length for AssemblyAI
-  const estimatedTOCTime = 20 // Fixed ~20 seconds for TOC generation
+
+  // More realistic estimates based on testing
+  // AssemblyAI is very fast - usually 10-15% of video duration
+  const estimatedTranscriptionTime = Math.max(30, Math.ceil(durationMinutes * 0.15))
+
+  // Download time scales with video length (rough estimate)
+  const estimatedDownloadTime = Math.max(45, Math.ceil(durationMinutes * 2))
+
+  // Audio extraction is fast
+  const estimatedAudioTime = 30
+
+  // TOC generation is fast with Claude
+  const estimatedTOCTime = 15
+
+  // Analysis time (only for videos under 30 mins)
+  const estimatedAnalysisTime = 20
 
   // Define processing stages with dynamic estimates
   const stages: ProcessingStage[] = [
@@ -42,7 +57,7 @@ export default function ProcessingProgress({
       description: t('processing.stages.download_description'),
       completed: !!project.localAudioPath || !!project.transcript,
       inProgress: !project.localAudioPath && !project.transcript,
-      estimatedSeconds: 60
+      estimatedSeconds: estimatedDownloadTime
     },
     {
       id: 'audio',
@@ -50,7 +65,7 @@ export default function ProcessingProgress({
       description: t('processing.stages.audio_description'),
       completed: !!project.localAudioPath || !!project.transcript,
       inProgress: !!project.localAudioPath && !project.transcript,
-      estimatedSeconds: 50
+      estimatedSeconds: estimatedAudioTime
     },
     {
       id: 'transcription',
@@ -69,7 +84,7 @@ export default function ProcessingProgress({
       description: t('processing.stages.analysis_description'),
       completed: !!project.videoAnalysis || project.analysisStatus === 'completed',
       inProgress: !!project.transcript && !project.videoAnalysis && (!project.duration || project.duration <= 1800),
-      estimatedSeconds: 15
+      estimatedSeconds: estimatedAnalysisTime
     },
     {
       id: 'toc',
@@ -97,9 +112,19 @@ export default function ProcessingProgress({
   // Find current stage
   const currentStage = activeStages.find(s => s.inProgress) || activeStages[activeStages.length - 1]
 
-  // Calculate estimated time remaining
+  // Calculate estimated time remaining with dynamic adjustment
   const remainingStages = activeStages.filter(s => !s.completed)
-  const estimatedTimeRemaining = remainingStages.reduce((sum, s) => sum + (s.estimatedSeconds || 0), 0)
+  let estimatedTimeRemaining = remainingStages.reduce((sum, s) => sum + (s.estimatedSeconds || 0), 0)
+
+  // If current stage is taking longer than expected, adjust the total estimate
+  const currentStageElapsed = Math.floor((Date.now() - stageStartTime) / 1000)
+  if (currentStage && currentStage.inProgress && currentStage.estimatedSeconds) {
+    const currentStageOvertime = Math.max(0, currentStageElapsed - currentStage.estimatedSeconds)
+    // Add overtime to remaining estimate (if stage is taking longer than expected)
+    if (currentStageOvertime > 0) {
+      estimatedTimeRemaining += currentStageOvertime
+    }
+  }
 
   // Track elapsed time
   useEffect(() => {
@@ -108,6 +133,11 @@ export default function ProcessingProgress({
     }, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  // Reset stage start time when current stage changes
+  useEffect(() => {
+    setStageStartTime(Date.now())
+  }, [currentStage?.id])
 
   // Format time in MM:SS
   const formatTime = (seconds: number) => {
