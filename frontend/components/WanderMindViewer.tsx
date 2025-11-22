@@ -267,41 +267,6 @@ const ContextPanel = ({
         )}
       </div>
 
-      {/* Source Guide (NotebookLM Style) */}
-      {metadata?.summary && (
-        <div className="bg-gradient-to-br from-white to-purple-50/30 rounded-xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
-          <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Sparkles className="w-16 h-16 text-purple-500" />
-          </div>
-          
-          <div className="flex items-center gap-2 mb-3 relative z-10">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-900">Source guide</h3>
-          </div>
-          
-          <div className="prose prose-sm max-w-none mb-4 relative z-10">
-            <p className="text-sm text-slate-700 leading-relaxed">
-              {metadata.summary}
-            </p>
-          </div>
-
-          {metadata.keyTopics && metadata.keyTopics.length > 0 && (
-             <div className="flex flex-wrap gap-2 relative z-10">
-               {metadata.keyTopics.map((topic, idx) => (
-                 <span 
-                   key={idx} 
-                   className="px-2.5 py-1 rounded-full bg-white border border-purple-100 text-xs font-medium text-purple-700 shadow-sm hover:bg-purple-50 hover:border-purple-200 transition-colors cursor-default"
-                 >
-                   {topic}
-                 </span>
-               ))}
-             </div>
-          )}
-        </div>
-      )}
-
       {/* Video Thumbnail - Above TOC */}
       {metadata?.thumbnail && (
         <div 
