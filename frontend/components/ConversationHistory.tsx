@@ -63,9 +63,15 @@ export default function ConversationHistory({
 
   const formatDate = (date: Date) => {
     const now = new Date()
-    const diff = now.getTime() - date.getTime()
+
+    // Reset time to midnight for accurate day comparison
+    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const inputDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+    // Calculate difference in calendar days
+    const diff = nowDate.getTime() - inputDate.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
+
     if (days === 0) {
       return t('conversations.today')
     } else if (days === 1) {
