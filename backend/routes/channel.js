@@ -11,6 +11,15 @@ const { getFirestore } = require('../config/firestore');
  */
 router.post('/import', async (req, res) => {
   try {
+    // Feature flag: Temporarily disable channel imports while fixing YouTube API issues
+    if (process.env.DISABLE_CHANNEL_IMPORTS === 'true') {
+      return res.status(503).json({
+        success: false,
+        error: 'Channel imports are temporarily unavailable',
+        message: 'We\'re improving this feature. Single video uploads work great! Try uploading individual videos while we enhance channel imports.'
+      });
+    }
+
     const { channelUrl, userId } = req.body;
 
     console.log(`[API] Channel import requested by user ${userId}`);
