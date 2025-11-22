@@ -58,10 +58,9 @@ export default function VideoUpload({ userId, onUploadComplete }: VideoUploadPro
           localStorage.removeItem('pendingUpload')
         }, 2000)
       }
-      // If still uploading, show message (can't recover mid-upload)
+      // If still uploading, clear old state (can't recover mid-upload)
       else if (pendingUpload.status === 'uploading' && pendingUpload.userId === userId) {
-        console.log('Found pending upload, but cannot recover mid-process')
-        setError(t('upload.upload_in_progress_message') || 'Previous upload in progress. Please wait or try again.')
+        console.log('Found pending upload, but cannot recover mid-process - clearing old state')
         localStorage.removeItem('pendingUpload')
       }
     } catch (err) {
