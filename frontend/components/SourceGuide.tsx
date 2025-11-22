@@ -14,22 +14,25 @@ export default function SourceGuide({ title, summary, keyTopics, onTopicClick }:
   const [isExpanded, setIsExpanded] = useState(true)
 
   // Debug: Log what data we receive
-  console.log('[SourceGuide] Rendering with:', {
-    title,
-    summary: summary?.substring(0, 100),
-    keyTopicsCount: keyTopics?.length,
-    isExpanded,
-    summaryType: typeof summary,
-    keyTopicsType: typeof keyTopics,
-    summaryValue: summary,
-    keyTopicsValue: keyTopics
-  });
+  console.log('[SourceGuide] ========================================');
+  console.log('[SourceGuide] title:', title);
+  console.log('[SourceGuide] summary:', summary);
+  console.log('[SourceGuide] summaryType:', typeof summary);
+  console.log('[SourceGuide] keyTopics:', keyTopics);
+  console.log('[SourceGuide] keyTopicsType:', typeof keyTopics);
+  console.log('[SourceGuide] keyTopicsLength:', keyTopics?.length);
+  console.log('[SourceGuide] isExpanded:', isExpanded);
+  console.log('[SourceGuide] ========================================');
 
   // Safety check: ensure we have valid data
   if (!summary || !keyTopics) {
-    console.error('[SourceGuide] Missing required props:', { summary, keyTopics });
+    console.error('[SourceGuide] FAILED SAFETY CHECK - Missing required props!');
+    console.error('[SourceGuide] summary:', summary);
+    console.error('[SourceGuide] keyTopics:', keyTopics);
     return null;
   }
+
+  console.log('[SourceGuide] ✅ Safety check passed, rendering content');
 
   return (
     <div className="mb-6 border border-slate-200 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden shadow-sm">
