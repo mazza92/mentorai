@@ -1,5 +1,16 @@
 # Production-Ready Minimal Viable Product
 
+---
+
+## 📋 Source Guide
+
+**This document outlines a pragmatic recovery strategy for the WanderCut MVP**, focusing on **eliminating broken features** and promoting **immediate shipping over perfectionism**. The plan emphasizes simplifying to a metadata-only mode to bypass YouTube API and cookie authentication issues, allowing users to instantly upload videos and interact with AI-generated summaries and Q&A based on video descriptions. Critically, the strategy **prioritizes market testing** by shipping a working product in ~3 hours rather than fixing complex infrastructure. The phased approach enables validation of user demand before investing in full transcript analysis, with future enhancements planned only after market validation proves the concept viable.
+
+**Key Topics:**
+`Metadata-only mode` `Broken feature removal` `YouTube API workaround` `Market testing strategy` `Phased development` `MVP simplification`
+
+---
+
 ## Current State: BROKEN ❌
 - Channel imports fail (YouTube API playlist errors)
 - Single video uploads fail (cookie authentication issues)
