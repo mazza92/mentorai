@@ -148,6 +148,8 @@ Provide a structured analysis with:
 - Objects/people detected
 - Key moments or highlights
 - Temporal information (when things happen)
+- A concise "Source Guide" summary (2-3 sentences max) capturing the core essence
+- Key topics/tags (3-6 items)
 
 Format as JSON with this structure:
 {
@@ -160,7 +162,8 @@ Format as JSON with this structure:
       "keyMoment": true
     }
   ],
-  "summary": "Overall video content summary",
+  "summary": "Brief, high-level source guide summary (max 3 sentences)",
+  "keyTopics": ["Makeup", "Beauty", "Product Reveal"],
   "keyMoments": [{"timestamp": 5.2, "description": "Makeup reveal"}]
 }`;
 
