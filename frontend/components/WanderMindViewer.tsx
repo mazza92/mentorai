@@ -598,9 +598,17 @@ const QnAPanel = ({
     const loadSourceGuide = async () => {
       if (!project) return
 
+      console.log('[WanderMindViewer] loadSourceGuide - project data:', {
+        hasSourceGuide: !!project.sourceGuide,
+        sourceGuideKeys: project.sourceGuide ? Object.keys(project.sourceGuide) : null,
+        sourceGuideData: project.sourceGuide,
+        hasTranscript: !!project.transcript,
+        hasTranscriptText: !!project.transcript?.text
+      });
+
       // If project already has cached source guide, use it
       if (project.sourceGuide) {
-        console.log('Using cached source guide from project');
+        console.log('Using cached source guide from project:', project.sourceGuide);
         setSourceGuide(project.sourceGuide);
         return;
       }

@@ -13,6 +13,24 @@ interface SourceGuideProps {
 export default function SourceGuide({ title, summary, keyTopics, onTopicClick }: SourceGuideProps) {
   const [isExpanded, setIsExpanded] = useState(true)
 
+  // Debug: Log what data we receive
+  console.log('[SourceGuide] Rendering with:', {
+    title,
+    summary: summary?.substring(0, 100),
+    keyTopicsCount: keyTopics?.length,
+    isExpanded,
+    summaryType: typeof summary,
+    keyTopicsType: typeof keyTopics,
+    summaryValue: summary,
+    keyTopicsValue: keyTopics
+  });
+
+  // Safety check: ensure we have valid data
+  if (!summary || !keyTopics) {
+    console.error('[SourceGuide] Missing required props:', { summary, keyTopics });
+    return null;
+  }
+
   return (
     <div className="mb-6 border border-slate-200 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden shadow-sm">
       {/* Header */}
