@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const admin = require('firebase-admin');
+const { getFirestore } = require('../config/firestore');
+const { FieldValue } = require('@google-cloud/firestore');
 const Anthropic = require('@anthropic-ai/sdk');
 
 const anthropic = new Anthropic({
@@ -20,8 +21,16 @@ router.post('/', async (req, res) => {
     }
 
     // Get project from Firestore
-    const db = admin.firestore();
-    const projectDoc = await db.collection('projects').doc(projectId).get();
+    const { firestore, useMockMode } = getFirestore();
+
+    if (useMockMode) {
+      return res.status(503).json({
+        error: 'Firestore not configured',
+        message: 'Source guide requires database access'
+      });
+    }
+
+    const projectDoc = await firestore.collection('projects').doc(projectId).get();
 
     if (!projectDoc.exists) {
       return res.status(404).json({ error: 'Project not found' });
@@ -101,7 +110,7 @@ Return ONLY valid JSON, no additional text.`
     // Save to Firestore for future requests
     await projectDoc.ref.update({
       sourceGuide,
-      sourceGuideGeneratedAt: admin.firestore.FieldValue.serverTimestamp()
+      sourceGuideGeneratedAt: FieldValue.serverTimestamp()
     });
 
     console.log('[SourceGuide] Generated and cached successfully');
