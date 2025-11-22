@@ -118,6 +118,7 @@ app.use('/api/qa', qaLimiter, require('./routes/qa'));
 app.use('/api/transcribe', require('./routes/transcribe'));
 app.use('/api/edit', require('./routes/edit'));
 app.use('/api/topics', require('./routes/topics')); // Topic clustering & table of contents
+app.use('/api/source-guide', require('./routes/sourceGuide')); // Source guide summary generation
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/user', require('./routes/user'));
 app.use('/api/conversations', require('./routes/conversations'));

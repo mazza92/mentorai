@@ -9,6 +9,7 @@ import ProcessingProgress from './ProcessingProgress'
 import SignupWall from './SignupWall'
 import ChannelViewer from './ChannelViewer'
 import ChatStarters from './ChatStarters'
+import SourceGuide from './SourceGuide'
 import {
   Conversation,
   loadConversations,
@@ -532,6 +533,8 @@ const QnAPanel = ({
   const [showSignupWall, setShowSignupWall] = useState(false)
   const [signupQuotaUsage, setSignupQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
   const [signupMessage, setSignupMessage] = useState<string | undefined>(undefined)
+  const [sourceGuide, setSourceGuide] = useState<{summary: string, keyTopics: string[]} | null>(null)
+  const [loadingSourceGuide, setLoadingSourceGuide] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   // Dynamic loading messages (NotebookLM/Claude-style)
@@ -589,6 +592,32 @@ const QnAPanel = ({
     }
     loadConversation()
   }, [projectId, userId]) // Only reload when projectId or userId changes
+
+  // Fetch source guide when project transcript is ready
+  useEffect(() => {
+    const fetchSourceGuide = async () => {
+      if (!project || !project.transcript || sourceGuide || loadingSourceGuide) return
+
+      setLoadingSourceGuide(true)
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const response = await axios.post(`${apiUrl}/api/source-guide`, {
+          projectId
+        })
+
+        if (response.data.success && response.data.sourceGuide) {
+          setSourceGuide(response.data.sourceGuide)
+        }
+      } catch (error) {
+        console.error('Error fetching source guide:', error)
+        // Silently fail - source guide is optional
+      } finally {
+        setLoadingSourceGuide(false)
+      }
+    }
+
+    fetchSourceGuide()
+  }, [project?.transcript, projectId])
 
   // Save conversation whenever history changes
   useEffect(() => {
@@ -1502,6 +1531,29 @@ const QnAPanel = ({
 
             {history.length === 0 && (
               <div className="space-y-4">
+                {/* Source Guide (NotebookLM style) */}
+                {sourceGuide && (
+                  <SourceGuide
+                    title={metadata?.title || project?.title || 'Video'}
+                    summary={sourceGuide.summary}
+                    keyTopics={sourceGuide.keyTopics}
+                    onTopicClick={(topic) => {
+                      // Auto-fill question based on topic
+                      setQuery(`Tell me more about ${topic}`)
+                    }}
+                  />
+                )}
+
+                {/* Loading source guide skeleton */}
+                {loadingSourceGuide && (
+                  <div className="mb-6 border border-slate-200 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden shadow-sm">
+                    <div className="px-4 py-3 flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
+                      <h3 className="text-base font-semibold text-slate-900">Generating source guide...</h3>
+                    </div>
+                  </div>
+                )}
+
                 {/* Always show ChatStarters component (NotebookLM style) */}
                 <div className="p-4 lg:p-6 border border-slate-200 rounded-xl bg-gradient-to-br from-white to-slate-50">
                   <div className="mb-4">
