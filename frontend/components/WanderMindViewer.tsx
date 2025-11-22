@@ -1548,31 +1548,31 @@ const QnAPanel = ({
               </h1>
             </div>
 
+            {/* Source Guide (NotebookLM style) - Always visible */}
+            {sourceGuide && (
+              <SourceGuide
+                title={metadata?.title || project?.title || 'Video'}
+                summary={sourceGuide.summary}
+                keyTopics={sourceGuide.keyTopics}
+                onTopicClick={(topic) => {
+                  // Auto-fill question based on topic
+                  setQuery(`Tell me more about ${topic}`)
+                }}
+              />
+            )}
+
+            {/* Loading source guide skeleton */}
+            {loadingSourceGuide && (
+              <div className="mb-6 border border-slate-200 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden shadow-sm">
+                <div className="px-4 py-3 flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
+                  <h3 className="text-base font-semibold text-slate-900">Generating source guide...</h3>
+                </div>
+              </div>
+            )}
+
             {history.length === 0 && (
               <div className="space-y-4">
-                {/* Source Guide (NotebookLM style) */}
-                {sourceGuide && (
-                  <SourceGuide
-                    title={metadata?.title || project?.title || 'Video'}
-                    summary={sourceGuide.summary}
-                    keyTopics={sourceGuide.keyTopics}
-                    onTopicClick={(topic) => {
-                      // Auto-fill question based on topic
-                      setQuery(`Tell me more about ${topic}`)
-                    }}
-                  />
-                )}
-
-                {/* Loading source guide skeleton */}
-                {loadingSourceGuide && (
-                  <div className="mb-6 border border-slate-200 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden shadow-sm">
-                    <div className="px-4 py-3 flex items-center gap-2">
-                      <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
-                      <h3 className="text-base font-semibold text-slate-900">Generating source guide...</h3>
-                    </div>
-                  </div>
-                )}
-
                 {/* Always show ChatStarters component (NotebookLM style) */}
                 <div className="p-4 lg:p-6 border border-slate-200 rounded-xl bg-gradient-to-br from-white to-slate-50">
                   <div className="mb-4">
