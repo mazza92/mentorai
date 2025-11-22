@@ -47,13 +47,23 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Check if transcript is available
+    if (!project.transcript || !project.transcript.text) {
+      return res.status(400).json({
+        error: 'Transcript not available',
+        message: 'Video must be transcribed before generating source guide'
+      });
+    }
+
     // Prepare content for analysis
     const title = project.title || project.fileName || 'Video';
     const description = project.description || '';
-    const transcript = project.transcript || '';
+
+    // Extract text from transcript object (transcript is {text, words, segments})
+    const transcriptText = project.transcript.text;
 
     // Get first 3000 characters of transcript for analysis
-    const transcriptPreview = transcript.substring(0, 3000);
+    const transcriptPreview = transcriptText.substring(0, 3000);
 
     console.log('[SourceGuide] Generating summary for:', title);
 

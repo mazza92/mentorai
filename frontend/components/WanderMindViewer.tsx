@@ -596,7 +596,8 @@ const QnAPanel = ({
   // Fetch source guide when project transcript is ready
   useEffect(() => {
     const fetchSourceGuide = async () => {
-      if (!project || !project.transcript || sourceGuide || loadingSourceGuide) return
+      // Only fetch if we have a transcript with text
+      if (!project || !project.transcript?.text || sourceGuide || loadingSourceGuide) return
 
       setLoadingSourceGuide(true)
       try {
@@ -617,7 +618,7 @@ const QnAPanel = ({
     }
 
     fetchSourceGuide()
-  }, [project?.transcript, projectId])
+  }, [project?.transcript?.text, projectId])
 
   // Save conversation whenever history changes
   useEffect(() => {
