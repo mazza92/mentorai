@@ -593,12 +593,22 @@ const QnAPanel = ({
     loadConversation()
   }, [projectId, userId]) // Only reload when projectId or userId changes
 
-  // Fetch source guide when project transcript is ready
+  // Load source guide from project or fetch if not available
   useEffect(() => {
-    const fetchSourceGuide = async () => {
-      // Only fetch if we have a transcript with text
-      if (!project || !project.transcript?.text || sourceGuide || loadingSourceGuide) return
+    const loadSourceGuide = async () => {
+      if (!project) return
 
+      // If project already has cached source guide, use it
+      if (project.sourceGuide) {
+        console.log('Using cached source guide from project');
+        setSourceGuide(project.sourceGuide);
+        return;
+      }
+
+      // Only fetch if we have a transcript with text and haven't already fetched
+      if (!project.transcript?.text || sourceGuide || loadingSourceGuide) return
+
+      console.log('Fetching source guide from API');
       setLoadingSourceGuide(true)
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -617,8 +627,8 @@ const QnAPanel = ({
       }
     }
 
-    fetchSourceGuide()
-  }, [project?.transcript?.text, projectId])
+    loadSourceGuide()
+  }, [project, projectId, sourceGuide, loadingSourceGuide])
 
   // Save conversation whenever history changes
   useEffect(() => {
