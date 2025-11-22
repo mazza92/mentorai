@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { getFirestore } = require('../config/firestore');
 const { FieldValue } = require('@google-cloud/firestore');
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Initialize Gemini (same as rest of app)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 /**
  * POST /api/source-guide
@@ -67,15 +67,8 @@ router.post('/', async (req, res) => {
 
     console.log('[SourceGuide] Generating summary for:', title);
 
-    // Generate summary using Claude
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1024,
-      temperature: 0.7,
-      messages: [
-        {
-          role: 'user',
-          content: `You are analyzing a video to create a "Source Guide" - a concise overview that helps viewers quickly understand the content and key concepts.
+    // Generate summary using Gemini
+    const prompt = `You are analyzing a video to create a "Source Guide" - a concise overview that helps viewers quickly understand the content and key concepts.
 
 Video Title: ${title}
 ${description ? `Description: ${description}` : ''}
@@ -96,20 +89,30 @@ Guidelines:
 - Generate 4-6 key topics that viewers might want to ask about
 - Topics should be specific enough to guide questions (e.g., "AI content production" not just "AI")
 
-Return ONLY valid JSON, no additional text.`
-        }
-      ]
-    });
+Return ONLY valid JSON, no additional text.`;
 
-    const responseText = message.content[0].text;
-    console.log('[SourceGuide] Claude response:', responseText);
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const responseText = response.text();
+    console.log('[SourceGuide] Gemini response:', responseText);
 
-    // Parse the JSON response
+    // Parse the JSON response (handle both raw JSON and markdown code blocks)
     let sourceGuide;
     try {
-      sourceGuide = JSON.parse(responseText);
+      // Try to extract JSON from markdown code blocks (```json ... ```)
+      let jsonText = responseText;
+      const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) ||
+                       responseText.match(/```\s*([\s\S]*?)\s*```/) ||
+                       responseText.match(/\{[\s\S]*\}/);
+
+      if (jsonMatch) {
+        jsonText = jsonMatch[1] || jsonMatch[0];
+      }
+
+      sourceGuide = JSON.parse(jsonText);
     } catch (parseError) {
-      console.error('[SourceGuide] Failed to parse Claude response:', parseError);
+      console.error('[SourceGuide] Failed to parse Gemini response:', parseError);
+      console.error('[SourceGuide] Raw response:', responseText.substring(0, 500));
       // Fallback to basic summary
       sourceGuide = {
         summary: `This video titled "${title}" covers various topics and insights.`,
