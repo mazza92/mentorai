@@ -602,8 +602,18 @@ const QnAPanel = ({
         return;
       }
 
-      // Only fetch if we have a transcript with text and haven't already fetched
-      if (!project.transcript?.text || sourceGuide || loadingSourceGuide) return
+      // Only fetch if we haven't already fetched
+      if (sourceGuide || loadingSourceGuide) return
+
+      // For single videos, need transcript. For channels, can generate without transcript.
+      const hasRequiredData = project.type === 'channel'
+        ? !!project.channelId
+        : !!project.transcript?.text;
+
+      if (!hasRequiredData) {
+        console.log('[SourceGuide] Missing required data for source guide generation');
+        return;
+      }
 
       console.log('Fetching source guide from API');
       setLoadingSourceGuide(true)
