@@ -101,11 +101,12 @@ class ChannelTranscriptService {
         // Use different user agent for each attempt
         const userAgent = this.userAgents[attempt % this.userAgents.length];
 
+        // Fetch transcript - try to get ANY available language
+        // Don't specify lang parameter to get the default/auto-generated transcript
         const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-          lang: 'en,fr,es,de,it,pt,ar', // Support multiple languages
           headers: {
             'User-Agent': userAgent,
-            'Accept-Language': 'en-US,en;q=0.9'
+            'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8'
           }
         });
 
