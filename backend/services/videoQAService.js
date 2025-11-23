@@ -1344,20 +1344,29 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
 
     console.log(`[VideoQAService] Found ${relevantVideos.length} relevant videos`);
 
-    // 2. Detect language from videos and question
+    // 2. Fetch transcripts on-demand for videos that need them
+    await this.fetchTranscriptsForVideos(channelId, relevantVideos);
+
+    // 3. Detect language from videos and question
     const videoTranscripts = relevantVideos
       .filter(v => v.transcript)
-      .map(v => v.transcript)
+      .map(v => {
+        // Handle both transcript object and plain text
+        if (typeof v.transcript === 'object' && v.transcript.text) {
+          return v.transcript.text;
+        }
+        return v.transcript || '';
+      })
       .join(' ')
       .substring(0, 1000); // Sample from transcripts
 
     const detectedLanguage = userLanguage || this.detectLanguage(videoTranscripts, question);
     console.log('Detected language for channel Q&A:', detectedLanguage);
 
-    // 3. Build context from relevant videos
+    // 4. Build context from relevant videos
     const context = this.buildContextFromVideos(relevantVideos, question);
 
-    // 4. Generate AI response
+    // 5. Generate AI response
     const prompt = this.buildChannelPrompt(question, context, conversationHistory, detectedLanguage);
 
     try {
@@ -1381,6 +1390,98 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       console.error('[VideoQAService] Error generating channel answer:', error);
       throw error;
     }
+  }
+
+  /**
+   * Fetch transcripts on-demand for videos that need them
+   * Updates videos in place with fetched transcripts
+   */
+  async fetchTranscriptsForVideos(channelId, videos) {
+    const channelTranscriptService = require('./channelTranscriptService');
+    const { getFirestore } = require('../config/firestore');
+    const { firestore, useMockMode } = getFirestore();
+
+    // Find videos that need transcripts (status: 'metadata_only' or no transcript)
+    const videosNeedingTranscripts = videos.filter(v =>
+      v.status === 'metadata_only' || !v.transcript
+    );
+
+    if (videosNeedingTranscripts.length === 0) {
+      console.log('[VideoQAService] All relevant videos already have transcripts');
+      return;
+    }
+
+    console.log(`[VideoQAService] Fetching transcripts for ${videosNeedingTranscripts.length} videos on-demand...`);
+
+    // Fetch transcripts in parallel (limit to 5 concurrent to avoid bot detection)
+    const batchSize = 5;
+    for (let i = 0; i < videosNeedingTranscripts.length; i += batchSize) {
+      const batch = videosNeedingTranscripts.slice(i, i + batchSize);
+
+      await Promise.all(batch.map(async (video) => {
+        try {
+          console.log(`[VideoQAService] Fetching transcript for: ${video.title} (${video.videoId})`);
+
+          // Fetch transcript using channelTranscriptService
+          const transcriptData = await channelTranscriptService.fetchTranscript(video.videoId);
+
+          if (transcriptData.available) {
+            console.log(`[VideoQAService] ✓ Transcript fetched for ${video.videoId}`);
+
+            // Update video object in array (for immediate use)
+            video.transcript = transcriptData.text;
+            video.transcriptSegments = transcriptData.segments || [];
+            video.status = 'ready';
+
+            // Save to Firestore (for future use)
+            if (!useMockMode && firestore) {
+              const videoRef = firestore.collection('channels')
+                .doc(channelId)
+                .collection('videos')
+                .doc(video.videoId);
+
+              await videoRef.update({
+                transcript: transcriptData.text,
+                transcriptSegments: transcriptData.segments || [],
+                status: 'ready',
+                transcriptSource: transcriptData.source,
+                transcriptFetchedAt: new Date()
+              });
+
+              console.log(`[VideoQAService] ✓ Transcript saved to Firestore for ${video.videoId}`);
+            }
+          } else {
+            console.log(`[VideoQAService] ✗ No transcript available for ${video.videoId}: ${transcriptData.error}`);
+            // Update status to indicate no captions available
+            video.status = 'no_captions';
+
+            if (!useMockMode && firestore) {
+              const videoRef = firestore.collection('channels')
+                .doc(channelId)
+                .collection('videos')
+                .doc(video.videoId);
+
+              await videoRef.update({
+                status: 'no_captions',
+                transcriptError: transcriptData.error,
+                transcriptAttemptedAt: new Date()
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`[VideoQAService] Error fetching transcript for ${video.videoId}:`, error.message);
+          video.status = 'error';
+        }
+      }));
+
+      // Small delay between batches to avoid bot detection
+      if (i + batchSize < videosNeedingTranscripts.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    const successCount = videosNeedingTranscripts.filter(v => v.status === 'ready').length;
+    console.log(`[VideoQAService] ✓ Fetched ${successCount}/${videosNeedingTranscripts.length} transcripts successfully`);
   }
 
   /**
@@ -1518,23 +1619,32 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
         contextPart += `\nDescription: ${descriptionPreview}`;
       }
 
-      // Add transcript segments if available (optional enhancement)
-      if (video.transcript || video.transcriptSegments) {
+      // Add full transcript if available (on-demand fetched or previously cached)
+      if (video.status === 'ready' && (video.transcript || video.transcriptSegments)) {
+        // Extract relevant segments from transcript
         const relevantSegments = this.extractRelevantSegments(
           video.transcript,
           video.transcriptSegments,
           question,
-          5 // Max 5 segments per video
+          10 // Max 10 segments per video for better context
         );
 
         if (relevantSegments.length > 0) {
-          contextPart += `\n\nTranscript segments:\n${relevantSegments
+          contextPart += `\n\nMost relevant transcript segments:\n${relevantSegments
             .filter(seg => seg && seg.text)
             .map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`)
             .join('\n')}`;
+        } else if (video.transcript) {
+          // If no relevant segments found, include first part of transcript
+          const transcriptPreview = video.transcript.length > 500
+            ? video.transcript.substring(0, 500) + '...'
+            : video.transcript;
+          contextPart += `\n\nTranscript:\n${transcriptPreview}`;
         }
-      } else {
-        contextPart += `\n\n(Note: Full transcript pending. Answer based on title, description, and metadata)`;
+      } else if (video.status === 'no_captions') {
+        contextPart += `\n\n(Note: No captions available for this video. Insights based on title and description only)`;
+      } else if (video.status === 'metadata_only') {
+        contextPart += `\n\n(Note: Transcript not fetched yet. Insights based on metadata only)`;
       }
 
       return contextPart;
