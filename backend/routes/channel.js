@@ -87,11 +87,29 @@ router.post('/import', async (req, res) => {
     }
     await batch.commit();
 
+    // Create a project for this channel so user can chat with it
+    const projectId = channelData.channelId; // Use channel ID as project ID
+    const projectRef = firestore.collection('projects').doc(projectId);
+
+    await projectRef.set({
+      id: projectId,
+      type: 'channel',
+      channelId: channelData.channelId,
+      title: channelData.channelTitle,
+      author: channelData.channelTitle,
+      videoCount: channelData.videos.length,
+      status: 'ready',
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
     console.log(`[API] ✓ Channel import complete (instant): ${channelData.videos.length} videos`);
 
     res.json({
       success: true,
       data: {
+        projectId: projectId,
         channelId: channelData.channelId,
         channelTitle: channelData.channelTitle,
         totalVideos: channelData.videos.length,
