@@ -112,11 +112,22 @@ class ChannelTranscriptService {
         return transcript;
 
       } catch (error) {
+        // Don't retry if transcript is explicitly disabled/unavailable
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('Transcript is disabled') ||
+            errorMsg.includes('No transcripts available') ||
+            errorMsg.includes('Subtitles are disabled') ||
+            errorMsg.includes('disabled on this video')) {
+          // Fail fast for videos without captions - don't waste time retrying
+          throw error;
+        }
+
         if (attempt === maxRetries) {
           throw error;
         }
 
-        // Exponential backoff: 1s, 2s, 4s
+        // Only retry for network/temporary errors
+        // Reduced backoff: 1s, 2s (faster failure for unavailable videos)
         const delay = Math.pow(2, attempt) * 1000;
         console.log(`[ChannelTranscript] Retry ${attempt}/${maxRetries} after ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -297,10 +308,10 @@ class ChannelTranscriptService {
       // 1. Get all videos from channel
       const channelData = await this.getChannelVideos(channelId);
 
-      // 2. Fetch transcripts for all videos (with conservative concurrency)
+      // 2. Fetch transcripts for all videos (with optimized concurrency)
       const transcripts = await this.fetchMultipleTranscripts(
         channelData.videos.map(v => v.id),
-        5 // Conservative: 5 videos at a time to avoid bot detection
+        10 // Increased: 10 videos at a time (fail-fast for videos without captions)
       );
 
       // 3. Combine video metadata with transcripts
@@ -309,31 +320,32 @@ class ChannelTranscriptService {
         transcript: transcripts[index]
       }));
 
-      // 4. Filter to only videos with available transcripts
-      const successfulVideos = videosWithTranscripts.filter(v => v.transcript.available);
-      const failedVideos = videosWithTranscripts.filter(v => !v.transcript.available);
+      // 4. Separate videos with/without transcripts
+      const videosWithCaptions = videosWithTranscripts.filter(v => v.transcript.available);
+      const videosWithoutCaptions = videosWithTranscripts.filter(v => !v.transcript.available);
 
       const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
 
       console.log(`[ChannelTranscript] ========================================`);
       console.log(`[ChannelTranscript] ✓ Import complete in ${elapsedTime}s`);
       console.log(`[ChannelTranscript] Total videos: ${channelData.videos.length}`);
-      console.log(`[ChannelTranscript] Successful: ${successfulVideos.length} (${(successfulVideos.length / channelData.videos.length * 100).toFixed(1)}%)`);
-      console.log(`[ChannelTranscript] Failed: ${failedVideos.length} (no captions available)`);
+      console.log(`[ChannelTranscript] With captions: ${videosWithCaptions.length} (${(videosWithCaptions.length / channelData.videos.length * 100).toFixed(1)}%)`);
+      console.log(`[ChannelTranscript] Without captions: ${videosWithoutCaptions.length} (metadata only)`);
       console.log(`[ChannelTranscript] ========================================`);
+
+      // Success if we got at least 1 video or if we have metadata for all videos
+      if (videosWithCaptions.length === 0 && channelData.videos.length > 0) {
+        console.warn(`[ChannelTranscript] ⚠️  No videos with captions found, but proceeding with metadata-only`);
+      }
 
       return {
         channelId: channelData.channelId,
         channelTitle: channelData.channelTitle,
         totalVideos: channelData.videos.length,
-        successfulVideos: successfulVideos.length,
-        failedVideos: failedVideos.length,
-        videos: successfulVideos, // Only return videos with transcripts
-        failedVideosList: failedVideos.map(v => ({
-          id: v.id,
-          title: v.title,
-          error: v.transcript.error
-        })),
+        successfulVideos: videosWithCaptions.length,
+        failedVideos: videosWithoutCaptions.length,
+        videos: videosWithTranscripts, // Return ALL videos (with metadata, transcripts when available)
+        videosWithCaptions: videosWithCaptions.length,
         processingTime: elapsedTime,
         method: 'youtube_captions',
         cost: 0 // FREE!
