@@ -9,8 +9,123 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 /**
+ * Generate source guide for a channel
+ */
+async function generateChannelSourceGuide(projectDoc, project, firestore, res) {
+  try {
+    console.log('[SourceGuide] Generating channel source guide for:', project.channelId);
+
+    // Get channel data from Firestore
+    const channelDoc = await firestore.collection('channels').doc(project.channelId).get();
+
+    if (!channelDoc.exists) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+
+    const channel = channelDoc.data();
+
+    // Get sample videos (first 20 with transcripts)
+    const videosSnapshot = await firestore.collection('channels')
+      .doc(project.channelId)
+      .collection('videos')
+      .where('transcript', '!=', null)
+      .limit(20)
+      .get();
+
+    const videos = videosSnapshot.docs.map(doc => doc.data());
+
+    // Prepare content for analysis
+    const channelTitle = channel.channelTitle || project.title || 'YouTube Channel';
+    const videoCount = channel.totalVideos || videos.length;
+    const videoTitles = videos.map(v => v.title).slice(0, 15).join('\n- ');
+
+    // Get sample transcript excerpts
+    const transcriptSamples = videos
+      .filter(v => v.transcript)
+      .slice(0, 5)
+      .map(v => `"${v.title}": ${v.transcript.substring(0, 300)}...`)
+      .join('\n\n');
+
+    console.log('[SourceGuide] Analyzing channel with', videos.length, 'videos');
+
+    // Generate summary using Gemini
+    const prompt = `You are analyzing a YouTube channel to create a "Source Guide" - a concise overview that helps viewers quickly understand the channel's content and key themes.
+
+Channel: ${channelTitle}
+Total Videos: ${videoCount}
+
+Sample Video Titles:
+- ${videoTitles}
+
+Sample Content Excerpts:
+${transcriptSamples}
+
+Generate a source guide in the following JSON format:
+{
+  "summary": "A comprehensive 2-3 sentence summary highlighting the channel's main focus, content themes, and what viewers can expect to learn. Use bold markdown (**text**) to emphasize key topics or specializations.",
+  "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5", "Topic 6"]
+}
+
+Guidelines:
+- Summary should describe the overall channel theme and value proposition
+- Use bold markdown to emphasize the channel's main areas of expertise or focus
+- Key topics should represent recurring themes across videos (3-5 words max)
+- Generate 4-6 key topics that capture the channel's content diversity
+- Topics should be specific enough to guide questions (e.g., "AI content production" not just "AI")
+
+Return ONLY valid JSON, no additional text.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const responseText = response.text();
+    console.log('[SourceGuide] Gemini response for channel:', responseText);
+
+    // Parse the JSON response
+    let sourceGuide;
+    try {
+      let jsonText = responseText;
+      const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) ||
+                       responseText.match(/```\s*([\s\S]*?)\s*```/) ||
+                       responseText.match(/\{[\s\S]*\}/);
+
+      if (jsonMatch) {
+        jsonText = jsonMatch[1] || jsonMatch[0];
+      }
+
+      sourceGuide = JSON.parse(jsonText);
+    } catch (parseError) {
+      console.error('[SourceGuide] Failed to parse Gemini response:', parseError);
+      sourceGuide = {
+        summary: `This channel "${channelTitle}" contains ${videoCount} videos covering various topics.`,
+        keyTopics: ['Channel overview', 'Video topics', 'Key themes']
+      };
+    }
+
+    // Save to project document for future requests
+    await projectDoc.ref.update({
+      sourceGuide,
+      sourceGuideGeneratedAt: FieldValue.serverTimestamp()
+    });
+
+    console.log('[SourceGuide] Channel source guide generated and cached');
+
+    return res.json({
+      success: true,
+      sourceGuide
+    });
+
+  } catch (error) {
+    console.error('[SourceGuide] Error generating channel source guide:', error);
+    return res.status(500).json({
+      error: 'Failed to generate channel source guide',
+      message: error.message
+    });
+  }
+}
+
+/**
  * POST /api/source-guide
- * Generate a comprehensive source guide summary for a video
+ * Generate a comprehensive source guide summary for a video or channel
  */
 router.post('/', async (req, res) => {
   try {
@@ -47,6 +162,12 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Handle channels differently from single videos
+    if (project.type === 'channel') {
+      return await generateChannelSourceGuide(projectDoc, project, firestore, res);
+    }
+
+    // Single video logic
     // Check if transcript is available
     if (!project.transcript || !project.transcript.text) {
       return res.status(400).json({

@@ -118,35 +118,7 @@ export default function ChannelViewer({ channelId, onVideoSelect }: ChannelViewe
   }
 
   return (
-    <div className="space-y-6">
-      {/* Channel Header */}
-      {channelInfo && (
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl p-6">
-          <div className="flex items-start gap-4">
-            {channelInfo.thumbnailUrl && (
-              <img
-                src={channelInfo.thumbnailUrl}
-                alt={channelInfo.channelName}
-                className="w-20 h-20 rounded-full"
-              />
-            )}
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-2">{channelInfo.channelName}</h2>
-              <div className="flex items-center gap-4 text-sm opacity-90">
-                <span className="flex items-center gap-1">
-                  <Youtube className="w-4 h-4" />
-                  {channelInfo.videoCount} videos
-                </span>
-                <span className="flex items-center gap-1">
-                  <CheckCircle className="w-4 h-4" />
-                  {channelInfo.processedVideoCount} ready
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="space-y-4">
       {/* Video Count */}
       <div className="text-sm text-gray-600">
         Showing {videos.length} video{videos.length !== 1 ? 's' : ''}
@@ -193,7 +165,15 @@ export default function ChannelViewer({ channelId, onVideoSelect }: ChannelViewe
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <span>
                   {video.publishedAt
-                    ? new Date(video.publishedAt).toLocaleDateString()
+                    ? (() => {
+                        try {
+                          // Handle both Firestore timestamp and ISO string
+                          const date = video.publishedAt.toDate ? video.publishedAt.toDate() : new Date(video.publishedAt);
+                          return date.toLocaleDateString();
+                        } catch {
+                          return 'Unknown date';
+                        }
+                      })()
                     : 'Unknown date'}
                 </span>
                 {video.viewCount && (
