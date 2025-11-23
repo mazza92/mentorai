@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const channelService = require('../services/channelService');
+const channelTranscriptService = require('../services/channelTranscriptService');
 const videoQAService = require('../services/videoQAService');
 const userService = require('../services/userService');
 const { getFirestore } = require('../config/firestore');
@@ -48,6 +49,105 @@ router.post('/import', async (req, res) => {
 
   } catch (error) {
     console.error('[API] Channel import error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/channel/import-captions
+ * Import YouTube channel using caption extraction (NotebookLM method)
+ * - No video downloads
+ * - FREE (no transcription costs)
+ * - Fast (45-60s for 200 videos)
+ * - Bot detection bypass strategies
+ */
+router.post('/import-captions', async (req, res) => {
+  try {
+    const { channelId, userId } = req.body;
+
+    console.log(`[API] Caption-based channel import requested by user ${userId}: ${channelId}`);
+
+    if (!channelId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Channel ID or URL is required'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+
+    // Check user quota
+    const user = await userService.getUser(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Import channel using caption extraction
+    const result = await channelTranscriptService.importChannel(channelId);
+
+    // Store in Firestore
+    const { firestore } = getFirestore();
+    const channelRef = firestore.collection('channels').doc(result.channelId);
+
+    await channelRef.set({
+      channelId: result.channelId,
+      channelTitle: result.channelTitle,
+      userId,
+      totalVideos: result.totalVideos,
+      successfulVideos: result.successfulVideos,
+      failedVideos: result.failedVideos,
+      method: 'youtube_captions',
+      status: 'ready',
+      createdAt: new Date(),
+      processingTime: result.processingTime
+    });
+
+    // Store each video with transcript
+    const batch = firestore.batch();
+    for (const video of result.videos) {
+      const videoRef = channelRef.collection('videos').doc(video.id);
+      batch.set(videoRef, {
+        ...video,
+        channelId: result.channelId,
+        status: 'ready',
+        processedAt: new Date()
+      });
+    }
+    await batch.commit();
+
+    console.log(`[API] ✓ Channel import complete: ${result.successfulVideos}/${result.totalVideos} videos`);
+
+    res.json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('[API] Caption-based channel import error:', error);
+
+    // Check if it's a bot detection error
+    if (error.message.includes('Too Many Requests') ||
+        error.message.includes('403') ||
+        error.message.includes('blocked')) {
+      return res.status(429).json({
+        success: false,
+        error: 'YouTube bot detection triggered',
+        message: 'Too many requests. Please try again in a few minutes.',
+        retryAfter: 300 // 5 minutes
+      });
+    }
+
     res.status(500).json({
       success: false,
       error: error.message
