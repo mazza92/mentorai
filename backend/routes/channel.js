@@ -34,15 +34,6 @@ router.post('/import', async (req, res) => {
       });
     }
 
-    // Check user exists
-    const user = await userService.getUser(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
     // Extract channel ID from URL
     let channelId = channelUrl;
 
@@ -145,15 +136,6 @@ router.post('/import-captions', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'User ID is required'
-      });
-    }
-
-    // Check user quota
-    const user = await userService.getUser(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
       });
     }
 
@@ -312,8 +294,15 @@ router.post('/:channelId/question', async (req, res) => {
     // Get user's language preference
     let userLanguage = null;
     try {
-      const user = await userService.getUser(userId);
-      userLanguage = user?.languagePreference || null;
+      if (!userService.isAnonymousUser(userId)) {
+        const { firestore } = getFirestore();
+        if (firestore) {
+          const userDoc = await firestore.collection('users').doc(userId).get();
+          if (userDoc.exists) {
+            userLanguage = userDoc.data().languagePreference || null;
+          }
+        }
+      }
     } catch (error) {
       console.log('[API] Could not fetch user language preference:', error.message);
     }
