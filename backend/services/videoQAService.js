@@ -1320,7 +1320,7 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
    * @param {Array} conversationHistory - Previous Q&A exchanges
    * @returns {Promise<Object>} Answer with citations from multiple videos
    */
-  async answerQuestionForChannel(channelId, question, conversationHistory = []) {
+  async answerQuestionForChannel(channelId, question, conversationHistory = [], userLanguage = null) {
     console.log(`[VideoQAService] Answering channel question: "${question}"`);
 
     this.ensureInitialized();
@@ -1329,8 +1329,14 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
     const relevantVideos = await this.searchRelevantVideos(channelId, question);
 
     if (relevantVideos.length === 0) {
+      // Detect language for error message
+      const detectedLanguage = userLanguage || this.detectLanguage('', question);
+      const errorMessage = detectedLanguage === 'fr'
+        ? "Je n'ai pas trouvé de vidéos dans cette chaîne qui traitent de ce sujet. Pourriez-vous reformuler votre question?"
+        : "I couldn't find any videos in this channel that discuss that topic. Could you try rephrasing your question?";
+
       return {
-        answer: "I couldn't find any videos in this channel that discuss that topic. Could you try rephrasing your question?",
+        answer: errorMessage,
         sources: [],
         videosAnalyzed: 0
       };
@@ -1338,11 +1344,21 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
 
     console.log(`[VideoQAService] Found ${relevantVideos.length} relevant videos`);
 
-    // 2. Build context from relevant videos
+    // 2. Detect language from videos and question
+    const videoTranscripts = relevantVideos
+      .filter(v => v.transcript)
+      .map(v => v.transcript)
+      .join(' ')
+      .substring(0, 1000); // Sample from transcripts
+
+    const detectedLanguage = userLanguage || this.detectLanguage(videoTranscripts, question);
+    console.log('Detected language for channel Q&A:', detectedLanguage);
+
+    // 3. Build context from relevant videos
     const context = this.buildContextFromVideos(relevantVideos, question);
 
-    // 3. Generate AI response
-    const prompt = this.buildChannelPrompt(question, context, conversationHistory);
+    // 4. Generate AI response
+    const prompt = this.buildChannelPrompt(question, context, conversationHistory, detectedLanguage);
 
     try {
       if (!this.model) {
@@ -1590,14 +1606,47 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
   /**
    * Build prompt for channel Q&A
    */
-  buildChannelPrompt(question, context, conversationHistory) {
+  buildChannelPrompt(question, context, conversationHistory, language = 'en') {
     const historyContext = conversationHistory.length > 0
       ? `\nPrevious conversation:\n${conversationHistory.map(msg =>
         `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
       ).join('\n')}`
       : '';
 
+    // Language-specific instructions
+    const isFrench = language === 'fr';
+    const languageInstruction = isFrench
+      ? `IMPORTANT: L'utilisateur parle français. Répondez TOUJOURS en français, même si le contenu des vidéos est en anglais. Traduisez les informations nécessaires.`
+      : `IMPORTANT: Always respond in English.`;
+
+    const instructions = isFrench
+      ? `Instructions:
+1. Répondez en français en vous basant sur les informations fournies ci-dessus
+2. Pour les vidéos avec transcriptions complètes, synthétisez des insights détaillés et incluez des horodatages
+3. Pour les vidéos avec métadonnées seulement, fournissez des insights basés sur les titres, descriptions et statistiques
+4. Incluez des citations au format: [Titre de la vidéo] ou [Titre de la vidéo @ MM:SS]
+5. Synthétisez les informations de plusieurs vidéos quand c'est pertinent
+6. Si la question ne peut pas être répondue, suggérez des sujets connexes de la chaîne
+7. Soyez concis mais complet
+8. Citez toujours vos sources avec les titres des vidéos`
+      : `Instructions:
+1. Answer based on the information provided above (metadata, descriptions, and transcript segments when available)
+2. For videos with full transcripts, synthesize detailed insights and include timestamps
+3. For videos with metadata only, provide insights based on titles, descriptions, and statistics
+4. Include citations in the format: [Video Title] or [Video Title @ MM:SS] when timestamps are available
+5. If a video has pending transcripts, acknowledge it but still provide value from available metadata
+6. Synthesize information across multiple videos when relevant
+7. If the question cannot be answered from the provided information, suggest related topics from the channel
+8. Be concise but comprehensive
+9. Always cite your sources with video titles`;
+
+    const finalPrompt = isFrench
+      ? `Réponse en français:`
+      : `Answer:`;
+
     return `You are an AI assistant helping users understand content from a YouTube channel. You have access to video metadata (titles, descriptions, statistics) and transcripts when available.
+
+${languageInstruction}
 
 ${historyContext}
 
@@ -1607,18 +1656,9 @@ ${context}
 
 User question: ${question}
 
-Instructions:
-1. Answer based on the information provided above (metadata, descriptions, and transcript segments when available)
-2. For videos with full transcripts, synthesize detailed insights and include timestamps
-3. For videos with metadata only, provide insights based on titles, descriptions, and statistics
-4. Include citations in the format: [Video Title] or [Video Title @ MM:SS] when timestamps are available
-5. If a video has pending transcripts, acknowledge it but still provide value from available metadata
-6. Synthesize information across multiple videos when relevant
-7. If the question cannot be answered from the provided information, suggest related topics from the channel
-8. Be concise but comprehensive
-9. Always cite your sources with video titles
+${instructions}
 
-Answer:`;
+${finalPrompt}`;
   }
 
   /**

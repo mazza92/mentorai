@@ -309,11 +309,21 @@ router.post('/:channelId/question', async (req, res) => {
       });
     }
 
+    // Get user's language preference
+    let userLanguage = null;
+    try {
+      const user = await userService.getUser(userId);
+      userLanguage = user?.languagePreference || null;
+    } catch (error) {
+      console.log('[API] Could not fetch user language preference:', error.message);
+    }
+
     // Answer question using enhanced videoQAService
     const result = await videoQAService.answerQuestionForChannel(
       channelId,
       question,
-      conversationHistory || []
+      conversationHistory || [],
+      userLanguage
     );
 
     // Increment quota

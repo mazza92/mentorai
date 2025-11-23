@@ -127,6 +127,7 @@ interface VideoMetadata {
   thumbnail?: string
   summary?: string
   keyTopics?: string[]
+  videoCount?: number // For channels
 }
 
 interface Topic {
@@ -376,7 +377,30 @@ const ContextPanel = ({
       
       {/* Channel Videos OR Transcript */}
       {isChannel && channelId ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Channel metadata header */}
+          {metadata && (metadata.title || metadata.author) && (
+            <div className="space-y-2 pb-4 border-b border-slate-200/80">
+              <div className="flex items-center flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-slate-600">
+                {metadata.author && (
+                  <div className="flex items-center">
+                    <Youtube className="w-4 h-4 mr-1.5 text-red-500" />
+                    <span className="text-slate-700">{metadata.author}</span>
+                  </div>
+                )}
+                {metadata.videoCount !== undefined && (
+                  <span className="text-slate-600">{metadata.videoCount} videos</span>
+                )}
+                {metadata.subscribers && (
+                  <span className="text-slate-600">{metadata.subscribers} subscribers</span>
+                )}
+              </div>
+              {metadata.title && (
+                <h1 className="text-xl font-bold text-slate-900 leading-snug">{metadata.title}</h1>
+              )}
+            </div>
+          )}
+
           <h2 className="text-lg font-semibold text-slate-900 flex items-center mb-4">
             <div className="p-1.5 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 mr-2.5">
               <Youtube className="w-4 h-4 text-white" />
@@ -1836,9 +1860,10 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
         url: projectData.youtubeUrl || projectData.publicUrl,
         thumbnail: thumbnailUrl,
         summary: projectData.videoAnalysis?.summary || (projectData.description ? (projectData.description.length > 300 ? projectData.description.substring(0, 300) + '...' : projectData.description) : undefined),
-        keyTopics: projectData.videoAnalysis?.keyTopics || []
+        keyTopics: projectData.videoAnalysis?.keyTopics || [],
+        videoCount: projectData.type === 'channel' ? projectData.videoCount : undefined // Add video count for channels
       }
-      
+
       console.log('✅ Final metadata.thumbnail:', videoMetadata.thumbnail)
       setMetadata(videoMetadata)
       
