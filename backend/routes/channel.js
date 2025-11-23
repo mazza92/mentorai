@@ -8,13 +8,17 @@ const { getFirestore } = require('../config/firestore');
 
 /**
  * POST /api/channel/import
- * Import full YouTube channel
+ * Import YouTube channel using caption extraction (cookie-free!)
+ * - Uses youtube-transcript package (no cookies needed, no bot detection)
+ * - No video downloads
+ * - FREE (no transcription costs)
+ * - Fast (45-60s for 200 videos)
  */
 router.post('/import', async (req, res) => {
   try {
     const { channelUrl, userId } = req.body;
 
-    console.log(`[API] Channel import requested by user ${userId}`);
+    console.log(`[API] Caption-based channel import requested by user ${userId}: ${channelUrl}`);
 
     if (!channelUrl) {
       return res.status(400).json({
@@ -30,8 +34,64 @@ router.post('/import', async (req, res) => {
       });
     }
 
-    // Import channel (async process)
-    const result = await channelService.importChannel(channelUrl, userId);
+    // Check user exists
+    const user = await userService.getUser(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Extract channel ID from URL
+    let channelId = channelUrl;
+
+    // Handle different URL formats
+    if (channelUrl.includes('youtube.com')) {
+      if (channelUrl.includes('/channel/')) {
+        channelId = channelUrl.split('/channel/')[1].split('/')[0].split('?')[0];
+      } else if (channelUrl.includes('/@')) {
+        // Handle @username format - let channelTranscriptService resolve it
+        channelId = channelUrl.split('/@')[1].split('/')[0].split('?')[0];
+      }
+    }
+
+    console.log(`[API] Resolved channel ID: ${channelId}`);
+
+    // Import channel using caption extraction (NO COOKIES, NO VIDEO DOWNLOADS!)
+    const result = await channelTranscriptService.importChannel(channelId);
+
+    // Store in Firestore
+    const { firestore } = getFirestore();
+    const channelRef = firestore.collection('channels').doc(result.channelId);
+
+    await channelRef.set({
+      channelId: result.channelId,
+      channelTitle: result.channelTitle,
+      userId,
+      totalVideos: result.totalVideos,
+      successfulVideos: result.successfulVideos,
+      failedVideos: result.failedVideos,
+      method: 'youtube_captions',
+      status: 'ready',
+      createdAt: new Date(),
+      processingTime: result.processingTime
+    });
+
+    // Store each video with transcript
+    const batch = firestore.batch();
+    for (const video of result.videos) {
+      const videoRef = channelRef.collection('videos').doc(video.id);
+      batch.set(videoRef, {
+        ...video,
+        channelId: result.channelId,
+        status: 'ready',
+        processedAt: new Date()
+      });
+    }
+    await batch.commit();
+
+    console.log(`[API] ✓ Channel import complete: ${result.successfulVideos}/${result.totalVideos} videos`);
 
     res.json({
       success: true,
@@ -40,6 +100,19 @@ router.post('/import', async (req, res) => {
 
   } catch (error) {
     console.error('[API] Channel import error:', error);
+
+    // Check if it's a bot detection error
+    if (error.message.includes('Too Many Requests') ||
+        error.message.includes('403') ||
+        error.message.includes('blocked')) {
+      return res.status(429).json({
+        success: false,
+        error: 'YouTube rate limit reached',
+        message: 'Too many requests. Please try again in a few minutes.',
+        retryAfter: 300
+      });
+    }
+
     res.status(500).json({
       success: false,
       error: error.message
