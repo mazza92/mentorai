@@ -111,8 +111,11 @@ router.post('/import', async (req, res) => {
       data: {
         projectId: projectId,
         channelId: channelData.channelId,
+        channelName: channelData.channelTitle, // Frontend expects channelName
         channelTitle: channelData.channelTitle,
+        videoCount: channelData.videos.length, // Frontend expects videoCount
         totalVideos: channelData.videos.length,
+        status: 'ready', // Frontend expects status
         method: 'metadata_only',
         message: 'Channel imported instantly! Transcripts will be fetched as needed.'
       }
