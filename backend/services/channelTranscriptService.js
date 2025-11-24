@@ -1,4 +1,4 @@
-const { getSubtitles } = require('youtube-captions-scraper');
+const axios = require('axios');
 const { google } = require('googleapis');
 
 /**
@@ -83,8 +83,79 @@ class ChannelTranscriptService {
   }
 
   /**
+   * Fetch captions directly from YouTube with proper browser headers
+   * This bypasses IP-based blocking by mimicking a real browser
+   * @param {string} videoId
+   * @returns {Promise<Array>}
+   */
+  async fetchCaptionsWithHeaders(videoId) {
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+    // Fetch video page with realistic browser headers
+    const { data } = await axios.get(videoUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      }
+    });
+
+    // Extract ytInitialPlayerResponse from page HTML
+    const match = data.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
+    if (!match) {
+      throw new Error('Could not find player response in page');
+    }
+
+    const playerResponse = JSON.parse(match[1]);
+
+    // Get caption tracks
+    const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    if (!captionTracks || captionTracks.length === 0) {
+      throw new Error('No captions available for this video');
+    }
+
+    // Get the first available caption track (usually auto-generated or English)
+    const captionTrack = captionTracks[0];
+    const captionUrl = captionTrack.baseUrl;
+
+    // Fetch the actual captions
+    const { data: captionsXml } = await axios.get(captionUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      }
+    });
+
+    // Parse XML captions (simplified XML parsing)
+    const captionMatches = [...captionsXml.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g)];
+
+    const transcript = captionMatches.map(match => ({
+      text: this.decodeHtml(match[3]),
+      offset: parseFloat(match[1]) * 1000, // Convert to milliseconds
+      duration: parseFloat(match[2]) * 1000
+    }));
+
+    return transcript;
+  }
+
+  /**
+   * Decode HTML entities in caption text
+   */
+  decodeHtml(html) {
+    return html
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]*>/g, ''); // Remove any remaining HTML tags
+  }
+
+  /**
    * Fetch transcript with retry logic and exponential backoff
-   * Uses youtube-captions-scraper which bypasses bot detection better
+   * Uses direct axios requests with proper browser headers
    * @param {string} videoId
    * @param {number} maxRetries
    * @returns {Promise<Array>}
@@ -94,19 +165,8 @@ class ChannelTranscriptService {
       try {
         console.log(`[ChannelTranscript] Attempt ${attempt}/${maxRetries} for ${videoId}`);
 
-        // Use youtube-captions-scraper - it scrapes like a browser
-        // This bypasses bot detection better than youtube-transcript
-        const subtitles = await getSubtitles({
-          videoID: videoId,
-          // Don't specify lang to get auto-generated captions in any language
-        });
-
-        // Convert to our expected format
-        const transcript = subtitles.map(sub => ({
-          text: sub.text,
-          offset: parseFloat(sub.start) * 1000, // Convert seconds to milliseconds
-          duration: parseFloat(sub.dur) * 1000
-        }));
+        // Use custom caption fetching with proper headers
+        const transcript = await this.fetchCaptionsWithHeaders(videoId);
 
         console.log(`[ChannelTranscript] ✓ Successfully fetched ${transcript.length} caption segments for ${videoId}`);
         return transcript;
@@ -115,9 +175,8 @@ class ChannelTranscriptService {
         const errorMsg = error.message || '';
 
         // Check if captions are genuinely unavailable
-        if (errorMsg.includes('Could not find captions') ||
-            errorMsg.includes('No captions found') ||
-            errorMsg.includes('Subtitles are disabled')) {
+        if (errorMsg.includes('No captions available') ||
+            errorMsg.includes('Could not find player response')) {
           console.log(`[ChannelTranscript] No captions available for ${videoId}`);
           throw new Error(`No captions available for this video`);
         }
