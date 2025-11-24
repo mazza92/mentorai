@@ -87,21 +87,24 @@ class ChannelTranscriptService {
    * Fetch captions using yt-dlp (most reliable method)
    * yt-dlp is the gold standard for YouTube content extraction
    * @param {string} videoId
+   * @param {string} browser - Browser to extract cookies from (chrome, firefox, edge, safari)
    * @returns {Promise<Array>}
    */
-  async fetchCaptionsWithYtDlp(videoId) {
+  async fetchCaptionsWithYtDlp(videoId, browser = 'chrome') {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
     try {
       // Use yt-dlp to extract subtitles without downloading video
+      // Using browser cookies to bypass YouTube bot detection
       const output = await youtubedl(videoUrl, {
         dumpSingleJson: true,
         skipDownload: true,
         writeAutoSub: true,
         subLang: 'en,fr,es,de,it,pt,ar', // Try multiple languages
         noWarnings: true,
-        preferFreeFormats: true,
-        youtubeSkipDashManifest: true,
+        // Extract cookies from browser to authenticate as real user
+        // This bypasses YouTube's bot detection
+        cookiesFromBrowser: browser,
       });
 
       // Extract subtitles from output
@@ -244,23 +247,28 @@ class ChannelTranscriptService {
 
   /**
    * Fetch transcript with retry logic and exponential backoff
-   * Tries yt-dlp first (most reliable), then falls back to axios scraping
+   * Tries yt-dlp with browser cookies first, then falls back to axios scraping
    * @param {string} videoId
    * @param {number} maxRetries
    * @returns {Promise<Array>}
    */
   async fetchWithRetry(videoId, maxRetries = 2) {
-    // Try yt-dlp first (most reliable method)
-    try {
-      console.log(`[ChannelTranscript] Using yt-dlp for ${videoId}`);
-      const transcript = await this.fetchCaptionsWithYtDlp(videoId);
+    // Try yt-dlp with multiple browsers (most reliable method)
+    const browsers = ['chrome', 'firefox', 'edge'];
 
-      if (transcript && transcript.length > 0) {
-        console.log(`[ChannelTranscript] ✓ yt-dlp: Successfully fetched ${transcript.length} caption segments`);
-        return transcript;
+    for (const browser of browsers) {
+      try {
+        console.log(`[ChannelTranscript] Using yt-dlp (${browser} cookies) for ${videoId}`);
+        const transcript = await this.fetchCaptionsWithYtDlp(videoId, browser);
+
+        if (transcript && transcript.length > 0) {
+          console.log(`[ChannelTranscript] ✓ yt-dlp (${browser}): Successfully fetched ${transcript.length} caption segments`);
+          return transcript;
+        }
+      } catch (ytdlpError) {
+        console.log(`[ChannelTranscript] yt-dlp (${browser}) failed for ${videoId}: ${ytdlpError.message}`);
+        // Try next browser
       }
-    } catch (ytdlpError) {
-      console.log(`[ChannelTranscript] yt-dlp failed for ${videoId}, trying fallback: ${ytdlpError.message}`);
     }
 
     // Fallback to axios scraping with retries
