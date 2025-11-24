@@ -122,6 +122,7 @@ app.use('/api/source-guide', require('./routes/sourceGuide')); // Source guide s
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/user', require('./routes/user'));
 app.use('/api/conversations', require('./routes/conversations'));
+app.use('/api/triple-index', require('./routes/tripleIndexRoutes')); // Triple-layered index for channel imports
 app.use('/api/export', require('./routes/export'));
 app.use('/api/subscriptions', subscriptionsRouter); // Stripe subscriptions (webhook is registered above with raw body)
 app.use('/api/channel', channelLimiter, require('./routes/channel')); // YouTube channel import

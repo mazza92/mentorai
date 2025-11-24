@@ -1,0 +1,4 @@
+# Python dependencies for caption fetching
+# Install with: pip install -r requirements.txt
+
+youtube-transcript-api==0.6.2

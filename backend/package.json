@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test:cookies": "node test-cookies.js"
+    "test:cookies": "node test-cookies.js",
+    "postinstall": "pip3 install -r requirements.txt || pip install -r requirements.txt || echo 'Warning: Could not install Python dependencies'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.69.0",
@@ -25,6 +26,7 @@
     "helmet": "^8.1.0",
     "multer": "^1.4.5-lts.1",
     "openai": "^6.9.0",
+    "puppeteer": "^24.31.0",
     "stripe": "^19.3.1",
     "uuid": "^9.0.1",
     "youtube-captions-scraper": "^2.0.3",

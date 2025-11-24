@@ -1,6 +1,8 @@
 const axios = require('axios');
 const { google } = require('googleapis');
 const youtubedl = require('youtube-dl-exec');
+const captionFetcher = require('./captionFetcher');
+const puppeteerCaptionFetcher = require('./puppeteerCaptionFetcher');
 
 /**
  * Channel Transcript Service
@@ -9,14 +11,15 @@ const youtubedl = require('youtube-dl-exec');
  *
  * Key advantages:
  * - FREE (no transcription costs)
- * - Fast (0.3s per video vs 2-4 minutes)
+ * - Fast (2-3s per video vs 2-4 minutes)
  * - No video downloads needed
+ * - NO COOKIES REQUIRED - uses real browser automation
+ * - TRULY SCALABLE - no cookie maintenance/expiration
  *
- * Bot detection mitigation:
- * - Uses youtube-transcript (mimics browser better than yt-dlp)
- * - Rate limiting between requests
- * - Exponential backoff on failures
- * - User agent rotation
+ * Primary method: Puppeteer (real headless browser - undetectable)
+ * Fallback 1: Python youtube-transcript-api
+ * Fallback 2: yt-dlp with browser cookies (local only)
+ * Fallback 3: axios scraping with headers
  */
 class ChannelTranscriptService {
   constructor() {
@@ -247,15 +250,44 @@ class ChannelTranscriptService {
 
   /**
    * Fetch transcript with retry logic and exponential backoff
-   * Tries yt-dlp with browser cookies first, then falls back to axios scraping
+   * Tries Puppeteer first (most reliable), then Python API, then yt-dlp, then axios
    * @param {string} videoId
    * @param {number} maxRetries
    * @returns {Promise<Array>}
    */
   async fetchWithRetry(videoId, maxRetries = 2) {
-    // Try yt-dlp with multiple browsers (most reliable method)
-    const browsers = ['chrome', 'firefox', 'edge'];
+    // METHOD 1: Try Puppeteer (REAL BROWSER - most reliable, works everywhere!)
+    try {
+      console.log(`[ChannelTranscript] Using Puppeteer (real browser) for ${videoId}`);
+      const result = await puppeteerCaptionFetcher.fetchCaptions(videoId);
 
+      if (result.success && result.segments && result.segments.length > 0) {
+        console.log(`[ChannelTranscript] ✓ Puppeteer: Successfully fetched ${result.segments.length} caption segments (${result.charCount} chars)`);
+        return result.segments;
+      } else {
+        console.log(`[ChannelTranscript] Puppeteer returned no segments for ${videoId}: ${result.error || 'Unknown error'}`);
+      }
+    } catch (puppeteerError) {
+      console.log(`[ChannelTranscript] Puppeteer failed for ${videoId}: ${puppeteerError.message}`);
+    }
+
+    // METHOD 2: Try Python youtube-transcript-api (lightweight fallback)
+    try {
+      console.log(`[ChannelTranscript] Using Python transcript-api for ${videoId}`);
+      const result = await captionFetcher.fetchTranscript(videoId);
+
+      if (result.success && result.segments && result.segments.length > 0) {
+        console.log(`[ChannelTranscript] ✓ Python API: Successfully fetched ${result.segments.length} caption segments (${result.charCount} chars)`);
+        return result.segments;
+      } else {
+        console.log(`[ChannelTranscript] Python API returned no segments for ${videoId}: ${result.error || 'Unknown error'}`);
+      }
+    } catch (pythonError) {
+      console.log(`[ChannelTranscript] Python API failed for ${videoId}: ${pythonError.message}`);
+    }
+
+    // METHOD 3: Try yt-dlp with browser cookies (only works locally, not on Railway)
+    const browsers = ['chrome', 'firefox', 'edge'];
     for (const browser of browsers) {
       try {
         console.log(`[ChannelTranscript] Using yt-dlp (${browser} cookies) for ${videoId}`);
@@ -271,7 +303,7 @@ class ChannelTranscriptService {
       }
     }
 
-    // Fallback to axios scraping with retries
+    // METHOD 3: Fallback to axios scraping with retries (last resort)
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[ChannelTranscript] Fallback attempt ${attempt}/${maxRetries} for ${videoId}`);
