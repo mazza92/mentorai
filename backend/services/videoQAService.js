@@ -1596,6 +1596,9 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
    * Build context from relevant videos
    */
   buildContextFromVideos(videos, question) {
+    let videosWithTranscripts = 0;
+    let videosWithoutTranscripts = 0;
+
     const contextParts = videos.map((video, index) => {
       const publishDate = video.publishedAt?.toDate ? video.publishedAt.toDate() : new Date(video.publishedAt);
       const stats = [];
@@ -1620,35 +1623,53 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
       }
 
       // Add full transcript if available (on-demand fetched or previously cached)
-      if (video.status === 'ready' && (video.transcript || video.transcriptSegments)) {
+      const hasTranscript = video.status === 'ready' && video.transcript;
+
+      if (hasTranscript) {
+        videosWithTranscripts++;
+
+        // Get transcript text
+        const transcriptText = typeof video.transcript === 'object' && video.transcript.text
+          ? video.transcript.text
+          : video.transcript;
+
         // Extract relevant segments from transcript
         const relevantSegments = this.extractRelevantSegments(
-          video.transcript,
+          transcriptText,
           video.transcriptSegments,
           question,
-          10 // Max 10 segments per video for better context
+          15 // Increased: Max 15 segments per video for richer context
         );
+
+        console.log(`[VideoQAService] Video "${video.title}": ${relevantSegments.length} relevant segments found`);
 
         if (relevantSegments.length > 0) {
           contextPart += `\n\nMost relevant transcript segments:\n${relevantSegments
             .filter(seg => seg && seg.text)
             .map(seg => `[${this.secondsToTime(seg.start)}] ${seg.text}`)
             .join('\n')}`;
-        } else if (video.transcript) {
-          // If no relevant segments found, include first part of transcript
-          const transcriptPreview = video.transcript.length > 500
-            ? video.transcript.substring(0, 500) + '...'
-            : video.transcript;
-          contextPart += `\n\nTranscript:\n${transcriptPreview}`;
+        } else {
+          // If no relevant segments found, include substantial portion of transcript
+          const transcriptPreview = transcriptText.length > 2000
+            ? transcriptText.substring(0, 2000) + '...'
+            : transcriptText;
+          contextPart += `\n\nFull transcript excerpt:\n${transcriptPreview}`;
+          console.log(`[VideoQAService] Video "${video.title}": No specific segments, using ${transcriptPreview.length} chars of transcript`);
         }
-      } else if (video.status === 'no_captions') {
-        contextPart += `\n\n(Note: No captions available for this video. Insights based on title and description only)`;
-      } else if (video.status === 'metadata_only') {
-        contextPart += `\n\n(Note: Transcript not fetched yet. Insights based on metadata only)`;
+      } else {
+        videosWithoutTranscripts++;
+
+        if (video.status === 'no_captions') {
+          contextPart += `\n\n(Note: No captions available for this video. Insights based on title and description only)`;
+        } else if (video.status === 'metadata_only') {
+          contextPart += `\n\n(Note: Transcript not fetched yet. Insights based on metadata only)`;
+        }
       }
 
       return contextPart;
     });
+
+    console.log(`[VideoQAService] Context built: ${videosWithTranscripts} videos with transcripts, ${videosWithoutTranscripts} without`);
 
     return contextParts.join('\n---\n');
   }
@@ -1730,25 +1751,22 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
       : `IMPORTANT: Always respond in English.`;
 
     const instructions = isFrench
-      ? `Instructions:
-1. Répondez en français en vous basant sur les informations fournies ci-dessus
-2. Pour les vidéos avec transcriptions complètes, synthétisez des insights détaillés et incluez des horodatages
-3. Pour les vidéos avec métadonnées seulement, fournissez des insights basés sur les titres, descriptions et statistiques
-4. Incluez des citations au format: [Titre de la vidéo] ou [Titre de la vidéo @ MM:SS]
-5. Synthétisez les informations de plusieurs vidéos quand c'est pertinent
-6. Si la question ne peut pas être répondue, suggérez des sujets connexes de la chaîne
-7. Soyez concis mais complet
-8. Citez toujours vos sources avec les titres des vidéos`
-      : `Instructions:
-1. Answer based on the information provided above (metadata, descriptions, and transcript segments when available)
-2. For videos with full transcripts, synthesize detailed insights and include timestamps
-3. For videos with metadata only, provide insights based on titles, descriptions, and statistics
-4. Include citations in the format: [Video Title] or [Video Title @ MM:SS] when timestamps are available
-5. If a video has pending transcripts, acknowledge it but still provide value from available metadata
-6. Synthesize information across multiple videos when relevant
-7. If the question cannot be answered from the provided information, suggest related topics from the channel
-8. Be concise but comprehensive
-9. Always cite your sources with video titles`;
+      ? `Instructions CRITIQUES:
+1. PRIORITÉ ABSOLUE: Utilisez les transcriptions complètes fournies ci-dessus pour extraire des insights détaillés, des étapes spécifiques, et des conseils actionnables
+2. Extrayez les ÉTAPES CONCRÈTES, CONSEILS PRATIQUES, et TECHNIQUES mentionnées dans les transcriptions
+3. Pour les questions demandant des "étapes" ou "tips actionnables", listez les points spécifiques mentionnés dans le contenu vidéo, PAS juste les titres
+4. Incluez des horodatages au format [Titre @ MM:SS] pour chaque insight provenant d'une transcription
+5. Si une vidéo n'a que des métadonnées, indiquez-le clairement et basez-vous sur le titre/description
+6. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
+7. Répondez TOUJOURS en français, même si le contenu est en anglais`
+      : `CRITICAL Instructions:
+1. TOP PRIORITY: Use the full transcript content provided above to extract detailed insights, specific steps, and actionable advice
+2. Extract CONCRETE STEPS, PRACTICAL TIPS, and TECHNIQUES mentioned in the transcript content
+3. For questions asking for "steps" or "actionable tips", list the specific points mentioned in the video content, NOT just video titles
+4. Include timestamps in format [Video Title @ MM:SS] for each insight from transcripts
+5. If a video has only metadata, clearly indicate this and base insights on title/description
+6. Synthesize information across multiple videos for comprehensive answers
+7. Always cite your sources with video titles and timestamps when available`;
 
     const finalPrompt = isFrench
       ? `Réponse en français:`
