@@ -141,44 +141,83 @@ class PuppeteerCaptionFetcher {
         };
       }
 
-      // Fetch caption content - YouTube now returns JSON3 format
-      const captionUrl = captionData.captionUrl + '&fmt=json3';
-      const captionResponse = await page.goto(captionUrl, {
-        waitUntil: 'networkidle0',
-        timeout: 15000
-      });
+      // Try both XML and JSON3 formats
+      let captionContent = null;
+      let captionFormat = null;
 
-      const captionContent = await captionResponse.text();
-
-      // Debug
-      console.log(`[PuppeteerCaptionFetcher] Caption format preview: ${captionContent.substring(0, 200)}...`);
-
-      // Parse JSON3 format
-      let segments = [];
+      // First try XML format (more reliable)
       try {
-        const json3Data = JSON.parse(captionContent);
+        const xmlUrl = captionData.captionUrl;
+        captionContent = await page.evaluate(async (url) => {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return await response.text();
+        }, xmlUrl);
+        captionFormat = 'xml';
+        console.log(`[PuppeteerCaptionFetcher] ✓ Fetched XML format`);
+      } catch (xmlError) {
+        console.log(`[PuppeteerCaptionFetcher] XML format failed: ${xmlError.message}`);
 
-        if (json3Data.events) {
-          for (const event of json3Data.events) {
-            if (event.segs) {
-              const text = event.segs.map(seg => seg.utf8).join('');
-              if (text.trim()) {
-                segments.push({
-                  text: text.trim(),
-                  offset: event.tStartMs || 0,
-                  duration: event.dDurationMs || 0
-                });
+        // Fallback to JSON3
+        try {
+          const json3Url = captionData.captionUrl + '&fmt=json3';
+          captionContent = await page.evaluate(async (url) => {
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return await response.text();
+          }, json3Url);
+          captionFormat = 'json3';
+          console.log(`[PuppeteerCaptionFetcher] ✓ Fetched JSON3 format`);
+        } catch (json3Error) {
+          console.log(`[PuppeteerCaptionFetcher] JSON3 format also failed: ${json3Error.message}`);
+          throw new Error('Both caption formats failed to fetch');
+        }
+      }
+
+      if (!captionContent || captionContent.length === 0) {
+        throw new Error('Caption content is empty');
+      }
+
+      const captionUrl = captionData.captionUrl;
+
+      // Debug - show more of the response
+      console.log(`[PuppeteerCaptionFetcher] Caption URL: ${captionUrl}`);
+      console.log(`[PuppeteerCaptionFetcher] Caption response length: ${captionContent.length} bytes`);
+      console.log(`[PuppeteerCaptionFetcher] Caption format preview: ${captionContent.substring(0, 500)}...`);
+
+      // Parse caption content based on format
+      let segments = [];
+
+      if (captionFormat === 'json3') {
+        try {
+          const json3Data = JSON.parse(captionContent);
+
+          if (json3Data.events) {
+            for (const event of json3Data.events) {
+              if (event.segs) {
+                const text = event.segs.map(seg => seg.utf8).join('');
+                if (text.trim()) {
+                  segments.push({
+                    text: text.trim(),
+                    offset: event.tStartMs || 0,
+                    duration: event.dDurationMs || 0
+                  });
+                }
               }
             }
           }
+
+          console.log(`[PuppeteerCaptionFetcher] Parsed ${segments.length} segments from JSON3`);
+
+        } catch (jsonError) {
+          console.log(`[PuppeteerCaptionFetcher] JSON3 parsing failed: ${jsonError.message}`);
         }
-
-        console.log(`[PuppeteerCaptionFetcher] Parsed ${segments.length} segments from JSON3`);
-
-      } catch (jsonError) {
-        console.log(`[PuppeteerCaptionFetcher] JSON parsing failed, trying XML...`);
-
-        // Fallback to XML parsing
+      } else if (captionFormat === 'xml') {
+        // Parse XML format
         const captionMatches = [...captionContent.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g)];
 
         segments = captionMatches.map(match => ({
