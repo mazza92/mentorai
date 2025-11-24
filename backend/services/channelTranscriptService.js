@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { google } = require('googleapis');
+const youtubedl = require('youtube-dl-exec');
 
 /**
  * Channel Transcript Service
@@ -83,8 +84,92 @@ class ChannelTranscriptService {
   }
 
   /**
+   * Fetch captions using yt-dlp (most reliable method)
+   * yt-dlp is the gold standard for YouTube content extraction
+   * @param {string} videoId
+   * @returns {Promise<Array>}
+   */
+  async fetchCaptionsWithYtDlp(videoId) {
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+    try {
+      // Use yt-dlp to extract subtitles without downloading video
+      const output = await youtubedl(videoUrl, {
+        dumpSingleJson: true,
+        skipDownload: true,
+        writeAutoSub: true,
+        subLang: 'en,fr,es,de,it,pt,ar', // Try multiple languages
+        noWarnings: true,
+        preferFreeFormats: true,
+        youtubeSkipDashManifest: true,
+      });
+
+      // Extract subtitles from output
+      if (!output.subtitles && !output.automatic_captions) {
+        throw new Error('No captions available');
+      }
+
+      // Get auto-generated captions or manual subtitles
+      const captions = output.automatic_captions || output.subtitles;
+
+      // Try to get English first, then any available language
+      let captionData = null;
+      for (const lang of ['en', 'fr', 'es', 'de', 'it', 'pt', 'ar']) {
+        if (captions[lang]) {
+          captionData = captions[lang];
+          break;
+        }
+      }
+
+      // If no specific language, get first available
+      if (!captionData) {
+        const firstLang = Object.keys(captions)[0];
+        if (firstLang) {
+          captionData = captions[firstLang];
+        }
+      }
+
+      if (!captionData || captionData.length === 0) {
+        throw new Error('No caption data found');
+      }
+
+      // Get JSON3 format (has text and timestamps)
+      const json3Format = captionData.find(c => c.ext === 'json3');
+      if (!json3Format) {
+        throw new Error('No JSON3 caption format available');
+      }
+
+      // Fetch the actual caption content
+      const { data: captionContent } = await axios.get(json3Format.url);
+
+      // Parse JSON3 format captions
+      const transcript = [];
+      if (captionContent.events) {
+        for (const event of captionContent.events) {
+          if (event.segs) {
+            const text = event.segs.map(seg => seg.utf8).join('');
+            if (text.trim()) {
+              transcript.push({
+                text: text.trim(),
+                offset: event.tStartMs || 0,
+                duration: event.dDurationMs || 0
+              });
+            }
+          }
+        }
+      }
+
+      return transcript;
+
+    } catch (error) {
+      console.error(`[ChannelTranscript] yt-dlp error for ${videoId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Fetch captions directly from YouTube with proper browser headers
-   * This bypasses IP-based blocking by mimicking a real browser
+   * Fallback method if yt-dlp fails
    * @param {string} videoId
    * @returns {Promise<Array>}
    */
@@ -105,13 +190,17 @@ class ChannelTranscriptService {
     // Extract ytInitialPlayerResponse from page HTML
     const match = data.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
     if (!match) {
+      console.error(`[ChannelTranscript] Could not find ytInitialPlayerResponse for ${videoId}`);
       throw new Error('Could not find player response in page');
     }
 
     const playerResponse = JSON.parse(match[1]);
+    console.log(`[ChannelTranscript] Player response captions:`, playerResponse?.captions ? 'Found' : 'Not found');
 
     // Get caption tracks
     const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    console.log(`[ChannelTranscript] Caption tracks for ${videoId}:`, captionTracks?.length || 0);
+
     if (!captionTracks || captionTracks.length === 0) {
       throw new Error('No captions available for this video');
     }
@@ -155,21 +244,36 @@ class ChannelTranscriptService {
 
   /**
    * Fetch transcript with retry logic and exponential backoff
-   * Uses direct axios requests with proper browser headers
+   * Tries yt-dlp first (most reliable), then falls back to axios scraping
    * @param {string} videoId
    * @param {number} maxRetries
    * @returns {Promise<Array>}
    */
-  async fetchWithRetry(videoId, maxRetries = 3) {
+  async fetchWithRetry(videoId, maxRetries = 2) {
+    // Try yt-dlp first (most reliable method)
+    try {
+      console.log(`[ChannelTranscript] Using yt-dlp for ${videoId}`);
+      const transcript = await this.fetchCaptionsWithYtDlp(videoId);
+
+      if (transcript && transcript.length > 0) {
+        console.log(`[ChannelTranscript] ✓ yt-dlp: Successfully fetched ${transcript.length} caption segments`);
+        return transcript;
+      }
+    } catch (ytdlpError) {
+      console.log(`[ChannelTranscript] yt-dlp failed for ${videoId}, trying fallback: ${ytdlpError.message}`);
+    }
+
+    // Fallback to axios scraping with retries
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[ChannelTranscript] Attempt ${attempt}/${maxRetries} for ${videoId}`);
+        console.log(`[ChannelTranscript] Fallback attempt ${attempt}/${maxRetries} for ${videoId}`);
 
-        // Use custom caption fetching with proper headers
         const transcript = await this.fetchCaptionsWithHeaders(videoId);
 
-        console.log(`[ChannelTranscript] ✓ Successfully fetched ${transcript.length} caption segments for ${videoId}`);
-        return transcript;
+        if (transcript && transcript.length > 0) {
+          console.log(`[ChannelTranscript] ✓ Fallback: Successfully fetched ${transcript.length} caption segments`);
+          return transcript;
+        }
 
       } catch (error) {
         const errorMsg = error.message || '';
@@ -188,10 +292,12 @@ class ChannelTranscriptService {
         }
 
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`[ChannelTranscript] Retry ${attempt}/${maxRetries} after ${delay}ms for ${videoId}...`);
+        console.log(`[ChannelTranscript] Retry ${attempt}/${maxRetries} after ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
+
+    throw new Error('All caption fetching methods failed');
   }
 
   /**
