@@ -1,4 +1,4 @@
-const { YoutubeTranscript } = require('youtube-transcript');
+const { getSubtitles } = require('youtube-captions-scraper');
 const { google } = require('googleapis');
 
 /**
@@ -74,23 +74,17 @@ class ChannelTranscriptService {
     } catch (error) {
       console.error(`[ChannelTranscript] ✗ Failed for ${videoId}:`, error.message);
 
-      // Check if it's a bot detection error
-      if (error.message.includes('Too Many Requests') ||
-          error.message.includes('403') ||
-          error.message.includes('blocked')) {
-        console.error(`[ChannelTranscript] ⚠️ Bot detection triggered for ${videoId}`);
-      }
-
       return {
         available: false,
         error: error.message,
-        source: 'youtube_captions'
+        source: 'youtube_captions_scraper'
       };
     }
   }
 
   /**
    * Fetch transcript with retry logic and exponential backoff
+   * Uses youtube-captions-scraper which bypasses bot detection better
    * @param {string} videoId
    * @param {number} maxRetries
    * @returns {Promise<Array>}
@@ -98,39 +92,44 @@ class ChannelTranscriptService {
   async fetchWithRetry(videoId, maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Use different user agent for each attempt
-        const userAgent = this.userAgents[attempt % this.userAgents.length];
+        console.log(`[ChannelTranscript] Attempt ${attempt}/${maxRetries} for ${videoId}`);
 
-        // Fetch transcript - try to get ANY available language
-        // Don't specify lang parameter to get the default/auto-generated transcript
-        const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-          headers: {
-            'User-Agent': userAgent,
-            'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8'
-          }
+        // Use youtube-captions-scraper - it scrapes like a browser
+        // This bypasses bot detection better than youtube-transcript
+        const subtitles = await getSubtitles({
+          videoID: videoId,
+          // Don't specify lang to get auto-generated captions in any language
         });
 
+        // Convert to our expected format
+        const transcript = subtitles.map(sub => ({
+          text: sub.text,
+          offset: parseFloat(sub.start) * 1000, // Convert seconds to milliseconds
+          duration: parseFloat(sub.dur) * 1000
+        }));
+
+        console.log(`[ChannelTranscript] ✓ Successfully fetched ${transcript.length} caption segments for ${videoId}`);
         return transcript;
 
       } catch (error) {
-        // Don't retry if transcript is explicitly disabled/unavailable
         const errorMsg = error.message || '';
-        if (errorMsg.includes('Transcript is disabled') ||
-            errorMsg.includes('No transcripts available') ||
-            errorMsg.includes('Subtitles are disabled') ||
-            errorMsg.includes('disabled on this video')) {
-          // Fail fast for videos without captions - don't waste time retrying
-          throw error;
+
+        // Check if captions are genuinely unavailable
+        if (errorMsg.includes('Could not find captions') ||
+            errorMsg.includes('No captions found') ||
+            errorMsg.includes('Subtitles are disabled')) {
+          console.log(`[ChannelTranscript] No captions available for ${videoId}`);
+          throw new Error(`No captions available for this video`);
         }
 
+        // For network/temporary errors, retry with exponential backoff
         if (attempt === maxRetries) {
+          console.error(`[ChannelTranscript] Failed after ${maxRetries} attempts for ${videoId}: ${errorMsg}`);
           throw error;
         }
 
-        // Only retry for network/temporary errors
-        // Reduced backoff: 1s, 2s (faster failure for unavailable videos)
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`[ChannelTranscript] Retry ${attempt}/${maxRetries} after ${delay}ms...`);
+        console.log(`[ChannelTranscript] Retry ${attempt}/${maxRetries} after ${delay}ms for ${videoId}...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
