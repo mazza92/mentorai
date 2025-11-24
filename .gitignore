@@ -41,3 +41,6 @@ temp/
 firebase-debug.log
 
 TECHNICAL_OVERVIEW.md
+
+# YouTube cookies (sensitive)
+backend/cookies.txt

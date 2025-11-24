@@ -1,5 +1,7 @@
 const { google } = require('googleapis');
 const audioOnlyTranscriptionService = require('./audioOnlyTranscriptionService');
+const puppeteerCaptionFetcher = require('./puppeteerCaptionFetcher');
+const captionFetcher = require('./captionFetcher');
 const { getFirestore } = require('../config/firestore');
 
 /**
@@ -53,9 +55,8 @@ class TripleLayeredIndexService {
       console.log(`[TripleIndex] ✓ Found ${videos.length} videos`);
 
       // 3. For each video, try to get Tier 1 + Tier 2 data
-      const videoDataWithTiers = await Promise.all(
-        videos.map(video => this.fetchVideoTiers(video))
-      );
+      // Process in batches to avoid overwhelming the system
+      const videoDataWithTiers = await this.fetchVideoTiersInBatches(videos, 10);
 
       // 4. Calculate tier coverage
       const tierStats = this.calculateTierStats(videoDataWithTiers);
@@ -89,6 +90,35 @@ class TripleLayeredIndexService {
       console.error(`[TripleIndex] ✗ PHASE 1 failed:`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Fetch video tiers in batches to avoid overwhelming the system
+   * @param {Array} videos - Array of video metadata
+   * @param {number} batchSize - Number of videos to process at once
+   * @returns {Promise<Array>} Videos with tier data
+   */
+  async fetchVideoTiersInBatches(videos, batchSize = 10) {
+    const results = [];
+    const chunks = this.chunkArray(videos, batchSize);
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`[TripleIndex] Processing tier batch ${i + 1}/${chunks.length} (${chunk.length} videos)`);
+
+      const chunkResults = await Promise.all(
+        chunk.map(video => this.fetchVideoTiers(video))
+      );
+
+      results.push(...chunkResults);
+
+      // Small delay between batches
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    return results;
   }
 
   /**
@@ -145,13 +175,39 @@ class TripleLayeredIndexService {
 
   /**
    * Best-effort caption fetching (don't let failures block channel import)
+   * Uses multiple fallback methods to maximize success rate
    * @param {string} videoId
    * @returns {Promise<Array|null>}
    */
   async fetchCaptionsBestEffort(videoId) {
-    // Try multiple methods quickly
-    // For now, return null (captions not available)
-    // This can be enhanced with the caption scraping methods we built earlier
+    // METHOD 1: Try Puppeteer (real browser - most reliable)
+    try {
+      console.log(`[TripleIndex] Trying Puppeteer for ${videoId}`);
+      const result = await puppeteerCaptionFetcher.fetchCaptions(videoId);
+
+      if (result.success && result.segments && result.segments.length > 0) {
+        console.log(`[TripleIndex] ✓ Puppeteer: ${result.segments.length} segments`);
+        return result.segments;
+      }
+    } catch (error) {
+      console.log(`[TripleIndex] Puppeteer failed for ${videoId}: ${error.message}`);
+    }
+
+    // METHOD 2: Try Python youtube-transcript-api (lightweight fallback)
+    try {
+      console.log(`[TripleIndex] Trying Python API for ${videoId}`);
+      const result = await captionFetcher.fetchTranscript(videoId);
+
+      if (result.success && result.segments && result.segments.length > 0) {
+        console.log(`[TripleIndex] ✓ Python API: ${result.segments.length} segments`);
+        return result.segments;
+      }
+    } catch (error) {
+      console.log(`[TripleIndex] Python API failed for ${videoId}: ${error.message}`);
+    }
+
+    // No captions available from any method
+    console.log(`[TripleIndex] No captions available for ${videoId}`);
     return null;
   }
 
@@ -526,6 +582,17 @@ class TripleLayeredIndexService {
     const seconds = parseInt(match[3]) || 0;
 
     return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  /**
+   * Chunk array helper
+   */
+  chunkArray(array, size) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
   }
 
   /**
