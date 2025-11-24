@@ -9,6 +9,31 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 /**
+ * Detect if content is primarily in French
+ */
+function detectFrenchContent(text) {
+  if (!text) return false;
+
+  const lowerText = text.toLowerCase();
+
+  // French-specific patterns
+  const frenchPatterns = [
+    /\b(le|la|les|un|une|des|de|du|dans|sur|avec|pour|par|est|sont|être|avoir)\b/gi,
+    /\b(et|ou|mais|donc|car|parce|si|alors|comment|pourquoi|quand|où)\b/gi,
+    /c'est|qu'|d'|l'|n'|s'|à|ça/gi
+  ];
+
+  let frenchScore = 0;
+  frenchPatterns.forEach(pattern => {
+    const matches = lowerText.match(pattern);
+    if (matches) frenchScore += matches.length;
+  });
+
+  // If we find 10+ French words, it's French
+  return frenchScore >= 10;
+}
+
+/**
  * Generate source guide for a channel
  */
 async function generateChannelSourceGuide(projectDoc, project, firestore, res) {
@@ -24,41 +49,69 @@ async function generateChannelSourceGuide(projectDoc, project, firestore, res) {
 
     const channel = channelDoc.data();
 
-    // Get sample videos (first 20 with transcripts)
+    // Get sample videos (first 20, with or without transcripts)
     const videosSnapshot = await firestore.collection('channels')
       .doc(project.channelId)
       .collection('videos')
-      .where('transcript', '!=', null)
       .limit(20)
       .get();
 
     const videos = videosSnapshot.docs.map(doc => doc.data());
+
+    console.log('[SourceGuide] Analyzing channel with', videos.length, 'videos');
+
+    if (videos.length === 0) {
+      return res.status(400).json({
+        error: 'No videos found',
+        message: 'Channel has no videos to analyze'
+      });
+    }
 
     // Prepare content for analysis
     const channelTitle = channel.channelTitle || project.title || 'YouTube Channel';
     const videoCount = channel.totalVideos || videos.length;
     const videoTitles = videos.map(v => v.title).slice(0, 15).join('\n- ');
 
-    // Get sample transcript excerpts
+    // Get sample descriptions (always available)
+    const descriptionSamples = videos
+      .filter(v => v.description && v.description.length > 50)
+      .slice(0, 10)
+      .map(v => `"${v.title}": ${v.description.substring(0, 200)}...`)
+      .join('\n\n');
+
+    // Get sample transcript excerpts (if available)
     const transcriptSamples = videos
       .filter(v => v.transcript)
       .slice(0, 5)
-      .map(v => `"${v.title}": ${v.transcript.substring(0, 300)}...`)
+      .map(v => {
+        const transcriptText = typeof v.transcript === 'object' ? v.transcript.text : v.transcript;
+        return `"${v.title}": ${transcriptText.substring(0, 300)}...`;
+      })
       .join('\n\n');
 
-    console.log('[SourceGuide] Analyzing channel with', videos.length, 'videos');
+    // Detect language from video titles and descriptions
+    const sampleText = (videoTitles + ' ' + descriptionSamples).substring(0, 1000);
+    const isFrench = detectFrenchContent(sampleText);
+
+    // Language-specific instructions
+    const languageInstruction = isFrench
+      ? 'IMPORTANT: Générez le guide source EN FRANÇAIS. Le résumé et les sujets clés doivent être en français.'
+      : 'Generate the source guide in English.';
 
     // Generate summary using Gemini
     const prompt = `You are analyzing a YouTube channel to create a "Source Guide" - a concise overview that helps viewers quickly understand the channel's content and key themes.
 
+${languageInstruction}
+
 Channel: ${channelTitle}
 Total Videos: ${videoCount}
 
-Sample Video Titles:
+Sample Video Titles (first 15):
 - ${videoTitles}
 
-Sample Content Excerpts:
-${transcriptSamples}
+${descriptionSamples ? `Video Descriptions:\n${descriptionSamples}\n` : ''}
+
+${transcriptSamples ? `Transcript Excerpts:\n${transcriptSamples}\n` : ''}
 
 Generate a source guide in the following JSON format:
 {
@@ -67,11 +120,13 @@ Generate a source guide in the following JSON format:
 }
 
 Guidelines:
-- Summary should describe the overall channel theme and value proposition
+- ${isFrench ? 'Écrivez le résumé et les sujets EN FRANÇAIS' : 'Write the summary and topics in English'}
+- Summary should describe the overall channel theme and value proposition based on video titles and descriptions
 - Use bold markdown to emphasize the channel's main areas of expertise or focus
-- Key topics should represent recurring themes across videos (3-5 words max)
+- Key topics should represent recurring themes across videos (3-5 words max each)
 - Generate 4-6 key topics that capture the channel's content diversity
 - Topics should be specific enough to guide questions (e.g., "AI content production" not just "AI")
+- Base your analysis on the video titles and descriptions provided above
 
 Return ONLY valid JSON, no additional text.`;
 

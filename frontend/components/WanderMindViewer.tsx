@@ -211,8 +211,8 @@ const ContextPanel = ({
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-blue-50/30 border-r border-slate-200/60 p-4 lg:p-6 space-y-6 overflow-y-auto custom-scrollbar">
-      {/* Video Metadata Header */}
-      {metadata && (metadata.title || metadata.author) && (
+      {/* Video Metadata Header (for non-channel projects only) */}
+      {!isChannel && metadata && (metadata.title || metadata.author) && (
         <div className="space-y-3 pb-4 border-b border-slate-200/80">
           <div className="flex items-center flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-slate-600">
             {metadata.author && (
