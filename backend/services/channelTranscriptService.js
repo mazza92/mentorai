@@ -87,6 +87,46 @@ class ChannelTranscriptService {
   }
 
   /**
+   * Get cookie options for yt-dlp based on environment
+   * Production: Use cookies from environment variable or file
+   * Development: Use browser cookies
+   * @param {string} browser - Browser name (chrome, firefox, edge)
+   * @returns {Object} Cookie options for yt-dlp
+   */
+  getCookieOptions(browser) {
+    const fs = require('fs');
+    const path = require('path');
+
+    // PRODUCTION: Check for cookies in environment variable first
+    if (process.env.YOUTUBE_COOKIES_BASE64) {
+      console.log(`[ChannelTranscript] Using cookies from environment variable`);
+
+      // Decode base64 cookies and write to temporary file
+      const cookiesDir = path.join(__dirname, '../temp');
+      if (!fs.existsSync(cookiesDir)) {
+        fs.mkdirSync(cookiesDir, { recursive: true });
+      }
+
+      const cookiesPath = path.join(cookiesDir, 'youtube-cookies.txt');
+      const cookiesContent = Buffer.from(process.env.YOUTUBE_COOKIES_BASE64, 'base64').toString('utf-8');
+      fs.writeFileSync(cookiesPath, cookiesContent);
+
+      return { cookies: cookiesPath };
+    }
+
+    // PRODUCTION: Check for cookies.txt file
+    const cookiesPath = path.join(__dirname, '../cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+      console.log(`[ChannelTranscript] Using cookies from file: cookies.txt`);
+      return { cookies: cookiesPath };
+    }
+
+    // DEVELOPMENT: Try to use browser cookies
+    console.log(`[ChannelTranscript] Using ${browser} browser cookies (local development)`);
+    return { cookiesFromBrowser: browser };
+  }
+
+  /**
    * Fetch captions using yt-dlp (most reliable method)
    * yt-dlp is the gold standard for YouTube content extraction
    * @param {string} videoId
@@ -99,15 +139,17 @@ class ChannelTranscriptService {
     try {
       // Use yt-dlp to extract subtitles without downloading video
       // Using browser cookies to bypass YouTube bot detection
+
+      // Determine cookie strategy based on environment
+      const cookieOptions = this.getCookieOptions(browser);
+
       const output = await youtubedl(videoUrl, {
         dumpSingleJson: true,
         skipDownload: true,
         writeAutoSub: true,
         subLang: 'en,fr,es,de,it,pt,ar', // Try multiple languages
         noWarnings: true,
-        // Extract cookies from browser to authenticate as real user
-        // This bypasses YouTube's bot detection
-        cookiesFromBrowser: browser,
+        ...cookieOptions
       });
 
       // Extract subtitles from output
