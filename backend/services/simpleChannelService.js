@@ -216,8 +216,7 @@ class SimpleChannelService {
       // Transcript doesn't exist - transcribe on-demand
       console.log(`[SimpleChannel] 📝 Transcribing ${videoId} on-demand with AssemblyAI...`);
 
-      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      const transcriptResult = await audioOnlyTranscriptionService.transcribeYouTubeVideo(videoUrl);
+      const transcriptResult = await audioOnlyTranscriptionService.processVideo(videoId);
 
       if (!transcriptResult.success) {
         throw new Error(transcriptResult.error || 'Transcription failed');
