@@ -3,6 +3,8 @@ const { google } = require('googleapis');
 const youtubedl = require('youtube-dl-exec');
 const captionFetcher = require('./captionFetcher');
 const puppeteerCaptionFetcher = require('./puppeteerCaptionFetcher');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Channel Transcript Service
@@ -94,9 +96,6 @@ class ChannelTranscriptService {
    * @returns {Object} Cookie options for yt-dlp
    */
   getCookieOptions(browser) {
-    const fs = require('fs');
-    const path = require('path');
-
     // PRODUCTION: Check for cookies in environment variable first
     if (process.env.YOUTUBE_COOKIES_BASE64) {
       console.log(`[ChannelTranscript] Using cookies from environment variable`);
