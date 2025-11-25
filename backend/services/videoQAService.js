@@ -1411,72 +1411,73 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       return;
     }
 
-    console.log(`[VideoQAService] Fetching transcripts for ${videosNeedingTranscripts.length} videos on-demand...`);
+    // SIMPLE STRATEGY: Limit to max 3 videos per query for cost control
+    // Users get fast, accurate answers without waiting for all videos
+    const maxVideosToTranscribe = 3;
+    const videosToTranscribe = videosNeedingTranscripts.slice(0, maxVideosToTranscribe);
 
-    // Fetch transcripts in parallel (limit to 5 concurrent to avoid bot detection)
-    const batchSize = 5;
-    for (let i = 0; i < videosNeedingTranscripts.length; i += batchSize) {
-      const batch = videosNeedingTranscripts.slice(i, i + batchSize);
+    if (videosNeedingTranscripts.length > maxVideosToTranscribe) {
+      console.log(`[VideoQAService] Limiting to top ${maxVideosToTranscribe} videos (out of ${videosNeedingTranscripts.length})`);
+    }
 
-      await Promise.all(batch.map(async (video) => {
-        try {
-          console.log(`[VideoQAService] Fetching transcript for: ${video.title} (${video.videoId})`);
+    console.log(`[VideoQAService] 📝 Transcribing ${videosToTranscribe.length} videos with AssemblyAI (audio-based)...`);
 
-          // Fetch transcript using channelTranscriptService
-          const transcriptData = await channelTranscriptService.fetchTranscript(video.videoId);
+    // Use simple audio transcription service (reliable, no caption complexity)
+    const audioOnlyTranscriptionService = require('./audioOnlyTranscriptionService');
 
-          if (transcriptData.available) {
-            console.log(`[VideoQAService] ✓ Transcript fetched for ${video.videoId}`);
+    // Transcribe videos one by one (AssemblyAI is fast, ~30s per 10min video)
+    for (const video of videosToTranscribe) {
+      try {
+        console.log(`[VideoQAService] Transcribing: ${video.title} (${video.videoId})`);
 
-            // Update video object in array (for immediate use)
-            video.transcript = transcriptData.text;
-            video.transcriptSegments = transcriptData.segments || [];
-            video.status = 'ready';
+        const videoUrl = `https://www.youtube.com/watch?v=${video.videoId}`;
+        const transcriptResult = await audioOnlyTranscriptionService.transcribeYouTubeVideo(videoUrl);
 
-            // Save to Firestore (for future use)
-            if (!useMockMode && firestore) {
-              const videoRef = firestore.collection('channels')
-                .doc(channelId)
-                .collection('videos')
-                .doc(video.videoId);
+        if (transcriptResult.success) {
+          console.log(`[VideoQAService] ✓ Transcribed ${video.videoId} (${transcriptResult.text.length} chars)`);
 
-              await videoRef.update({
-                transcript: transcriptData.text,
-                transcriptSegments: transcriptData.segments || [],
-                status: 'ready',
-                transcriptSource: transcriptData.source,
-                transcriptFetchedAt: new Date()
-              });
+          // Update video object in array (for immediate use)
+          video.transcript = transcriptResult.text;
+          video.status = 'ready';
 
-              console.log(`[VideoQAService] ✓ Transcript saved to Firestore for ${video.videoId}`);
-            }
-          } else {
-            console.log(`[VideoQAService] ✗ No transcript available for ${video.videoId}: ${transcriptData.error}`);
-            // Update status to indicate no captions available
-            video.status = 'no_captions';
+          // Save to Firestore (cached forever - subsequent queries are FREE)
+          if (!useMockMode && firestore) {
+            const videoRef = firestore.collection('channels')
+              .doc(channelId)
+              .collection('videos')
+              .doc(video.videoId);
 
-            if (!useMockMode && firestore) {
-              const videoRef = firestore.collection('channels')
-                .doc(channelId)
-                .collection('videos')
-                .doc(video.videoId);
+            await videoRef.update({
+              transcript: transcriptResult.text,
+              status: 'ready',
+              transcriptSource: 'assemblyai',
+              transcriptionDuration: transcriptResult.duration,
+              transcriptionCost: transcriptResult.cost || 0,
+              transcribedAt: new Date().toISOString()
+            });
 
-              await videoRef.update({
-                status: 'no_captions',
-                transcriptError: transcriptData.error,
-                transcriptAttemptedAt: new Date()
-              });
-            }
+            console.log(`[VideoQAService] ✓ Transcript cached to Firestore for ${video.videoId}`);
           }
-        } catch (error) {
-          console.error(`[VideoQAService] Error fetching transcript for ${video.videoId}:`, error.message);
-          video.status = 'error';
-        }
-      }));
+        } else {
+          console.log(`[VideoQAService] ✗ Transcription failed for ${video.videoId}: ${transcriptResult.error}`);
+          video.status = 'transcription_failed';
 
-      // Small delay between batches to avoid bot detection
-      if (i + batchSize < videosNeedingTranscripts.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+          if (!useMockMode && firestore) {
+            const videoRef = firestore.collection('channels')
+              .doc(channelId)
+              .collection('videos')
+              .doc(video.videoId);
+
+            await videoRef.update({
+              status: 'transcription_failed',
+              transcriptError: transcriptResult.error,
+              transcriptAttemptedAt: new Date().toISOString()
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`[VideoQAService] Error transcribing ${video.videoId}:`, error.message);
+        video.status = 'error';
       }
     }
 
