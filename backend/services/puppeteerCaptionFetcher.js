@@ -50,7 +50,7 @@ class PuppeteerCaptionFetcher {
 
       // On Railway/production, use chromium
       if (isProduction) {
-        launchOptions.executablePath = '/usr/bin/chromium-browser';
+        launchOptions.executablePath = '/usr/bin/chromium';
       }
 
       this.browser = await puppeteer.launch(launchOptions);
