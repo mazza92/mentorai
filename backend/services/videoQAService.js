@@ -1430,8 +1430,7 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       try {
         console.log(`[VideoQAService] Transcribing: ${video.title} (${video.videoId})`);
 
-        const videoUrl = `https://www.youtube.com/watch?v=${video.videoId}`;
-        const transcriptResult = await audioOnlyTranscriptionService.transcribeYouTubeVideo(videoUrl);
+        const transcriptResult = await audioOnlyTranscriptionService.processVideo(video.videoId);
 
         if (transcriptResult.success) {
           console.log(`[VideoQAService] ✓ Transcribed ${video.videoId} (${transcriptResult.text.length} chars)`);
