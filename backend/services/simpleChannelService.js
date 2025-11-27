@@ -78,7 +78,9 @@ class SimpleChannelService {
           {
             maxVideos: maxVideosToTranscribe,
             concurrency,
-            prioritizeBy: 'views' // Fetch most popular videos first
+            prioritizeBy: 'views', // Fetch most popular videos first
+            stopOnLowSuccessRate: true, // Stop early if channel has no captions
+            minSampleSize: 10
           }
         );
 
@@ -86,10 +88,20 @@ class SimpleChannelService {
           total: transcriptResults.total,
           successful: transcriptResults.successful,
           failed: transcriptResults.failed,
-          skipped: videos.length - videosToProcess.length
+          skipped: (transcriptResults.skipped || 0) + (videos.length - videosToProcess.length),
+          lowCaptionAvailability: transcriptResults.lowCaptionAvailability || false
         };
 
-        console.log(`[SimpleChannel] ✓ Transcripts: ${transcriptStats.successful}/${transcriptStats.total} successful`);
+        const successRate = transcriptStats.total > 0
+          ? ((transcriptStats.successful / transcriptStats.total) * 100).toFixed(1)
+          : 0;
+
+        console.log(`[SimpleChannel] ✓ Transcripts: ${transcriptStats.successful}/${transcriptStats.total} successful (${successRate}%)`);
+
+        if (transcriptStats.lowCaptionAvailability) {
+          console.log(`[SimpleChannel] ⚠️ This channel has low caption availability (${successRate}% success rate)`);
+          console.log(`[SimpleChannel] Recommendation: Creator should enable auto-captions in YouTube Studio`);
+        }
 
         // Update videos array with transcript data
         for (const video of videos) {

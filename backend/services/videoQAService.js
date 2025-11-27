@@ -1420,24 +1420,28 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       console.log(`[VideoQAService] Limiting to top ${maxVideosToTranscribe} videos (out of ${videosNeedingTranscripts.length})`);
     }
 
-    console.log(`[VideoQAService] 📝 Fetching transcripts for ${videosToTranscribe.length} videos (Innertube + fallback)...`);
+    console.log(`[VideoQAService] 📝 Fetching transcripts for ${videosToTranscribe.length} videos (Innertube only)...`);
 
-    // Use Innertube caption scraper (fast, free) with fallback to audio transcription
+    // Use Innertube caption scraper (fast, free)
     const youtubeInnertubeService = require('./youtubeInnertubeService');
-    const audioOnlyTranscriptionService = require('./audioOnlyTranscriptionService');
 
-    // Fetch transcripts one by one with intelligent fallback
+    // Circuit breaker: Stop trying audio transcription if it fails due to bot detection
+    let audioTranscriptionBlocked = false;
+
+    // Fetch transcripts one by one
     for (const video of videosToTranscribe) {
       try {
         console.log(`[VideoQAService] Fetching: ${video.title} (${video.videoId})`);
 
-        // METHOD 1: Try Innertube caption scraping (fast, free)
+        // Try Innertube caption scraping (fast, free, works for 70-80% of videos)
         let transcriptResult = await youtubeInnertubeService.fetchTranscript(video.videoId);
 
-        // METHOD 2: Fallback to audio transcription if captions unavailable
+        // DISABLED: Audio transcription fallback (causes YouTube bot detection)
+        // If you need audio transcription, enable auto-captions in YouTube Studio
+        // or contact support for alternative solutions
         if (!transcriptResult.success) {
-          console.log(`[VideoQAService] ⚠️ Captions unavailable, using audio transcription...`);
-          transcriptResult = await audioOnlyTranscriptionService.processVideo(video.videoId);
+          console.log(`[VideoQAService] ⚠️ No captions available for ${video.videoId}`);
+          console.log(`[VideoQAService] Recommendation: Enable auto-captions in YouTube Studio for this video`);
         }
 
         if (transcriptResult.success) {
