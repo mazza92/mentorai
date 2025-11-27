@@ -1420,20 +1420,29 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       console.log(`[VideoQAService] Limiting to top ${maxVideosToTranscribe} videos (out of ${videosNeedingTranscripts.length})`);
     }
 
-    console.log(`[VideoQAService] 📝 Transcribing ${videosToTranscribe.length} videos with AssemblyAI (audio-based)...`);
+    console.log(`[VideoQAService] 📝 Fetching transcripts for ${videosToTranscribe.length} videos (Innertube + fallback)...`);
 
-    // Use simple audio transcription service (reliable, no caption complexity)
+    // Use Innertube caption scraper (fast, free) with fallback to audio transcription
+    const youtubeInnertubeService = require('./youtubeInnertubeService');
     const audioOnlyTranscriptionService = require('./audioOnlyTranscriptionService');
 
-    // Transcribe videos one by one (AssemblyAI is fast, ~30s per 10min video)
+    // Fetch transcripts one by one with intelligent fallback
     for (const video of videosToTranscribe) {
       try {
-        console.log(`[VideoQAService] Transcribing: ${video.title} (${video.videoId})`);
+        console.log(`[VideoQAService] Fetching: ${video.title} (${video.videoId})`);
 
-        const transcriptResult = await audioOnlyTranscriptionService.processVideo(video.videoId);
+        // METHOD 1: Try Innertube caption scraping (fast, free)
+        let transcriptResult = await youtubeInnertubeService.fetchTranscript(video.videoId);
+
+        // METHOD 2: Fallback to audio transcription if captions unavailable
+        if (!transcriptResult.success) {
+          console.log(`[VideoQAService] ⚠️ Captions unavailable, using audio transcription...`);
+          transcriptResult = await audioOnlyTranscriptionService.processVideo(video.videoId);
+        }
 
         if (transcriptResult.success) {
-          console.log(`[VideoQAService] ✓ Transcribed ${video.videoId} (${transcriptResult.text.length} chars)`);
+          const source = transcriptResult.source || 'youtube-innertube';
+          console.log(`[VideoQAService] ✓ Transcript fetched via ${source} (${transcriptResult.text.length} chars)`);
 
           // Update video object in array (for immediate use)
           video.transcript = transcriptResult.text;
@@ -1449,16 +1458,17 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
             await videoRef.update({
               transcript: transcriptResult.text,
               status: 'ready',
-              transcriptSource: 'assemblyai',
-              transcriptionDuration: transcriptResult.duration,
-              transcriptionCost: transcriptResult.cost || 0,
-              transcribedAt: new Date().toISOString()
+              transcriptSource: source,
+              transcriptLanguage: transcriptResult.language || 'en',
+              transcriptWordCount: transcriptResult.wordCount || 0,
+              transcriptCost: source === 'youtube-innertube' ? 0 : 0.15,
+              transcriptFetchedAt: new Date().toISOString()
             });
 
             console.log(`[VideoQAService] ✓ Transcript cached to Firestore for ${video.videoId}`);
           }
         } else {
-          console.log(`[VideoQAService] ✗ Transcription failed for ${video.videoId}: ${transcriptResult.error}`);
+          console.log(`[VideoQAService] ✗ Transcript fetch failed for ${video.videoId}: ${transcriptResult.error}`);
           video.status = 'transcription_failed';
 
           if (!useMockMode && firestore) {
