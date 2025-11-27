@@ -50,12 +50,13 @@ class SimpleChannelService {
     } = options;
 
     try {
-      // 1. Get channel info
+      // 1. Get channel info (this resolves @handle to channel ID)
       const channelData = await this.fetchChannelInfo(channelId);
+      const resolvedChannelId = channelData.id; // Use resolved ID throughout
       console.log(`[SimpleChannel] ✓ Channel: ${channelData.title}`);
 
       // 2. Get ALL videos (metadata only - fast)
-      const videos = await this.fetchAllVideos(channelId);
+      const videos = await this.fetchAllVideos(resolvedChannelId);
       console.log(`[SimpleChannel] ✓ Found ${videos.length} videos`);
 
       let transcriptStats = {
@@ -119,7 +120,7 @@ class SimpleChannelService {
       }
 
       // 4. Store in Firestore
-      await this.storeChannelData(channelId, {
+      await this.storeChannelData(resolvedChannelId, {
         channelData,
         videos,
         userId,
@@ -135,7 +136,7 @@ class SimpleChannelService {
 
       return {
         success: true,
-        channelId,
+        channelId: resolvedChannelId, // Return resolved ID
         channelName: channelData.title,
         videoCount: videos.length,
         transcripts: transcriptStats,
@@ -152,14 +153,67 @@ class SimpleChannelService {
   }
 
   /**
+   * Resolve @handle or username to channel ID
+   * @param {string} handleOrId - Can be @handle, username, or UC...channelId
+   * @returns {Promise<string>} Channel ID (UC...)
+   */
+  async resolveChannelId(handleOrId) {
+    // If already a channel ID (starts with UC), return as-is
+    if (handleOrId.startsWith('UC')) {
+      return handleOrId;
+    }
+
+    console.log(`[SimpleChannel] Resolving handle/username: ${handleOrId}`);
+
+    // Try search API to find channel by handle
+    try {
+      const searchResponse = await this.youtube.search.list({
+        part: 'snippet',
+        q: handleOrId,
+        type: 'channel',
+        maxResults: 1
+      });
+
+      if (searchResponse.data.items && searchResponse.data.items.length > 0) {
+        const channelId = searchResponse.data.items[0].snippet.channelId;
+        console.log(`[SimpleChannel] ✓ Resolved ${handleOrId} → ${channelId}`);
+        return channelId;
+      }
+    } catch (searchError) {
+      console.log(`[SimpleChannel] Search API failed: ${searchError.message}`);
+    }
+
+    // Fallback: Try forUsername (works for old-style usernames)
+    try {
+      const response = await this.youtube.channels.list({
+        part: 'id',
+        forUsername: handleOrId
+      });
+
+      if (response.data.items && response.data.items.length > 0) {
+        const channelId = response.data.items[0].id;
+        console.log(`[SimpleChannel] ✓ Resolved ${handleOrId} → ${channelId} (via forUsername)`);
+        return channelId;
+      }
+    } catch (usernameError) {
+      console.log(`[SimpleChannel] forUsername failed: ${usernameError.message}`);
+    }
+
+    throw new Error(`Could not resolve channel: ${handleOrId}. Please use the full channel URL.`);
+  }
+
+  /**
    * Fetch channel information
    * @param {string} channelId
    * @returns {Promise<Object>}
    */
   async fetchChannelInfo(channelId) {
+    // Resolve handle/username to actual channel ID first
+    const resolvedChannelId = await this.resolveChannelId(channelId);
+
     const response = await this.youtube.channels.list({
       part: 'snippet,statistics,contentDetails',
-      id: channelId
+      id: resolvedChannelId
     });
 
     if (!response.data.items || response.data.items.length === 0) {
@@ -168,7 +222,7 @@ class SimpleChannelService {
 
     const channel = response.data.items[0];
     return {
-      id: channelId,
+      id: resolvedChannelId,
       title: channel.snippet.title,
       description: channel.snippet.description,
       thumbnailUrl: channel.snippet.thumbnails.high?.url,
