@@ -169,7 +169,9 @@ class YouTubeInnertubeService {
     const {
       maxVideos = null, // null = fetch all
       concurrency = 10,
-      prioritizeBy = 'views' // 'views', 'recency', or 'duration'
+      prioritizeBy = 'views', // 'views', 'recency', or 'duration'
+      stopOnLowSuccessRate = true, // Stop if success rate < 20% to avoid wasting time
+      minSampleSize = 10 // Minimum videos to try before checking success rate
     } = options;
 
     console.log(`[Innertube] 🎬 Fetching transcripts for channel (${videos.length} videos)`);
@@ -185,6 +187,62 @@ class YouTubeInnertubeService {
     console.log(`[Innertube] Processing ${videosToFetch.length} videos (prioritized by ${prioritizeBy})`);
 
     const videoIds = videosToFetch.map(v => v.videoId || v.id);
+
+    // Smart early stopping: If first batch has very low success rate, channel likely has no captions
+    if (stopOnLowSuccessRate && videoIds.length > minSampleSize) {
+      console.log(`[Innertube] Testing ${minSampleSize} videos first to check caption availability...`);
+
+      const sampleResults = await this.fetchBatch(videoIds.slice(0, minSampleSize), concurrency);
+      const sampleSuccessRate = (sampleResults.successful / minSampleSize) * 100;
+
+      console.log(`[Innertube] Sample success rate: ${sampleSuccessRate.toFixed(1)}%`);
+
+      if (sampleSuccessRate < 20) {
+        console.log(`[Innertube] ⚠️ Low caption availability detected. This channel likely doesn't have auto-captions enabled.`);
+        console.log(`[Innertube] Skipping remaining ${videoIds.length - minSampleSize} videos to save time.`);
+
+        return {
+          ...sampleResults,
+          total: videoIds.length,
+          skipped: videoIds.length - minSampleSize,
+          videos: videosToFetch,
+          lowCaptionAvailability: true
+        };
+      }
+
+      // Good success rate, continue with remaining videos
+      if (videoIds.length > minSampleSize) {
+        console.log(`[Innertube] Good caption availability! Continuing with remaining videos...`);
+        const remainingResults = await this.fetchBatch(videoIds.slice(minSampleSize), concurrency);
+
+        // Merge results
+        const results = {
+          total: sampleResults.total + remainingResults.total,
+          successful: sampleResults.successful + remainingResults.successful,
+          failed: sampleResults.failed + remainingResults.failed,
+          cached: sampleResults.cached + remainingResults.cached,
+          transcripts: { ...sampleResults.transcripts, ...remainingResults.transcripts }
+        };
+
+        // Attach transcripts to video objects
+        for (const video of videosToFetch) {
+          const videoId = video.videoId || video.id;
+          if (results.transcripts[videoId]) {
+            video.transcript = results.transcripts[videoId].text;
+            video.transcriptSegments = results.transcripts[videoId].segments;
+            video.transcriptSource = 'youtube-innertube';
+            video.hasTranscript = true;
+          }
+        }
+
+        return {
+          ...results,
+          videos: videosToFetch
+        };
+      }
+    }
+
+    // Regular batch processing (no smart stopping)
     const results = await this.fetchBatch(videoIds, concurrency);
 
     // Attach transcripts to video objects

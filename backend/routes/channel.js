@@ -1,24 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const channelService = require('../services/channelService');
-const channelTranscriptService = require('../services/channelTranscriptService');
+const simpleChannelService = require('../services/simpleChannelService');
 const videoQAService = require('../services/videoQAService');
 const userService = require('../services/userService');
 const { getFirestore } = require('../config/firestore');
 
 /**
  * POST /api/channel/import
- * Import YouTube channel using caption extraction (cookie-free!)
- * - Uses youtube-transcript package (no cookies needed, no bot detection)
- * - No video downloads
- * - FREE (no transcription costs)
- * - Fast (45-60s for 200 videos)
+ * Import YouTube channel with Innertube caption scraping
+ * - Fetches metadata + transcripts using Innertube API (fast, free)
+ * - Falls back to audio transcription if captions unavailable
+ * - 2-5 minutes for full channel with transcripts
  */
 router.post('/import', async (req, res) => {
   try {
     const { channelUrl, userId } = req.body;
 
-    console.log(`[API] Caption-based channel import requested by user ${userId}: ${channelUrl}`);
+    console.log(`[API] Channel import requested by user ${userId}: ${channelUrl}`);
 
     if (!channelUrl) {
       return res.status(400).json({
@@ -42,82 +41,58 @@ router.post('/import', async (req, res) => {
       if (channelUrl.includes('/channel/')) {
         channelId = channelUrl.split('/channel/')[1].split('/')[0].split('?')[0];
       } else if (channelUrl.includes('/@')) {
-        // Handle @username format - let channelTranscriptService resolve it
         channelId = channelUrl.split('/@')[1].split('/')[0].split('?')[0];
       }
     }
 
     console.log(`[API] Resolved channel ID: ${channelId}`);
 
-    // Get channel metadata ONLY (instant, no transcript fetching)
-    const channelData = await channelTranscriptService.getChannelVideos(channelId);
-
-    // Store in Firestore immediately
-    const { firestore } = getFirestore();
-    const channelRef = firestore.collection('channels').doc(channelData.channelId);
-
-    await channelRef.set({
-      channelId: channelData.channelId,
-      channelTitle: channelData.channelTitle,
-      userId,
-      totalVideos: channelData.videos.length,
-      status: 'ready',
-      createdAt: new Date(),
-      method: 'metadata_only' // Transcripts fetched on-demand
+    // Import channel with Innertube caption scraping
+    const importResult = await simpleChannelService.importChannel(channelId, userId, {
+      fetchTranscripts: true, // Enable Innertube scraping
+      maxVideosToTranscribe: null, // Fetch all videos
+      concurrency: 10 // 10 parallel requests
     });
 
-    // Store each video with metadata only (NO transcript fetching yet)
-    const batch = firestore.batch();
-    for (const video of channelData.videos) {
-      const videoRef = channelRef.collection('videos').doc(video.id);
-      batch.set(videoRef, {
-        videoId: video.id,
-        title: video.title,
-        description: video.description,
-        publishedAt: video.publishedAt,
-        thumbnailUrl: video.thumbnailUrl,
-        duration: video.duration,
-        viewCount: video.viewCount,
-        likeCount: video.likeCount,
-        channelId: channelData.channelId,
-        status: 'metadata_only', // Transcript not fetched yet
-        transcript: null, // Fetch on first question
-        processedAt: new Date()
-      });
+    if (!importResult.success) {
+      throw new Error(importResult.error || 'Channel import failed');
     }
-    await batch.commit();
 
     // Create a project for this channel so user can chat with it
-    const projectId = channelData.channelId; // Use channel ID as project ID
+    const { firestore } = getFirestore();
+    const projectId = importResult.channelId;
     const projectRef = firestore.collection('projects').doc(projectId);
 
     await projectRef.set({
       id: projectId,
       type: 'channel',
-      channelId: channelData.channelId,
-      title: channelData.channelTitle,
-      author: channelData.channelTitle,
-      videoCount: channelData.videos.length,
+      channelId: importResult.channelId,
+      title: importResult.channelName,
+      author: importResult.channelName,
+      videoCount: importResult.videoCount,
+      transcriptStats: importResult.transcripts,
       status: 'ready',
       userId,
       createdAt: new Date(),
       updatedAt: new Date()
     });
 
-    console.log(`[API] ✓ Channel import complete (instant): ${channelData.videos.length} videos`);
+    console.log(`[API] ✓ Channel import complete: ${importResult.videoCount} videos, ${importResult.transcripts.successful} transcripts`);
 
     res.json({
       success: true,
       data: {
         projectId: projectId,
-        channelId: channelData.channelId,
-        channelName: channelData.channelTitle, // Frontend expects channelName
-        channelTitle: channelData.channelTitle,
-        videoCount: channelData.videos.length, // Frontend expects videoCount
-        totalVideos: channelData.videos.length,
-        status: 'ready', // Frontend expects status
-        method: 'metadata_only',
-        message: 'Channel imported instantly! Transcripts will be fetched as needed.'
+        channelId: importResult.channelId,
+        channelName: importResult.channelName,
+        channelTitle: importResult.channelName,
+        videoCount: importResult.videoCount,
+        totalVideos: importResult.videoCount,
+        transcripts: importResult.transcripts,
+        status: 'ready',
+        method: importResult.strategy,
+        importTime: importResult.importTime,
+        message: importResult.message
       }
     });
 
