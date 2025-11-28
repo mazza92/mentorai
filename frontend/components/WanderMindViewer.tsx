@@ -522,7 +522,7 @@ const QnAPanel = ({
   const [showSignupWall, setShowSignupWall] = useState(false)
   const [signupQuotaUsage, setSignupQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
   const [signupMessage, setSignupMessage] = useState<string | undefined>(undefined)
-  const [sourceGuide, setSourceGuide] = useState<{summary: string, keyTopics: string[]} | null>(null)
+  const [sourceGuide, setSourceGuide] = useState<{summary: string, keyTopics: string[], suggestedPrompts?: string[]} | null>(null)
   const [loadingSourceGuide, setLoadingSourceGuide] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -598,7 +598,10 @@ const QnAPanel = ({
       // If project already has cached source guide, use it
       if (project.sourceGuide) {
         console.log('Using cached source guide from project:', project.sourceGuide);
-        setSourceGuide(project.sourceGuide);
+        setSourceGuide({
+          ...project.sourceGuide,
+          suggestedPrompts: project.suggestedPrompts || project.sourceGuide.suggestedPrompts || []
+        });
         return;
       }
 
@@ -624,7 +627,11 @@ const QnAPanel = ({
         })
 
         if (response.data.success && response.data.sourceGuide) {
-          setSourceGuide(response.data.sourceGuide)
+          // Combine sourceGuide with suggestedPrompts from API
+          setSourceGuide({
+            ...response.data.sourceGuide,
+            suggestedPrompts: response.data.suggestedPrompts || []
+          })
         }
       } catch (error) {
         console.error('Error fetching source guide:', error)
@@ -1458,9 +1465,14 @@ const QnAPanel = ({
     return promptTemplates.generic[userLanguage] || promptTemplates.generic.en
   }
 
-  const suggestedPrompts = chatStarters.length > 0 ? chatStarters :
-    (project?.suggestedPrompts && project.suggestedPrompts.length > 0) ? project.suggestedPrompts :
-    generateContextualPrompts()
+  // Use intelligent prompts from source guide (NotebookLM style)
+  const suggestedPrompts = sourceGuide?.suggestedPrompts && sourceGuide.suggestedPrompts.length > 0
+    ? sourceGuide.suggestedPrompts
+    : chatStarters.length > 0
+    ? chatStarters
+    : (project?.suggestedPrompts && project.suggestedPrompts.length > 0)
+    ? project.suggestedPrompts
+    : generateContextualPrompts()
 
   return (
     <div className="flex flex-col h-full bg-white">
