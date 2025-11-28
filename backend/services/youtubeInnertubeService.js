@@ -60,7 +60,8 @@ class YouTubeInnertubeService {
         text: fullText,
         segments: segments.map(seg => ({
           text: seg.text,
-          offset: seg.offset,
+          start: Math.floor(seg.offset / 1000), // Convert ms to seconds for timestamps
+          offset: seg.offset, // Keep original ms offset
           duration: seg.duration
         })),
         wordCount: fullText.split(/\s+/).length,

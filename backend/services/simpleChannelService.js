@@ -112,6 +112,7 @@ class SimpleChannelService {
             video.status = 'ready'; // CRITICAL: videoQAService checks for this
             video.hasTranscript = true;
             video.transcript = transcript.text;
+            video.transcriptSegments = transcript.segments; // Include for timestamps
             video.transcriptSource = 'youtube-innertube';
             video.transcriptLanguage = transcript.language;
             video.transcriptWordCount = transcript.wordCount;
@@ -358,6 +359,7 @@ class SimpleChannelService {
           status: 'ready',
           hasTranscript: true,
           transcript: innertubeResult.text,
+          transcriptSegments: innertubeResult.segments,
           transcriptSource: 'youtube-innertube',
           transcriptLanguage: innertubeResult.language,
           transcriptWordCount: innertubeResult.wordCount,
