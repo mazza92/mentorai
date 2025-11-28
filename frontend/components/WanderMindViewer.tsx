@@ -1582,22 +1582,7 @@ const QnAPanel = ({
               </div>
             )}
 
-            {history.length === 0 && (
-              <div className="space-y-4">
-                {/* Always show ChatStarters component (NotebookLM style) */}
-                <div className="p-4 lg:p-6 border border-slate-200 rounded-xl bg-gradient-to-br from-white to-slate-50">
-                  <div className="mb-4">
-                    <p className="font-semibold text-slate-900 text-base lg:text-lg">Hi! I'm Lurnia, your AI learning companion.</p>
-                    <p className="text-xs lg:text-sm text-slate-600 mt-1">Instant preview ready. Ask me anything about this content!</p>
-                  </div>
-                  <ChatStarters
-                    questions={suggestedPrompts}
-                    onQuestionClick={handleSuggestedPrompt}
-                    sourceCount={sourceCount}
-                  />
-                </div>
-              </div>
-            )}
+            {/* Removed Lurnia greeting - only Source Guide needed */}
 
             {history.map((item, index) => (
               <div key={index} className={`flex ${item.type === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
@@ -1643,6 +1628,26 @@ const QnAPanel = ({
               </div>
             )}
 
+            {/* NotebookLM-style suggested questions - above input */}
+            {suggestedPrompts && suggestedPrompts.length > 0 && history.length === 0 && (
+              <div className="mb-3">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                  {suggestedPrompts.slice(0, 6).map((prompt, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setQuery(prompt)
+                        handleQuery(prompt)
+                      }}
+                      className="flex-shrink-0 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-all duration-200 whitespace-nowrap"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 lg:gap-3">
               <input
                 type="text"
@@ -1654,7 +1659,7 @@ const QnAPanel = ({
                     handleQuery(query)
                   }
                 }}
-                placeholder="Ask Lurnia..."
+                placeholder="Ask about this content..."
                 className="flex-grow p-3 lg:p-3.5 text-sm lg:text-base bg-slate-50 border border-slate-200 text-slate-900 rounded-xl lg:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder-slate-400 shadow-sm"
                 disabled={isLoading}
               />
