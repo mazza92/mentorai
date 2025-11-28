@@ -156,17 +156,92 @@ Return ONLY valid JSON, no additional text.`;
       };
     }
 
+    // Generate intelligent suggested prompts based on actual available content
+    let suggestedPrompts = [];
+    const videosWithTranscripts = videos.filter(v => v.transcript);
+
+    if (videosWithTranscripts.length > 0) {
+      console.log('[SourceGuide] Generating suggested prompts from', videosWithTranscripts.length, 'videos with transcripts');
+
+      // Get sample transcript content to understand what we can answer
+      const transcriptContext = videosWithTranscripts
+        .slice(0, 5)
+        .map(v => {
+          const transcriptText = typeof v.transcript === 'object' ? v.transcript.text : v.transcript;
+          return `"${v.title}": ${transcriptText.substring(0, 400)}...`;
+        })
+        .join('\n\n');
+
+      const promptsPrompt = `Based on the following YouTube channel content, generate 6 intelligent, specific questions that users would want to ask about this content.
+
+${languageInstruction}
+
+Channel: ${channelTitle}
+Key Topics: ${sourceGuide.keyTopics.join(', ')}
+
+Video Titles:
+- ${videoTitles}
+
+Sample Transcript Content:
+${transcriptContext}
+
+Generate questions that:
+- ${isFrench ? 'Sont spécifiques au contenu disponible (pas génériques)' : 'Are specific to the available content (not generic)'}
+- ${isFrench ? 'Peuvent être répondues avec les transcriptions disponibles' : 'Can be answered using the available transcripts'}
+- ${isFrench ? 'Sont actionnables et pratiques' : 'Are actionable and practical'}
+- ${isFrench ? 'Montrent la profondeur du contenu disponible' : 'Showcase the depth of available content'}
+
+Return ONLY a JSON array of 6 strings (questions), nothing else:
+["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?", "Question 6?"]`;
+
+      try {
+        const promptsResult = await model.generateContent(promptsPrompt);
+        const promptsResponse = await promptsResult.response;
+        const promptsText = promptsResponse.text();
+
+        console.log('[SourceGuide] Generated prompts:', promptsText.substring(0, 200));
+
+        // Parse JSON array
+        let jsonText = promptsText;
+        const jsonMatch = promptsText.match(/```json\s*([\s\S]*?)\s*```/) ||
+                         promptsText.match(/```\s*([\s\S]*?)\s*```/) ||
+                         promptsText.match(/\[[\s\S]*\]/);
+
+        if (jsonMatch) {
+          jsonText = jsonMatch[1] || jsonMatch[0];
+        }
+
+        suggestedPrompts = JSON.parse(jsonText);
+        console.log('[SourceGuide] Parsed', suggestedPrompts.length, 'suggested prompts');
+      } catch (error) {
+        console.error('[SourceGuide] Failed to generate suggested prompts:', error);
+        // Fallback prompts based on key topics
+        suggestedPrompts = sourceGuide.keyTopics.slice(0, 4).map(topic =>
+          isFrench
+            ? `Comment puis-je en savoir plus sur ${topic.toLowerCase()} ?`
+            : `How can I learn more about ${topic.toLowerCase()}?`
+        );
+      }
+    } else {
+      // No transcripts - guide user to understand why
+      suggestedPrompts = isFrench
+        ? ['Pourquoi les transcriptions ne sont-elles pas disponibles ?']
+        : ['Why are transcripts not available?'];
+    }
+
     // Save to project document for future requests
     await projectDoc.ref.update({
       sourceGuide,
+      suggestedPrompts,
       sourceGuideGeneratedAt: FieldValue.serverTimestamp()
     });
 
-    console.log('[SourceGuide] Channel source guide generated and cached');
+    console.log('[SourceGuide] Channel source guide and suggested prompts generated and cached');
 
     return res.json({
       success: true,
-      sourceGuide
+      sourceGuide,
+      suggestedPrompts
     });
 
   } catch (error) {
