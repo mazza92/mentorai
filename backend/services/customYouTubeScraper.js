@@ -53,15 +53,22 @@ class CustomYouTubeScraper {
     try {
       console.log(`[CustomScraper] Fetching captions for ${videoId}...`);
 
-      // Step 1: Fetch video page HTML
-      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      const pageResponse = await axios.get(videoUrl, {
+      // Create axios instance with cookie jar for session persistence
+      const axiosInstance = axios.create({
         headers: this.headers,
-        timeout: 15000
+        timeout: 15000,
+        withCredentials: true
       });
 
+      // Step 1: Fetch video page HTML
+      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const pageResponse = await axiosInstance.get(videoUrl);
+
       const html = pageResponse.data;
+      const cookies = pageResponse.headers['set-cookie'] || [];
+
       console.log(`[CustomScraper] DEBUG: Page fetched, size: ${html.length} chars, status: ${pageResponse.status}`);
+      console.log(`[CustomScraper] DEBUG: Got ${cookies.length} cookies from response`);
 
       // Step 2: Extract ytInitialPlayerResponse from HTML
       const playerResponse = this.extractPlayerResponse(html);
@@ -92,8 +99,9 @@ class CustomYouTubeScraper {
       const selectedTrack = this.selectBestTrack(captionTracks);
       console.log(`[CustomScraper] Selected track: ${selectedTrack.languageCode} (${selectedTrack.kind || 'standard'})`);
 
-      // Step 5: Fetch caption content
-      const captions = await this.fetchCaptionContent(selectedTrack.baseUrl);
+      // Step 5: Fetch caption content using same axios instance with cookies
+      console.log(`[CustomScraper] DEBUG: Full caption track object:`, JSON.stringify(selectedTrack).substring(0, 300));
+      const captions = await this.fetchCaptionContent(selectedTrack.baseUrl, axiosInstance, cookies);
 
       // Step 6: Parse and format
       const result = {
@@ -139,27 +147,87 @@ class CustomYouTubeScraper {
 
   /**
    * Extract ytInitialPlayerResponse from HTML
+   * Uses brace-counting to properly extract the complete JSON object
    */
   extractPlayerResponse(html) {
     try {
-      // YouTube embeds player data in a script tag
+      // Find the start of ytInitialPlayerResponse
       const patterns = [
-        /var ytInitialPlayerResponse\s*=\s*({.+?});/,
-        /ytInitialPlayerResponse\s*=\s*({.+?});/,
+        'var ytInitialPlayerResponse = ',
+        'ytInitialPlayerResponse = '
       ];
 
       for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (match && match[1]) {
-          return JSON.parse(match[1]);
+        const startIndex = html.indexOf(pattern);
+        if (startIndex === -1) continue;
+
+        // Start parsing from the opening brace
+        const jsonStart = startIndex + pattern.length;
+
+        // Extract complete JSON by counting braces
+        const jsonStr = this.extractCompleteJSON(html, jsonStart);
+
+        if (jsonStr) {
+          try {
+            const parsed = JSON.parse(jsonStr);
+            console.log('[CustomScraper] DEBUG: Successfully parsed playerResponse JSON');
+            return parsed;
+          } catch (parseError) {
+            console.error('[CustomScraper] DEBUG: Failed to parse extracted JSON:', parseError.message);
+            continue;
+          }
         }
       }
 
       return null;
     } catch (error) {
-      console.error('[CustomScraper] Error parsing player response:', error.message);
+      console.error('[CustomScraper] Error extracting player response:', error.message);
       return null;
     }
+  }
+
+  /**
+   * Extract complete JSON object by counting braces
+   */
+  extractCompleteJSON(str, startIndex) {
+    let braceCount = 0;
+    let inString = false;
+    let escapeNext = false;
+    let jsonStart = -1;
+
+    for (let i = startIndex; i < str.length; i++) {
+      const char = str[i];
+
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+
+      if (char === '"' && !escapeNext) {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === '{') {
+        if (jsonStart === -1) jsonStart = i;
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0 && jsonStart !== -1) {
+          // Found complete JSON object
+          return str.substring(jsonStart, i + 1);
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -200,41 +268,55 @@ class CustomYouTubeScraper {
   /**
    * Fetch and parse caption content from URL
    */
-  async fetchCaptionContent(baseUrl) {
+  async fetchCaptionContent(baseUrl, axiosInstance, cookies) {
     try {
-      // YouTube caption URLs return XML by default
-      const response = await axios.get(baseUrl, {
+      // Add fmt=json3 to get JSON format instead of XML
+      const url = baseUrl.includes('?') ? `${baseUrl}&fmt=json3` : `${baseUrl}?fmt=json3`;
+
+      console.log(`[CustomScraper] DEBUG: Fetching caption URL: ${url.substring(0, 150)}...`);
+
+      // Build cookie header from received cookies
+      const cookieHeader = cookies.map(c => c.split(';')[0]).join('; ');
+
+      // Use same axios instance with session cookies
+      const response = await axiosInstance.get(url, {
         headers: {
-          'User-Agent': this.headers['User-Agent']
-        },
-        timeout: 10000
+          'Referer': `https://www.youtube.com/`,
+          'Accept': '*/*',
+          'Cookie': cookieHeader
+        }
       });
 
-      const xml = response.data;
+      const data = response.data;
+      console.log(`[CustomScraper] DEBUG: Got caption response, type: ${typeof data}, size: ${JSON.stringify(data).length} chars`);
 
-      // Parse XML to get caption segments
-      const parsed = await parseStringPromise(xml);
-      const textElements = parsed?.transcript?.text || [];
+      // Parse JSON response
+      const events = data?.events || [];
+      console.log(`[CustomScraper] DEBUG: Found ${events.length} caption events`);
 
       const segments = [];
       let fullText = '';
 
-      for (const element of textElements) {
-        const text = this.decodeHTMLEntities(element._ || '');
-        const start = parseFloat(element.$.start || 0);
-        const duration = parseFloat(element.$.dur || 0);
+      for (const event of events) {
+        if (!event.segs) continue;
+
+        const text = event.segs.map(seg => seg.utf8 || '').join('');
+        const startMs = event.tStartMs || 0;
+        const durationMs = event.dDurationMs || 0;
 
         if (text.trim()) {
           segments.push({
             text: text.trim(),
-            start: Math.floor(start),
-            offset: Math.floor(start * 1000), // milliseconds
-            duration: Math.floor(duration * 1000)
+            start: Math.floor(startMs / 1000),
+            offset: startMs,
+            duration: durationMs
           });
 
           fullText += text + ' ';
         }
       }
+
+      console.log(`[CustomScraper] DEBUG: Extracted ${segments.length} segments, ${fullText.trim().split(/\s+/).length} words`);
 
       return {
         text: fullText.trim(),
@@ -243,6 +325,10 @@ class CustomYouTubeScraper {
 
     } catch (error) {
       console.error('[CustomScraper] Error fetching caption content:', error.message);
+      if (error.response) {
+        console.error(`[CustomScraper] DEBUG: Response status: ${error.response.status}`);
+        console.error(`[CustomScraper] DEBUG: Response data:`, JSON.stringify(error.response.data).substring(0, 200));
+      }
       throw new Error(`Failed to fetch captions: ${error.message}`);
     }
   }

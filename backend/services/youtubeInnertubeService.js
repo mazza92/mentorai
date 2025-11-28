@@ -1,5 +1,6 @@
 const customScraper = require('./customYouTubeScraper');
 const apiScraper = require('./youtubeApiScraper');
+const ytdlpScraper = require('./youtubeDlpScraper');
 
 /**
  * YouTube Caption Scraper
@@ -43,14 +44,8 @@ class YouTubeInnertubeService {
     try {
       console.log(`[Innertube] Fetching transcript for ${videoId}...`);
 
-      // Try API scraper first (more reliable)
-      let result = await apiScraper.fetchTranscript(videoId);
-
-      // If API scraper fails, try HTML scraper as fallback
-      if (!result.success) {
-        console.log(`[Innertube] API scraper failed, trying HTML scraper...`);
-        result = await customScraper.fetchTranscript(videoId);
-      }
+      // Try yt-dlp first (ONLY method that works reliably for auto-generated transcripts)
+      let result = await ytdlpScraper.fetchTranscript(videoId);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch transcript');
