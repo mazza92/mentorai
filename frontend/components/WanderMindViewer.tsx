@@ -1595,7 +1595,7 @@ const QnAPanel = ({
                     : 'bg-slate-50 text-slate-900 rounded-tl-sm lg:rounded-tl-none border border-slate-200/80'
                 }`}>
                   {item.type === 'ai' ? (
-                    <div className="prose prose-slate max-w-none text-sm lg:text-base">
+                    <div className="ai-response">
                       {formatAiAnswer(item.text, item.citations)}
                     </div>
                   ) : (
