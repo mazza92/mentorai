@@ -41,14 +41,46 @@ class YouTubeInnertubeService {
     try {
       console.log(`[Innertube] Fetching transcript for ${videoId}...`);
 
-      // Fetch using youtube-transcript-plus (Innertube API)
-      const segments = await fetchTranscript(videoId, {
-        lang: options.lang || 'en',
-        ...options
-      });
+      let segments = null;
+      let captionLanguage = null;
+
+      // Try multiple languages in order of preference
+      // Start with auto-generated (no lang specified), then common languages
+      const languagesToTry = [
+        null,        // Auto-detect / any available language
+        'en',        // English
+        'fr',        // French
+        'es',        // Spanish
+        'de',        // German
+        'pt',        // Portuguese
+        'it',        // Italian
+        'ja',        // Japanese
+        'ko',        // Korean
+        'zh',        // Chinese
+        'ar',        // Arabic
+        'hi',        // Hindi
+        'ru'         // Russian
+      ];
+
+      // Try each language until we find captions
+      for (const lang of languagesToTry) {
+        try {
+          const fetchOptions = lang ? { lang } : {}; // No lang = fetch any available
+          segments = await fetchTranscript(videoId, fetchOptions);
+
+          if (segments && segments.length > 0) {
+            captionLanguage = segments[0]?.lang || lang || 'auto';
+            console.log(`[Innertube] ✓ Found captions in language: ${captionLanguage}`);
+            break;
+          }
+        } catch (langError) {
+          // Continue to next language
+          continue;
+        }
+      }
 
       if (!segments || segments.length === 0) {
-        throw new Error('No captions available');
+        throw new Error('No captions available in any language');
       }
 
       // Convert to our format
@@ -66,7 +98,7 @@ class YouTubeInnertubeService {
         })),
         wordCount: fullText.split(/\s+/).length,
         charCount: fullText.length,
-        language: segments[0]?.lang || 'en',
+        language: captionLanguage || segments[0]?.lang || 'auto', // Use detected language
         source: 'youtube-innertube',
         fetchTime: ((Date.now() - startTime) / 1000).toFixed(2)
       };
@@ -75,7 +107,7 @@ class YouTubeInnertubeService {
       this.cache.set(videoId, result);
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log(`[Innertube] ✓ Fetched transcript for ${videoId} in ${elapsed}s (${result.wordCount} words)`);
+      console.log(`[Innertube] ✓ Fetched transcript for ${videoId} in ${elapsed}s (${result.wordCount} words, lang: ${captionLanguage})`);
 
       return result;
 
