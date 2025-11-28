@@ -1375,6 +1375,53 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
     // 4. Build context from relevant videos
     const context = this.buildContextFromVideos(relevantVideos, question);
 
+    // Check if we have ANY transcripts available
+    const videosWithTranscripts = relevantVideos.filter(v => v.transcript && v.transcript.length > 0);
+
+    if (videosWithTranscripts.length === 0) {
+      // No transcripts available - return helpful error message
+      return {
+        answer: `## No Transcripts Available
+
+Unfortunately, none of the videos in this channel have transcripts available. This can happen when:
+
+**Why Transcripts Are Missing**
+- The creator hasn't enabled auto-captions in YouTube Studio
+- The videos are too new (captions not yet generated)
+- The videos are in a language without auto-caption support
+- The videos are unlisted or have restricted caption access
+
+**What You Can Do**
+- Ask the channel creator to enable auto-generated captions in YouTube Studio
+- Try asking about video metadata (titles, descriptions, view counts)
+- Wait a few hours if the channel was just imported (YouTube may still be processing captions)
+
+You can still browse video titles and statistics, but detailed content analysis requires transcript availability.`,
+        answerHtml: `<h2>No Transcripts Available</h2>
+
+<p>Unfortunately, none of the videos in this channel have transcripts available. This can happen when:</p>
+
+<p><strong>Why Transcripts Are Missing</strong></p>
+<ul>
+<li>The creator hasn't enabled auto-captions in YouTube Studio</li>
+<li>The videos are too new (captions not yet generated)</li>
+<li>The videos are in a language without auto-caption support</li>
+<li>The videos are unlisted or have restricted caption access</li>
+</ul>
+
+<p><strong>What You Can Do</strong></p>
+<ul>
+<li>Ask the channel creator to enable auto-generated captions in YouTube Studio</li>
+<li>Try asking about video metadata (titles, descriptions, view counts)</li>
+<li>Wait a few hours if the channel was just imported (YouTube may still be processing captions)</li>
+</ul>
+
+<p>You can still browse video titles and statistics, but detailed content analysis requires transcript availability.</p>`,
+        sources: [],
+        videosAnalyzed: 0
+      };
+    }
+
     // 5. Generate AI response
     const prompt = this.buildChannelPrompt(question, context, conversationHistory, detectedLanguage);
 

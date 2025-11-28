@@ -97,16 +97,11 @@ body {
 
 /* Enhanced bullet points - ChatGPT style */
 .ai-response ul {
-  @apply space-y-2 my-4 ml-0;
+  @apply space-y-2 my-4 ml-6 list-disc;
 }
 
 .ai-response ul li {
-  @apply relative pl-6 text-slate-700 leading-7;
-}
-
-.ai-response ul li::before {
-  content: "•";
-  @apply absolute left-0 text-slate-400 font-bold;
+  @apply text-slate-700 leading-7 pl-2;
 }
 
 /* Nested lists with proper indentation */
