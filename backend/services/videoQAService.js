@@ -1775,23 +1775,61 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
       ? `IMPORTANT: L'utilisateur parle français. Répondez TOUJOURS en français, même si le contenu des vidéos est en anglais. Traduisez les informations nécessaires.`
       : `IMPORTANT: Always respond in English.`;
 
+    const formatExample = `
+**REQUIRED FORMAT EXAMPLE** (you MUST follow this exact structure):
+
+## Main Category
+
+**Subcategory or Strategy**
+- First concrete actionable tip or step
+- Second specific tip with details
+- Third tip explaining the approach
+
+**Another Subcategory**
+- Detailed actionable advice
+- Specific technique or method
+- Clear implementation steps
+
+## Another Main Category
+
+**Specific Area**
+- Concrete step-by-step guidance
+- Practical tips from the content
+- Real examples when available`;
+
     const instructions = isFrench
-      ? `Instructions CRITIQUES:
+      ? `Instructions CRITIQUES - VOUS DEVEZ SUIVRE CES RÈGLES:
 1. PRIORITÉ ABSOLUE: Utilisez les transcriptions complètes fournies ci-dessus pour extraire des insights détaillés, des étapes spécifiques, et des conseils actionnables
 2. Extrayez les ÉTAPES CONCRÈTES, CONSEILS PRATIQUES, et TECHNIQUES mentionnées dans les transcriptions
 3. Pour les questions demandant des "étapes" ou "tips actionnables", listez les points spécifiques mentionnés dans le contenu vidéo, PAS juste les titres
-4. Formatez votre réponse de manière structurée avec des titres en gras (**titre**), des puces claires, et des paragraphes bien séparés
-5. NE PAS inclure les titres de vidéos ou horodatages dans le corps de la réponse - les sources seront ajoutées automatiquement
-6. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
-7. Répondez TOUJOURS en français, même si le contenu est en anglais`
-      : `CRITICAL Instructions:
+
+FORMATAGE OBLIGATOIRE (suivez EXACTEMENT ce format):
+- Commencez TOUJOURS par des titres de niveau 2 (## Titre Principal)
+- Utilisez des sous-titres en gras (**Sous-titre**)
+- Chaque point d'action doit être une puce (-)
+- Groupez les idées similaires sous des titres appropriés
+- NE JAMAIS écrire de longs paragraphes sans structure
+- NE PAS inclure les titres de vidéos ou horodatages dans le corps de la réponse
+${formatExample}
+
+5. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
+6. Répondez TOUJOURS en français, même si le contenu est en anglais`
+      : `CRITICAL Instructions - YOU MUST FOLLOW THESE RULES:
 1. TOP PRIORITY: Use the full transcript content provided above to extract detailed insights, specific steps, and actionable advice
 2. Extract CONCRETE STEPS, PRACTICAL TIPS, and TECHNIQUES mentioned in the transcript content
 3. For questions asking for "steps" or "actionable tips", list the specific points mentioned in the video content, NOT just video titles
-4. Format your response with clear structure: use bold headings (**heading**), bullet points, and well-separated paragraphs
-5. DO NOT include video titles or timestamps inline - sources will be added automatically at the end
-6. Synthesize information across multiple videos for comprehensive answers
-7. Keep your answer focused and well-organized for easy reading`;
+
+MANDATORY FORMATTING (follow this EXACT structure):
+- ALWAYS start with level 2 headings (## Main Heading)
+- Use bold subheadings (**Subheading**)
+- Every action item must be a bullet point (-)
+- Group similar ideas under appropriate headings
+- NEVER write long paragraphs without structure
+- DO NOT include video titles or timestamps inline
+${formatExample}
+
+5. Synthesize information across multiple videos for comprehensive answers
+6. Keep your answer focused and well-organized for easy reading`;
 
     const finalPrompt = isFrench
       ? `Réponse en français:`
