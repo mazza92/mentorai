@@ -1,9 +1,10 @@
-const { fetchTranscript } = require('youtube-transcript-plus');
+const customScraper = require('./customYouTubeScraper');
 
 /**
- * YouTube Innertube Caption Scraper
+ * YouTube Caption Scraper
  *
- * Uses YouTube's internal Innertube API to fetch existing captions/transcripts.
+ * Uses custom scraper to fetch existing captions/transcripts.
+ * (Third-party library blocked by YouTube - switched to custom implementation)
  *
  * Key advantages:
  * - 10-50x faster than audio transcription (just downloads existing captions)
@@ -41,73 +42,19 @@ class YouTubeInnertubeService {
     try {
       console.log(`[Innertube] Fetching transcript for ${videoId}...`);
 
-      let segments = null;
-      let captionLanguage = null;
+      // Use custom scraper (handles multi-language internally)
+      const result = await customScraper.fetchTranscript(videoId);
 
-      // Try multiple languages in order of preference
-      // Start with auto-generated (no lang specified), then common languages
-      const languagesToTry = [
-        null,        // Auto-detect / any available language
-        'en',        // English
-        'fr',        // French
-        'es',        // Spanish
-        'de',        // German
-        'pt',        // Portuguese
-        'it',        // Italian
-        'ja',        // Japanese
-        'ko',        // Korean
-        'zh',        // Chinese
-        'ar',        // Arabic
-        'hi',        // Hindi
-        'ru'         // Russian
-      ];
-
-      // Try each language until we find captions
-      for (const lang of languagesToTry) {
-        try {
-          const fetchOptions = lang ? { lang } : {}; // No lang = fetch any available
-          segments = await fetchTranscript(videoId, fetchOptions);
-
-          if (segments && segments.length > 0) {
-            captionLanguage = segments[0]?.lang || lang || 'auto';
-            console.log(`[Innertube] ✓ Found captions in language: ${captionLanguage}`);
-            break;
-          }
-        } catch (langError) {
-          // Continue to next language
-          continue;
-        }
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch transcript');
       }
 
-      if (!segments || segments.length === 0) {
-        throw new Error('No captions available in any language');
-      }
-
-      // Convert to our format
-      const fullText = segments.map(seg => seg.text).join(' ');
-
-      const result = {
-        success: true,
-        videoId,
-        text: fullText,
-        segments: segments.map(seg => ({
-          text: seg.text,
-          start: Math.floor(seg.offset / 1000), // Convert ms to seconds for timestamps
-          offset: seg.offset, // Keep original ms offset
-          duration: seg.duration
-        })),
-        wordCount: fullText.split(/\s+/).length,
-        charCount: fullText.length,
-        language: captionLanguage || segments[0]?.lang || 'auto', // Use detected language
-        source: 'youtube-innertube',
-        fetchTime: ((Date.now() - startTime) / 1000).toFixed(2)
-      };
-
+      // Result already in correct format from custom scraper
       // Cache the result
       this.cache.set(videoId, result);
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log(`[Innertube] ✓ Fetched transcript for ${videoId} in ${elapsed}s (${result.wordCount} words, lang: ${captionLanguage})`);
+      console.log(`[Innertube] ✓ Fetched transcript for ${videoId} in ${elapsed}s (${result.wordCount} words, lang: ${result.language})`);
 
       return result;
 
