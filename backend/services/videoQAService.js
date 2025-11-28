@@ -1,4 +1,13 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { marked } = require('marked');
+
+// Configure marked for better HTML output
+marked.setOptions({
+  breaks: true, // Convert \n to <br>
+  gfm: true, // GitHub Flavored Markdown
+  headerIds: false, // Don't add IDs to headers
+  mangle: false // Don't escape HTML
+});
 
 class VideoQAService {
   constructor() {
@@ -1381,15 +1390,32 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
 
 YOUR GOAL: Provide detailed, comprehensive, actionable answers using the transcript content.
 
-FORMATTING RULES (apply to your detailed content):
-1. Use ## headings to organize main topics
+CRITICAL MARKDOWN FORMATTING RULES:
+1. Use ## headings to organize main topics (with blank line before and after)
 2. Use **bold** for subcategories within topics
 3. Use bullet points (-) for each specific tip or action item
-4. Provide 3-5 bullet points under each subcategory
+4. Provide 4-6 bullet points under EVERY subcategory
 5. Each bullet should be a complete, detailed sentence with specific advice
 6. Include concrete steps, techniques, and examples from the transcripts
+7. NEVER output just headings without bullet points
+8. DO NOT include inline video references like "(Video 5)" or "(Video 1, Video 2)"
 
-IMPORTANT: Provide FULL detailed answers with ALL the actionable content. The formatting is to organize the content, NOT to limit it.
+FORMATTING STRUCTURE (YOU MUST FOLLOW):
+## Main Topic
+
+**Subcategory Name**
+- First detailed bullet point with complete explanation
+- Second detailed bullet point with specific guidance
+- Third detailed bullet point with examples from transcripts
+- Fourth detailed bullet point with actionable steps
+
+**Another Subcategory**
+- Complete bullet point with full details
+- Another complete bullet point with specifics
+- Third bullet point with examples
+- Fourth bullet point with action items
+
+IMPORTANT: Provide FULL detailed answers with ALL actionable content. Your response MUST be 500+ words with comprehensive details.
 
 ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponses détaillées et complètes.' : 'Always respond in English with detailed, complete answers.'}`,
         generationConfig: {
@@ -1404,6 +1430,26 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
       const response = await result.response;
       const answer = response.text();
 
+      // Convert markdown to HTML for better frontend rendering
+      let answerHtml;
+      try {
+        // Clean up the markdown before conversion
+        let cleanedMarkdown = answer
+          // Remove inline video references like (Video 5, Video 4)
+          .replace(/\(Video\s+\d+(?:,\s*Video\s+\d+)*\)/gi, '')
+          // Ensure proper spacing between sections
+          .replace(/\n\n\n+/g, '\n\n')
+          // Ensure headings have proper line breaks
+          .replace(/([^\n])\n##\s/g, '$1\n\n## ')
+          // Ensure bullet points have proper line breaks
+          .replace(/([^\n])\n-\s/g, '$1\n\n- ');
+
+        answerHtml = await marked(cleanedMarkdown);
+      } catch (error) {
+        console.error('[VideoQAService] Error converting markdown to HTML:', error);
+        answerHtml = null; // Fallback to plain markdown
+      }
+
       // 4. Build sources from relevant videos (all videos with transcripts contributed)
       const sources = relevantVideos
         .filter(v => v.transcript) // Only videos with transcripts
@@ -1417,7 +1463,8 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
         }));
 
       return {
-        answer: answer,
+        answer: answer, // Original markdown
+        answerHtml: answerHtml, // HTML version for frontend
         sources: sources,
         videosAnalyzed: relevantVideos.length
       };
