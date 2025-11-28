@@ -1391,7 +1391,13 @@ FORMATTING RULES (apply to your detailed content):
 
 IMPORTANT: Provide FULL detailed answers with ALL the actionable content. The formatting is to organize the content, NOT to limit it.
 
-${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponses détaillées et complètes.' : 'Always respond in English with detailed, complete answers.'}`
+${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponses détaillées et complètes.' : 'Always respond in English with detailed, complete answers.'}`,
+        generationConfig: {
+          temperature: 0.7, // Balanced creativity for detailed responses
+          maxOutputTokens: 8192, // Allow long, comprehensive answers
+          topP: 0.95,
+          topK: 40
+        }
       });
 
       const result = await modelWithSystem.generateContent(prompt);
@@ -1822,36 +1828,66 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
 - Additional strategies and approaches discussed`;
 
     const instructions = isFrench
-      ? `Instructions CRITIQUES - VOUS DEVEZ SUIVRE CES RÈGLES:
-1. PRIORITÉ ABSOLUE: Utilisez les transcriptions complètes pour extraire TOUS les insights, étapes, et conseils actionnables
-2. Fournissez des réponses COMPLÈTES et DÉTAILLÉES avec 4-6 points par sous-catégorie
-3. Chaque point doit être une phrase complète avec des détails spécifiques du contenu
+      ? `⚠️ Instructions CRITIQUES - VOUS DEVEZ SUIVRE CES RÈGLES:
 
-FORMATAGE OBLIGATOIRE (pour organiser votre contenu détaillé):
+🚫 NE JAMAIS FAIRE CECI (réponse incomplète):
+## Sujet Principal
+**Sous-catégorie**
+
+✅ TOUJOURS FAIRE CECI (réponse complète):
+## Sujet Principal
+**Sous-catégorie**
+- Premier point détaillé expliquant la technique spécifique avec des exemples de la vidéo
+- Deuxième point avec des étapes détaillées et des conseils d'implémentation pratiques
+- Troisième point décrivant l'approche complète et pourquoi elle fonctionne
+- Quatrième point avec des exemples concrets et des chiffres/données des transcriptions
+
+RÈGLES OBLIGATOIRES:
+1. PRIORITÉ ABSOLUE: Extrayez TOUS les insights, étapes, et conseils actionnables des transcriptions complètes
+2. Fournissez des réponses COMPLÈTES et DÉTAILLÉES avec 4-6 PUCES COMPLÈTES par sous-catégorie
+3. Chaque puce DOIT être une phrase complète avec des détails spécifiques du contenu
+4. NE JAMAIS produire juste des titres - TOUJOURS inclure les puces détaillées
+5. Si vous produisez seulement des titres sans puces, vous avez ÉCHOUÉ
+
+FORMATAGE (pour organiser votre contenu détaillé):
 - Utilisez ## pour les catégories principales
 - Utilisez ** pour les sous-catégories
-- 4-6 puces (-) détaillées sous chaque sous-catégorie
-- Chaque puce = une phrase complète avec explication
-- NE PAS juste lister des titres - donnez le CONTENU complet
+- 4-6 puces (-) détaillées sous CHAQUE sous-catégorie
+- Chaque puce = phrase complète avec explication et exemples
 ${formatExample}
 
-4. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
-5. Répondez TOUJOURS en français avec tous les détails`
-      : `CRITICAL Instructions - YOU MUST FOLLOW THESE RULES:
-1. TOP PRIORITY: Extract ALL insights, steps, and actionable advice from the full transcripts
-2. Provide COMPLETE, DETAILED answers with 4-6 points per subcategory
-3. Each point must be a full sentence with specific details from the content
+6. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
+7. Votre réponse DOIT faire 500+ mots avec tous les détails actionnables`
+      : `⚠️ CRITICAL Instructions - YOU MUST FOLLOW THESE RULES:
 
-MANDATORY FORMATTING (to organize your detailed content):
+🚫 NEVER DO THIS (incomplete response):
+## Main Topic
+**Subcategory**
+
+✅ ALWAYS DO THIS (complete response):
+## Main Topic
+**Subcategory**
+- First detailed point explaining the specific technique with examples from the video
+- Second point with step-by-step guidance and practical implementation advice
+- Third point describing the complete approach and why it works
+- Fourth point with real-world examples and specific numbers/data from transcripts
+
+MANDATORY RULES:
+1. TOP PRIORITY: Extract ALL insights, steps, and actionable advice from the full transcripts
+2. Provide COMPLETE, DETAILED answers with 4-6 FULL BULLET POINTS per subcategory
+3. Each bullet point MUST be a complete sentence with specific details from the content
+4. NEVER output just headings - ALWAYS include the detailed bullet points
+5. If you only output headings without bullet points, you have FAILED
+
+FORMATTING (to organize your detailed content):
 - Use ## for main categories
 - Use ** for subcategories
-- 4-6 detailed bullet points (-) under each subcategory
-- Each bullet = complete sentence with explanation
-- DO NOT just list headings - provide FULL content
+- 4-6 detailed bullet points (-) under EVERY subcategory
+- Each bullet = complete sentence with explanation and examples
 ${formatExample}
 
-4. Synthesize information across multiple videos for comprehensive answers
-5. Provide complete, thorough answers with all actionable details`;
+6. Synthesize information across multiple videos for comprehensive answers
+7. Your response MUST be 500+ words with full actionable details`;
 
     const finalPrompt = isFrench
       ? `Réponse en français:`
