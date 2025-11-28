@@ -61,16 +61,26 @@ class CustomYouTubeScraper {
       });
 
       const html = pageResponse.data;
+      console.log(`[CustomScraper] DEBUG: Page fetched, size: ${html.length} chars, status: ${pageResponse.status}`);
 
       // Step 2: Extract ytInitialPlayerResponse from HTML
       const playerResponse = this.extractPlayerResponse(html);
 
       if (!playerResponse) {
+        console.error(`[CustomScraper] DEBUG: Failed to extract playerResponse`);
+        console.error(`[CustomScraper] DEBUG: HTML contains 'ytInitialPlayerResponse': ${html.includes('ytInitialPlayerResponse')}`);
+        console.error(`[CustomScraper] DEBUG: HTML preview: ${html.substring(0, 500)}`);
         throw new Error('Could not extract player response from page');
       }
 
+      console.log(`[CustomScraper] DEBUG: PlayerResponse extracted successfully`);
+
       // Step 3: Get caption tracks
       const captionTracks = this.extractCaptionTracks(playerResponse);
+
+      console.log(`[CustomScraper] DEBUG: Caption tracks extracted, count: ${captionTracks?.length || 0}`);
+      console.log(`[CustomScraper] DEBUG: Has captions object: ${!!playerResponse?.captions}`);
+      console.log(`[CustomScraper] DEBUG: Has tracklistRenderer: ${!!playerResponse?.captions?.playerCaptionsTracklistRenderer}`);
 
       if (!captionTracks || captionTracks.length === 0) {
         throw new Error('No captions available for this video');
@@ -109,6 +119,14 @@ class CustomYouTubeScraper {
     } catch (error) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.error(`[CustomScraper] ✗ Failed to fetch ${videoId} after ${elapsed}s:`, error.message);
+
+      // Log additional error details
+      if (error.response) {
+        console.error(`[CustomScraper] DEBUG: HTTP ${error.response.status} - ${error.response.statusText}`);
+        console.error(`[CustomScraper] DEBUG: Response preview: ${JSON.stringify(error.response.data).substring(0, 200)}`);
+      } else if (error.code) {
+        console.error(`[CustomScraper] DEBUG: Error code: ${error.code}`);
+      }
 
       return {
         success: false,
