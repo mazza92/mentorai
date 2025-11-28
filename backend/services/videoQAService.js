@@ -1378,12 +1378,21 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
       const response = await result.response;
       const answer = response.text();
 
-      // 4. Extract citations from answer
-      const citations = this.extractChannelCitations(answer, relevantVideos);
+      // 4. Build sources from relevant videos (all videos with transcripts contributed)
+      const sources = relevantVideos
+        .filter(v => v.transcript) // Only videos with transcripts
+        .map(v => ({
+          videoId: v.videoId,
+          videoTitle: v.title,
+          thumbnailUrl: v.thumbnailUrl,
+          publishedAt: v.publishedAt,
+          viewCount: v.viewCount,
+          url: `https://www.youtube.com/watch?v=${v.videoId}`
+        }));
 
       return {
         answer: answer,
-        sources: citations,
+        sources: sources,
         videosAnalyzed: relevantVideos.length
       };
     } catch (error) {
@@ -1450,6 +1459,7 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
 
           // Update video object in array (for immediate use)
           video.transcript = transcriptResult.text;
+          video.transcriptSegments = transcriptResult.segments; // Include segments for timestamps
           video.status = 'ready';
 
           // Save to Firestore (cached forever - subsequent queries are FREE)
@@ -1461,6 +1471,7 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
 
             await videoRef.update({
               transcript: transcriptResult.text,
+              transcriptSegments: transcriptResult.segments, // Store segments for future queries
               status: 'ready',
               transcriptSource: source,
               transcriptLanguage: transcriptResult.language || 'en',
@@ -1769,18 +1780,18 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
 1. PRIORITÉ ABSOLUE: Utilisez les transcriptions complètes fournies ci-dessus pour extraire des insights détaillés, des étapes spécifiques, et des conseils actionnables
 2. Extrayez les ÉTAPES CONCRÈTES, CONSEILS PRATIQUES, et TECHNIQUES mentionnées dans les transcriptions
 3. Pour les questions demandant des "étapes" ou "tips actionnables", listez les points spécifiques mentionnés dans le contenu vidéo, PAS juste les titres
-4. Incluez des horodatages au format [Titre @ MM:SS] pour chaque insight provenant d'une transcription
-5. Si une vidéo n'a que des métadonnées, indiquez-le clairement et basez-vous sur le titre/description
+4. Formatez votre réponse de manière structurée avec des titres en gras (**titre**), des puces claires, et des paragraphes bien séparés
+5. NE PAS inclure les titres de vidéos ou horodatages dans le corps de la réponse - les sources seront ajoutées automatiquement
 6. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
 7. Répondez TOUJOURS en français, même si le contenu est en anglais`
       : `CRITICAL Instructions:
 1. TOP PRIORITY: Use the full transcript content provided above to extract detailed insights, specific steps, and actionable advice
 2. Extract CONCRETE STEPS, PRACTICAL TIPS, and TECHNIQUES mentioned in the transcript content
 3. For questions asking for "steps" or "actionable tips", list the specific points mentioned in the video content, NOT just video titles
-4. Include timestamps in format [Video Title @ MM:SS] for each insight from transcripts
-5. If a video has only metadata, clearly indicate this and base insights on title/description
+4. Format your response with clear structure: use bold headings (**heading**), bullet points, and well-separated paragraphs
+5. DO NOT include video titles or timestamps inline - sources will be added automatically at the end
 6. Synthesize information across multiple videos for comprehensive answers
-7. Always cite your sources with video titles and timestamps when available`;
+7. Keep your answer focused and well-organized for easy reading`;
 
     const finalPrompt = isFrench
       ? `Réponse en français:`
