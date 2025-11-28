@@ -1379,15 +1379,19 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
         model: 'gemini-2.5-flash',
         systemInstruction: `You are a professional content analyst who extracts actionable insights from YouTube videos.
 
-STRICT FORMATTING RULES (you MUST follow):
-1. Always use ## headings for main categories
-2. Always use **bold** for subcategories
-3. Always use bullet points (-) for individual tips
-4. Never write unformatted paragraphs
-5. Group related ideas under clear headings
-6. Be concise and scannable
+YOUR GOAL: Provide detailed, comprehensive, actionable answers using the transcript content.
 
-${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français.' : 'Always respond in English.'}`
+FORMATTING RULES (apply to your detailed content):
+1. Use ## headings to organize main topics
+2. Use **bold** for subcategories within topics
+3. Use bullet points (-) for each specific tip or action item
+4. Provide 3-5 bullet points under each subcategory
+5. Each bullet should be a complete, detailed sentence with specific advice
+6. Include concrete steps, techniques, and examples from the transcripts
+
+IMPORTANT: Provide FULL detailed answers with ALL the actionable content. The formatting is to organize the content, NOT to limit it.
+
+${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponses détaillées et complètes.' : 'Always respond in English with detailed, complete answers.'}`
       });
 
       const result = await modelWithSystem.generateContent(prompt);
@@ -1792,60 +1796,62 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
       : `IMPORTANT: Always respond in English.`;
 
     const formatExample = `
-**REQUIRED FORMAT EXAMPLE** (you MUST follow this exact structure):
+**REQUIRED FORMAT EXAMPLE** (provide THIS level of detail):
 
 ## Main Category
 
 **Subcategory or Strategy**
-- First concrete actionable tip or step
-- Second specific tip with details
-- Third tip explaining the approach
+- First concrete actionable tip with full explanation of how to implement it
+- Second specific tip including details, context, and examples from the videos
+- Third tip explaining the complete approach and why it works
+- Fourth tip with step-by-step guidance
+- Fifth tip with practical implementation advice
 
 **Another Subcategory**
-- Detailed actionable advice
-- Specific technique or method
-- Clear implementation steps
+- Detailed actionable advice with context and reasoning
+- Specific technique or method with implementation steps
+- Clear guidance with real examples from the transcript
+- Additional tips and variations mentioned in the content
 
 ## Another Main Category
 
 **Specific Area**
-- Concrete step-by-step guidance
-- Practical tips from the content
-- Real examples when available`;
+- Concrete step-by-step guidance with full details
+- Practical tips from the content with explanation
+- Real examples and techniques mentioned in videos
+- Additional strategies and approaches discussed`;
 
     const instructions = isFrench
       ? `Instructions CRITIQUES - VOUS DEVEZ SUIVRE CES RÈGLES:
-1. PRIORITÉ ABSOLUE: Utilisez les transcriptions complètes fournies ci-dessus pour extraire des insights détaillés, des étapes spécifiques, et des conseils actionnables
-2. Extrayez les ÉTAPES CONCRÈTES, CONSEILS PRATIQUES, et TECHNIQUES mentionnées dans les transcriptions
-3. Pour les questions demandant des "étapes" ou "tips actionnables", listez les points spécifiques mentionnés dans le contenu vidéo, PAS juste les titres
+1. PRIORITÉ ABSOLUE: Utilisez les transcriptions complètes pour extraire TOUS les insights, étapes, et conseils actionnables
+2. Fournissez des réponses COMPLÈTES et DÉTAILLÉES avec 4-6 points par sous-catégorie
+3. Chaque point doit être une phrase complète avec des détails spécifiques du contenu
 
-FORMATAGE OBLIGATOIRE (suivez EXACTEMENT ce format):
-- Commencez TOUJOURS par des titres de niveau 2 (## Titre Principal)
-- Utilisez des sous-titres en gras (**Sous-titre**)
-- Chaque point d'action doit être une puce (-)
-- Groupez les idées similaires sous des titres appropriés
-- NE JAMAIS écrire de longs paragraphes sans structure
-- NE PAS inclure les titres de vidéos ou horodatages dans le corps de la réponse
+FORMATAGE OBLIGATOIRE (pour organiser votre contenu détaillé):
+- Utilisez ## pour les catégories principales
+- Utilisez ** pour les sous-catégories
+- 4-6 puces (-) détaillées sous chaque sous-catégorie
+- Chaque puce = une phrase complète avec explication
+- NE PAS juste lister des titres - donnez le CONTENU complet
 ${formatExample}
 
-5. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
-6. Répondez TOUJOURS en français, même si le contenu est en anglais`
+4. Synthétisez les informations de plusieurs vidéos pour des réponses complètes
+5. Répondez TOUJOURS en français avec tous les détails`
       : `CRITICAL Instructions - YOU MUST FOLLOW THESE RULES:
-1. TOP PRIORITY: Use the full transcript content provided above to extract detailed insights, specific steps, and actionable advice
-2. Extract CONCRETE STEPS, PRACTICAL TIPS, and TECHNIQUES mentioned in the transcript content
-3. For questions asking for "steps" or "actionable tips", list the specific points mentioned in the video content, NOT just video titles
+1. TOP PRIORITY: Extract ALL insights, steps, and actionable advice from the full transcripts
+2. Provide COMPLETE, DETAILED answers with 4-6 points per subcategory
+3. Each point must be a full sentence with specific details from the content
 
-MANDATORY FORMATTING (follow this EXACT structure):
-- ALWAYS start with level 2 headings (## Main Heading)
-- Use bold subheadings (**Subheading**)
-- Every action item must be a bullet point (-)
-- Group similar ideas under appropriate headings
-- NEVER write long paragraphs without structure
-- DO NOT include video titles or timestamps inline
+MANDATORY FORMATTING (to organize your detailed content):
+- Use ## for main categories
+- Use ** for subcategories
+- 4-6 detailed bullet points (-) under each subcategory
+- Each bullet = complete sentence with explanation
+- DO NOT just list headings - provide FULL content
 ${formatExample}
 
-5. Synthesize information across multiple videos for comprehensive answers
-6. Keep your answer focused and well-organized for easy reading`;
+4. Synthesize information across multiple videos for comprehensive answers
+5. Provide complete, thorough answers with all actionable details`;
 
     const finalPrompt = isFrench
       ? `Réponse en français:`
