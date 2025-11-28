@@ -1374,7 +1374,23 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
         return this.generateMockChannelResponse(question, relevantVideos);
       }
 
-      const result = await this.model.generateContent(prompt);
+      // Use system instruction for more consistent formatting
+      const modelWithSystem = this.genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        systemInstruction: `You are a professional content analyst who extracts actionable insights from YouTube videos.
+
+STRICT FORMATTING RULES (you MUST follow):
+1. Always use ## headings for main categories
+2. Always use **bold** for subcategories
+3. Always use bullet points (-) for individual tips
+4. Never write unformatted paragraphs
+5. Group related ideas under clear headings
+6. Be concise and scannable
+
+${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français.' : 'Always respond in English.'}`
+      });
+
+      const result = await modelWithSystem.generateContent(prompt);
       const response = await result.response;
       const answer = response.text();
 
