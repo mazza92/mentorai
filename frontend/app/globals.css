@@ -75,3 +75,106 @@ body {
   background: transparent;
 }
 
+/* ChatGPT/Gemini-style AI Response Formatting */
+.ai-response {
+  @apply text-[15px] leading-relaxed;
+}
+
+/* Enhanced heading styles - more prominent like ChatGPT */
+.ai-response h2 {
+  @apply text-lg font-semibold mt-6 mb-3 text-slate-900;
+  @apply first:mt-0;
+}
+
+.ai-response h3 {
+  @apply text-base font-semibold mt-4 mb-2 text-slate-800;
+}
+
+/* Better paragraph spacing */
+.ai-response p {
+  @apply mb-4 text-slate-700 leading-7;
+}
+
+/* Enhanced bullet points - ChatGPT style */
+.ai-response ul {
+  @apply space-y-2 my-4 ml-0;
+}
+
+.ai-response ul li {
+  @apply relative pl-6 text-slate-700 leading-7;
+}
+
+.ai-response ul li::before {
+  content: "•";
+  @apply absolute left-0 text-slate-400 font-bold;
+}
+
+/* Nested lists with proper indentation */
+.ai-response ul ul {
+  @apply mt-2 ml-4;
+}
+
+/* Bold text styling */
+.ai-response strong {
+  @apply font-semibold text-slate-900;
+}
+
+/* Code blocks */
+.ai-response code {
+  @apply bg-slate-100 px-1.5 py-0.5 rounded text-sm font-mono text-slate-800;
+}
+
+.ai-response pre {
+  @apply bg-slate-50 p-4 rounded-lg my-4 overflow-x-auto;
+}
+
+.ai-response pre code {
+  @apply bg-transparent p-0;
+}
+
+/* Links */
+.ai-response a {
+  @apply text-blue-600 hover:text-blue-700 underline;
+}
+
+/* Blockquotes */
+.ai-response blockquote {
+  @apply border-l-4 border-slate-300 pl-4 py-2 my-4 italic text-slate-600;
+}
+
+/* Tables */
+.ai-response table {
+  @apply w-full my-4 border-collapse;
+}
+
+.ai-response th {
+  @apply bg-slate-50 px-4 py-2 text-left font-semibold text-slate-900 border-b-2 border-slate-200;
+}
+
+.ai-response td {
+  @apply px-4 py-2 border-b border-slate-100 text-slate-700;
+}
+
+/* Horizontal rules */
+.ai-response hr {
+  @apply my-6 border-slate-200;
+}
+
+/* Ordered lists */
+.ai-response ol {
+  @apply space-y-2 my-4 ml-6 list-decimal;
+}
+
+.ai-response ol li {
+  @apply text-slate-700 leading-7 pl-2;
+}
+
+/* Better spacing for first and last elements */
+.ai-response > *:first-child {
+  @apply mt-0;
+}
+
+.ai-response > *:last-child {
+  @apply mb-0;
+}
+
