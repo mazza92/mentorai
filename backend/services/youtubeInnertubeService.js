@@ -1,4 +1,5 @@
 const customScraper = require('./customYouTubeScraper');
+const apiScraper = require('./youtubeApiScraper');
 
 /**
  * YouTube Caption Scraper
@@ -42,19 +43,24 @@ class YouTubeInnertubeService {
     try {
       console.log(`[Innertube] Fetching transcript for ${videoId}...`);
 
-      // Use custom scraper (handles multi-language internally)
-      const result = await customScraper.fetchTranscript(videoId);
+      // Try API scraper first (more reliable)
+      let result = await apiScraper.fetchTranscript(videoId);
+
+      // If API scraper fails, try HTML scraper as fallback
+      if (!result.success) {
+        console.log(`[Innertube] API scraper failed, trying HTML scraper...`);
+        result = await customScraper.fetchTranscript(videoId);
+      }
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch transcript');
       }
 
-      // Result already in correct format from custom scraper
       // Cache the result
       this.cache.set(videoId, result);
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log(`[Innertube] ✓ Fetched transcript for ${videoId} in ${elapsed}s (${result.wordCount} words, lang: ${result.language})`);
+      console.log(`[Innertube] ✓ Fetched transcript for ${videoId} in ${elapsed}s (${result.wordCount} words, lang: ${result.language}, source: ${result.source})`);
 
       return result;
 
