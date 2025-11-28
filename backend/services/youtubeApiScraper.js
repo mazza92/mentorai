@@ -12,7 +12,9 @@ class YouTubeApiScraper {
     this.cache = new Map();
 
     // Innertube API configuration
-    this.API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'; // Public web client API key
+    // Note: This is YouTube's public web client API key (embedded in youtube.com)
+    // Not a private/secret key, but we use env var for best practice
+    this.API_KEY = process.env.YOUTUBE_INNERTUBE_API_KEY || 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
     this.CLIENT_VERSION = '2.20231219.04.00';
     this.CLIENT_NAME = 'WEB';
   }
