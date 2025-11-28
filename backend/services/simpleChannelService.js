@@ -109,6 +109,7 @@ class SimpleChannelService {
           const videoId = video.id;
           if (transcriptResults.transcripts[videoId]) {
             const transcript = transcriptResults.transcripts[videoId];
+            video.status = 'ready'; // CRITICAL: videoQAService checks for this
             video.hasTranscript = true;
             video.transcript = transcript.text;
             video.transcriptSource = 'youtube-innertube';
@@ -281,8 +282,9 @@ class SimpleChannelService {
           likeCount: parseInt(video.statistics.likeCount) || 0,
           commentCount: parseInt(video.statistics.commentCount) || 0,
           // Track transcription status
+          status: 'metadata_only', // Will be 'ready' when transcript fetched
           hasTranscript: false,
-          transcriptSource: null, // Will be 'assemblyai' when transcribed
+          transcriptSource: null,
           transcribedAt: null
         });
       });
@@ -353,6 +355,7 @@ class SimpleChannelService {
 
         // Store transcript
         await videoRef.update({
+          status: 'ready',
           hasTranscript: true,
           transcript: innertubeResult.text,
           transcriptSource: 'youtube-innertube',
@@ -382,6 +385,7 @@ class SimpleChannelService {
 
       // Store transcript
       await videoRef.update({
+        status: 'ready',
         hasTranscript: true,
         transcript: transcriptResult.text,
         transcriptSource: 'assemblyai',
