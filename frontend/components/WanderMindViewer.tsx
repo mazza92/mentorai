@@ -1632,7 +1632,7 @@ const QnAPanel = ({
             {suggestedPrompts && suggestedPrompts.length > 0 && history.length === 0 && (
               <div className="mb-3">
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                  {suggestedPrompts.slice(0, 6).map((prompt, idx) => (
+                  {suggestedPrompts.slice(0, 6).map((prompt: string, idx: number) => (
                     <button
                       key={idx}
                       onClick={() => {
