@@ -73,6 +73,28 @@ router.post('/import', async (req, res) => {
       { concurrency: 10, prioritizeBy: 'views' }
     );
 
+    // Save initial transcripts to channels collection
+    const { firestore: firestoreForUpdate } = getFirestore();
+    const channelRef = firestoreForUpdate.collection('channels').doc(quickImport.channelId);
+    const batch = firestoreForUpdate.batch();
+
+    for (const video of initialVideos) {
+      if (video.hasTranscript) {
+        const videoRef = channelRef.collection('videos').doc(video.id);
+        batch.update(videoRef, {
+          status: 'ready',
+          hasTranscript: true,
+          transcript: video.transcript,
+          transcriptSegments: video.transcriptSegments,
+          transcriptSource: video.transcriptSource,
+          transcriptFetchedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    await batch.commit();
+    console.log(`[API] ✓ Saved ${initialTranscripts.successful} transcripts to Firestore`);
+
     // Step 3: Create project with "partial" or "ready" status
     const { firestore } = getFirestore();
     const projectId = quickImport.channelId;
@@ -92,7 +114,8 @@ router.post('/import', async (req, res) => {
         fetched: initialTranscripts.successful,
         total: quickImport.videoCount
       },
-      transcripts: initialTranscripts.transcripts,
+      // Don't store transcripts here - they're in channels/{channelId}/videos
+      // This keeps document under 1MB Firestore limit
       transcriptStats: {
         successful: initialTranscripts.successful,
         failed: initialTranscripts.failed,
@@ -139,12 +162,29 @@ router.post('/import', async (req, res) => {
             { concurrency: 10, prioritizeBy: 'views' }
           );
 
-          // Merge with initial transcripts
-          const allTranscripts = {
-            ...initialTranscripts.transcripts,
-            ...remainingTranscripts.transcripts
-          };
+          // Save remaining transcripts to channels collection
+          const { firestore: firestoreBg } = getFirestore();
+          const channelRefBg = firestoreBg.collection('channels').doc(quickImport.channelId);
+          const batchBg = firestoreBg.batch();
 
+          for (const video of remainingVideos) {
+            if (video.hasTranscript) {
+              const videoRef = channelRefBg.collection('videos').doc(video.id);
+              batchBg.update(videoRef, {
+                status: 'ready',
+                hasTranscript: true,
+                transcript: video.transcript,
+                transcriptSegments: video.transcriptSegments,
+                transcriptSource: video.transcriptSource,
+                transcriptFetchedAt: new Date().toISOString()
+              });
+            }
+          }
+
+          await batchBg.commit();
+          console.log(`[API] ✓ Saved ${remainingTranscripts.successful} remaining transcripts to Firestore`);
+
+          // Calculate final stats (transcripts already stored in channels collection)
           const totalStats = {
             successful: initialTranscripts.successful + remainingTranscripts.successful,
             failed: initialTranscripts.failed + remainingTranscripts.failed,
@@ -152,10 +192,9 @@ router.post('/import', async (req, res) => {
             isPartial: false
           };
 
-          // Update project with all transcripts
+          // Update project status (transcripts are in channels/{channelId}/videos)
           await projectRef.update({
             status: 'ready',
-            transcripts: allTranscripts,
             transcriptStats: totalStats,
             transcriptProgress: {
               fetched: totalStats.successful,
