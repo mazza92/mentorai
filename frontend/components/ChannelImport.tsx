@@ -57,7 +57,7 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
         channelUrl,
         userId
       }, {
-        timeout: 10 * 60 * 1000, // 10 minute timeout for large channels (300+ videos)
+        timeout: 60 * 1000, // 60 second timeout (only waits for initial 15 videos)
       })
 
       if (response.data.success) {
@@ -66,14 +66,14 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
         setImportStatus({
           channelName: data.channelName,
           videoCount: data.videoCount,
-          status: data.status
+          status: data.status === 'partial' ? 'Processing additional videos...' : 'Complete'
         })
 
-        // Redirect to channel project
+        // Redirect to channel project (shorter delay)
         if (onImportComplete) {
           setTimeout(() => {
             onImportComplete(data.channelId, data.projectId)
-          }, 2000)
+          }, 1500)
         }
       }
 
