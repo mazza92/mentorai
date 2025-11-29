@@ -168,18 +168,50 @@ class SimpleChannelService {
 
     console.log(`[SimpleChannel] Resolving handle/username: ${handleOrId}`);
 
+    // Remove @ if present for search
+    const cleanHandle = handleOrId.replace(/^@/, '');
+
     // Try search API to find channel by handle
     try {
       const searchResponse = await this.youtube.search.list({
         part: 'snippet',
         q: handleOrId,
         type: 'channel',
-        maxResults: 1
+        maxResults: 5 // Get top 5 to find best match
       });
 
       if (searchResponse.data.items && searchResponse.data.items.length > 0) {
+        // Try to find exact match by checking channel details
+        for (const item of searchResponse.data.items) {
+          const channelId = item.snippet.channelId;
+
+          // Get full channel details to check custom URL
+          try {
+            const channelDetails = await this.youtube.channels.list({
+              part: 'snippet',
+              id: channelId
+            });
+
+            if (channelDetails.data.items && channelDetails.data.items.length > 0) {
+              const channel = channelDetails.data.items[0];
+              const customUrl = channel.snippet.customUrl;
+
+              // Check if custom URL matches (case-insensitive)
+              if (customUrl && customUrl.toLowerCase() === `@${cleanHandle.toLowerCase()}`) {
+                console.log(`[SimpleChannel] ✓ Exact match found: ${handleOrId} → ${channelId} (${customUrl})`);
+                return channelId;
+              }
+            }
+          } catch (detailsError) {
+            console.log(`[SimpleChannel] Could not fetch details for ${channelId}: ${detailsError.message}`);
+          }
+        }
+
+        // No exact match found, use first result but log warning
         const channelId = searchResponse.data.items[0].snippet.channelId;
-        console.log(`[SimpleChannel] ✓ Resolved ${handleOrId} → ${channelId}`);
+        const channelTitle = searchResponse.data.items[0].snippet.title;
+        console.log(`[SimpleChannel] ⚠️ No exact match for @${cleanHandle}, using closest result: ${channelTitle} (${channelId})`);
+        console.log(`[SimpleChannel] If this is wrong, please use the full channel URL instead`);
         return channelId;
       }
     } catch (searchError) {
