@@ -6,7 +6,7 @@ const videoQAService = require('../services/videoQAService');
 const userService = require('../services/userService');
 const { getFirestore } = require('../config/firestore');
 const youtubeInnertubeService = require('../services/youtubeInnertubeService');
-const admin = require('firebase-admin');
+const { FieldValue } = require('@google-cloud/firestore');
 
 /**
  * POST /api/channel/import
@@ -100,8 +100,8 @@ router.post('/import', async (req, res) => {
         isPartial
       },
       userId,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     });
 
     console.log(`[API] ✓ Initial sample complete: ${initialTranscripts.successful}/${initialSampleSize} transcripts fetched`);
@@ -161,7 +161,7 @@ router.post('/import', async (req, res) => {
               fetched: totalStats.successful,
               total: quickImport.videoCount
             },
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            updatedAt: FieldValue.serverTimestamp()
           });
 
           console.log(`[API] ✅ All transcripts complete for ${channelId} (${totalStats.successful}/${totalStats.total})`);
@@ -170,7 +170,7 @@ router.post('/import', async (req, res) => {
           await projectRef.update({
             status: 'error',
             error: error.message,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            updatedAt: FieldValue.serverTimestamp()
           });
         }
       });
