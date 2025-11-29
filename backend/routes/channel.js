@@ -5,6 +5,8 @@ const simpleChannelService = require('../services/simpleChannelService');
 const videoQAService = require('../services/videoQAService');
 const userService = require('../services/userService');
 const { getFirestore } = require('../config/firestore');
+const youtubeInnertubeService = require('../services/youtubeInnertubeService');
+const admin = require('firebase-admin');
 
 /**
  * POST /api/channel/import
@@ -47,54 +49,132 @@ router.post('/import', async (req, res) => {
 
     console.log(`[API] Resolved channel ID: ${channelId}`);
 
-    // Import channel with Innertube caption scraping
-    const importResult = await simpleChannelService.importChannel(channelId, userId, {
-      fetchTranscripts: true, // Enable Innertube scraping
-      maxVideosToTranscribe: null, // Fetch all videos
-      concurrency: 10 // 10 parallel requests
+    // Step 1: Quick import - get channel info and video list (no transcripts yet)
+    const quickImport = await simpleChannelService.importChannel(channelId, userId, {
+      fetchTranscripts: false, // Don't fetch transcripts yet
+      maxVideosToTranscribe: null,
+      concurrency: 10
     });
 
-    if (!importResult.success) {
-      throw new Error(importResult.error || 'Channel import failed');
+    if (!quickImport.success) {
+      throw new Error(quickImport.error || 'Channel import failed');
     }
 
-    // Create a project for this channel so user can chat with it
+    // Sort videos by view count (most viewed first)
+    const sortedVideos = (quickImport.videos || []).sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+
+    // Step 2: Fetch first 15 most viewed videos (15-30s wait)
+    console.log(`[API] 📝 Fetching initial sample (15 most viewed videos)...`);
+    const initialSampleSize = 15;
+    const initialVideos = sortedVideos.slice(0, initialSampleSize);
+
+    const initialTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
+      initialVideos,
+      { concurrency: 10, prioritizeBy: 'views' }
+    );
+
+    // Step 3: Create project with "partial" or "ready" status
     const { firestore } = getFirestore();
-    const projectId = importResult.channelId;
+    const projectId = quickImport.channelId;
     const projectRef = firestore.collection('projects').doc(projectId);
+
+    const isPartial = sortedVideos.length > initialSampleSize;
 
     await projectRef.set({
       id: projectId,
       type: 'channel',
-      channelId: importResult.channelId,
-      title: importResult.channelName,
-      author: importResult.channelName,
-      videoCount: importResult.videoCount,
-      transcriptStats: importResult.transcripts,
-      status: 'ready',
+      channelId: quickImport.channelId,
+      title: quickImport.channelName,
+      author: quickImport.channelName,
+      videoCount: quickImport.videoCount,
+      status: isPartial ? 'partial' : 'ready',
+      transcriptProgress: {
+        fetched: initialTranscripts.successful,
+        total: quickImport.videoCount
+      },
+      transcripts: initialTranscripts.transcripts,
+      transcriptStats: {
+        successful: initialTranscripts.successful,
+        failed: initialTranscripts.failed,
+        total: initialTranscripts.total,
+        isPartial
+      },
       userId,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    console.log(`[API] ✓ Channel import complete: ${importResult.videoCount} videos, ${importResult.transcripts.successful} transcripts`);
+    console.log(`[API] ✓ Initial sample complete: ${initialTranscripts.successful}/${initialSampleSize} transcripts fetched`);
 
+    // Step 4: Return immediately with initial transcripts
     res.json({
       success: true,
       data: {
-        projectId: projectId,
-        channelId: importResult.channelId,
-        channelName: importResult.channelName,
-        channelTitle: importResult.channelName,
-        videoCount: importResult.videoCount,
-        totalVideos: importResult.videoCount,
-        transcripts: importResult.transcripts,
-        status: 'ready',
-        method: importResult.strategy,
-        importTime: importResult.importTime,
-        message: importResult.message
+        projectId,
+        channelId: quickImport.channelId,
+        channelName: quickImport.channelName,
+        channelTitle: quickImport.channelName,
+        videoCount: quickImport.videoCount,
+        totalVideos: quickImport.videoCount,
+        status: isPartial ? 'partial' : 'ready',
+        transcriptsAvailable: initialTranscripts.successful,
+        transcripts: {
+          successful: initialTranscripts.successful,
+          failed: initialTranscripts.failed,
+          total: initialTranscripts.total
+        }
       }
     });
+
+    // Step 5: Continue fetching remaining videos in background (non-blocking)
+    if (isPartial) {
+      setImmediate(async () => {
+        try {
+          console.log(`[API] 📝 Starting background fetch for remaining ${sortedVideos.length - initialSampleSize} videos...`);
+
+          const remainingVideos = sortedVideos.slice(initialSampleSize);
+
+          const remainingTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
+            remainingVideos,
+            { concurrency: 10, prioritizeBy: 'views' }
+          );
+
+          // Merge with initial transcripts
+          const allTranscripts = {
+            ...initialTranscripts.transcripts,
+            ...remainingTranscripts.transcripts
+          };
+
+          const totalStats = {
+            successful: initialTranscripts.successful + remainingTranscripts.successful,
+            failed: initialTranscripts.failed + remainingTranscripts.failed,
+            total: initialTranscripts.total + remainingTranscripts.total,
+            isPartial: false
+          };
+
+          // Update project with all transcripts
+          await projectRef.update({
+            status: 'ready',
+            transcripts: allTranscripts,
+            transcriptStats: totalStats,
+            transcriptProgress: {
+              fetched: totalStats.successful,
+              total: quickImport.videoCount
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          console.log(`[API] ✅ All transcripts complete for ${channelId} (${totalStats.successful}/${totalStats.total})`);
+        } catch (error) {
+          console.error(`[API] ❌ Background transcript fetch failed:`, error);
+          await projectRef.update({
+            status: 'error',
+            error: error.message,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      });
+    }
 
   } catch (error) {
     console.error('[API] Channel import error:', error);
@@ -309,6 +389,44 @@ router.get('/:channelId/status', async (req, res) => {
 
   } catch (error) {
     console.error('[API] Channel status error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/channel/status/:projectId
+ * Get project transcript processing status (for polling during background fetch)
+ */
+router.get('/status/:projectId', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const { firestore } = getFirestore();
+    const projectRef = firestore.collection('projects').doc(projectId);
+    const projectDoc = await projectRef.get();
+
+    if (!projectDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Project not found'
+      });
+    }
+
+    const project = projectDoc.data();
+
+    res.json({
+      success: true,
+      status: project.status || 'ready', // 'partial' | 'ready' | 'error'
+      transcriptProgress: project.transcriptProgress || null,
+      transcriptStats: project.transcriptStats || null,
+      isPartial: project.transcriptStats?.isPartial || false
+    });
+
+  } catch (error) {
+    console.error('[API] Project status error:', error);
     res.status(500).json({
       success: false,
       error: error.message

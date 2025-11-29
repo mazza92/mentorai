@@ -1630,16 +1630,17 @@ const QnAPanel = ({
 
             {/* NotebookLM-style suggested questions - above input */}
             {suggestedPrompts && suggestedPrompts.length > 0 && history.length === 0 && (
-              <div className="mb-3">
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                  {suggestedPrompts.slice(0, 6).map((prompt: string, idx: number) => (
+              <div className="mb-3 w-full max-w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                  {suggestedPrompts.slice(0, 4).map((prompt: string, idx: number) => (
                     <button
                       key={idx}
                       onClick={() => {
                         setQuery(prompt)
                         handleQuery(prompt)
                       }}
-                      className="flex-shrink-0 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-all duration-200 whitespace-nowrap"
+                      title={prompt}
+                      className="px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-all duration-200 text-left overflow-hidden text-ellipsis line-clamp-2"
                     >
                       {prompt}
                     </button>
@@ -1704,10 +1705,13 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
   const [loadingTopics, setLoadingTopics] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [mobileContextOpen, setMobileContextOpen] = useState(false)
+  const [transcriptStatus, setTranscriptStatus] = useState<'partial' | 'ready' | 'error'>('ready')
+  const [transcriptProgress, setTranscriptProgress] = useState<any>(null)
   const topicsFetched = useRef(false)
   const projectRef = useRef(project)
   const projectNotFoundRef = useRef(false)
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const transcriptPollingRef = useRef<NodeJS.Timeout | null>(null)
   
   // Helper function for mobile navigation
   const handleSelectConversation = (conversation: Conversation) => {
@@ -1835,6 +1839,47 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
     }
   }, [projectId]) // Only depend on projectId
 
+  // Transcript status polling for partial data
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null
+
+    const pollTranscriptStatus = async () => {
+      if (!projectId) return
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const response = await axios.get(`${apiUrl}/api/channel/status/${projectId}`)
+
+        const { status, transcriptProgress, transcriptStats } = response.data
+
+        setTranscriptStatus(status)
+        setTranscriptProgress(transcriptProgress)
+
+        // Stop polling when ready or error
+        if (status === 'ready' || status === 'error') {
+          if (intervalId) {
+            clearInterval(intervalId)
+          }
+          // Refresh project data to get all transcripts
+          fetchProject()
+        }
+      } catch (error) {
+        console.error('Failed to poll transcript status:', error)
+      }
+    }
+
+    // Start polling if status is partial
+    if (transcriptStatus === 'partial') {
+      intervalId = setInterval(pollTranscriptStatus, 3000) // Poll every 3 seconds
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [projectId, transcriptStatus])
+
   const fetchProject = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -1844,7 +1889,19 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
       // Project found - reset error state
       setProjectNotFound(false)
       setProject(projectData)
-      
+
+      // Check transcript status for partial data
+      if (projectData.status === 'partial' && projectData.transcriptProgress) {
+        setTranscriptStatus('partial')
+        setTranscriptProgress(projectData.transcriptProgress)
+        console.log(`[Transcript] Partial status detected: ${projectData.transcriptProgress.fetched}/${projectData.transcriptProgress.total}`)
+      } else if (projectData.status === 'error') {
+        setTranscriptStatus('error')
+      } else {
+        setTranscriptStatus('ready')
+        setTranscriptProgress(null)
+      }
+
       // Update conversation with video metadata if available
       // Find conversation for this project by projectId
       if (projectData) {
@@ -2286,7 +2343,28 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
         </div>
         
         {/* Right Panel: Q&A Chat */}
-        <div className="flex-1 flex-shrink-0 flex">
+        <div className="flex-1 flex-shrink-0 flex flex-col">
+          {/* Partial data banner */}
+          {transcriptStatus === 'partial' && (
+            <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900">
+                    Loading additional channel content...
+                  </p>
+                  {transcriptProgress && (
+                    <p className="text-xs text-blue-700 mt-1">
+                      {transcriptProgress.fetched} / {transcriptProgress.total} videos processed
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-blue-600">
+                  Chatting with {transcriptProgress?.fetched || 15} most popular videos
+                </p>
+              </div>
+            </div>
+          )}
           <QnAPanel
             projectId={projectId}
             userId={userId}
@@ -2303,6 +2381,24 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
 
       {/* Mobile View: Full-screen Chat with Sticky Metadata */}
       <div className="lg:hidden w-full h-full flex flex-col relative">
+        {/* Partial data banner - Mobile */}
+        {transcriptStatus === 'partial' && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900">
+                  Loading more videos...
+                </p>
+                {transcriptProgress && (
+                  <p className="text-xs text-blue-700 mt-1">
+                    {transcriptProgress.fetched} / {transcriptProgress.total}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <QnAPanel
           projectId={projectId}
           userId={userId}

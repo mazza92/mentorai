@@ -141,6 +141,7 @@ class SimpleChannelService {
         channelId: resolvedChannelId, // Return resolved ID
         channelName: channelData.title,
         videoCount: videos.length,
+        videos: videos, // Return videos array for background processing
         transcripts: transcriptStats,
         strategy: 'Innertube caption scraping (fast & free)',
         estimatedCost: '$0.00 (caption scraping)',
