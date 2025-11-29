@@ -137,14 +137,14 @@ class YouTubeBotBypass {
       });
 
       // Wait a bit for cookies to be set
-      await page.waitForTimeout(2000);
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Scroll down to trigger more cookie setting
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight / 2);
       });
 
-      await page.waitForTimeout(1000);
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Extract cookies
       const cookies = await page.cookies();
