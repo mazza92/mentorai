@@ -1560,16 +1560,16 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
     // Fetch transcripts one by one
     for (const video of videosToTranscribe) {
       try {
-        console.log(`[VideoQAService] Fetching: ${video.title} (${video.videoId})`);
+        console.log(`[VideoQAService] Fetching: ${video.title} (${video.id})`);
 
         // Try Innertube caption scraping (fast, free, works for 70-80% of videos)
-        let transcriptResult = await youtubeInnertubeService.fetchTranscript(video.videoId);
+        let transcriptResult = await youtubeInnertubeService.fetchTranscript(video.id);
 
         // DISABLED: Audio transcription fallback (causes YouTube bot detection)
         // If you need audio transcription, enable auto-captions in YouTube Studio
         // or contact support for alternative solutions
         if (!transcriptResult.success) {
-          console.log(`[VideoQAService] ⚠️ No captions available for ${video.videoId}`);
+          console.log(`[VideoQAService] ⚠️ No captions available for ${video.id}`);
           console.log(`[VideoQAService] Recommendation: Enable auto-captions in YouTube Studio for this video`);
         }
 
@@ -1587,7 +1587,7 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
             const videoRef = firestore.collection('channels')
               .doc(channelId)
               .collection('videos')
-              .doc(video.videoId);
+              .doc(video.id);
 
             await videoRef.update({
               transcript: transcriptResult.text,
@@ -1600,17 +1600,17 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
               transcriptFetchedAt: new Date().toISOString()
             });
 
-            console.log(`[VideoQAService] ✓ Transcript cached to Firestore for ${video.videoId}`);
+            console.log(`[VideoQAService] ✓ Transcript cached to Firestore for ${video.id}`);
           }
         } else {
-          console.log(`[VideoQAService] ✗ Transcript fetch failed for ${video.videoId}: ${transcriptResult.error}`);
+          console.log(`[VideoQAService] ✗ Transcript fetch failed for ${video.id}: ${transcriptResult.error}`);
           video.status = 'transcription_failed';
 
           if (!useMockMode && firestore) {
             const videoRef = firestore.collection('channels')
               .doc(channelId)
               .collection('videos')
-              .doc(video.videoId);
+              .doc(video.id);
 
             await videoRef.update({
               status: 'transcription_failed',
@@ -1620,7 +1620,7 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
           }
         }
       } catch (error) {
-        console.error(`[VideoQAService] Error transcribing ${video.videoId}:`, error.message);
+        console.error(`[VideoQAService] Error transcribing ${video.id}:`, error.message);
         video.status = 'error';
       }
     }
