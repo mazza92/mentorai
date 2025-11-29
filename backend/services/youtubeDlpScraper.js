@@ -2,16 +2,19 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const axios = require('axios');
 const execAsync = promisify(exec);
+const youtubeBotBypass = require('./youtubeBotBypass');
 
 /**
  * YouTube Transcript Scraper using yt-dlp
  *
  * This is the ONLY method that reliably works for fetching YouTube transcripts.
  * yt-dlp handles all of YouTube's anti-bot measures automatically.
+ * Now includes automatic bot bypass with fresh cookie extraction.
  */
 class YouTubeDlpScraper {
   constructor() {
     this.cache = new Map();
+    this.useBotBypass = true; // Enable bot bypass by default
   }
 
   /**
@@ -29,6 +32,7 @@ class YouTubeDlpScraper {
     const fs = require('fs');
     const path = require('path');
     let tempCookiesPath = null;
+    let usedBotBypass = false;
 
     try {
       console.log(`[DlpScraper] Fetching transcript for ${videoId} using yt-dlp...`);
@@ -36,29 +40,74 @@ class YouTubeDlpScraper {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
       // Use yt-dlp with bot bypass strategies
-      // 1. Use player_client=default to avoid bot detection
-      // 2. Use cookies if available (from env var)
-      // 3. Skip download, just get subtitle info
       const extractorArgs = '--extractor-args "youtube:player_client=default"';
 
       let cookiesArg = '';
-      if (process.env.YOUTUBE_COOKIES_BASE64) {
-        // Decode base64 cookies and save to temp file
-        const cookiesContent = Buffer.from(process.env.YOUTUBE_COOKIES_BASE64, 'base64').toString('utf-8');
-        tempCookiesPath = path.join('/tmp', `yt-cookies-${Date.now()}-${videoId}.txt`);
-        fs.writeFileSync(tempCookiesPath, cookiesContent);
-        cookiesArg = `--cookies "${tempCookiesPath}"`;
-        console.log(`[DlpScraper] DEBUG: Using cookies for authentication`);
+      let stdout, stderr;
+
+      // Try with bot bypass first if enabled
+      if (this.useBotBypass) {
+        try {
+          console.log(`[DlpScraper] Using bot bypass service for fresh cookies...`);
+
+          const command = `yt-dlp ${extractorArgs} --cookies "{{cookies}}" --write-auto-subs --sub-lang en --sub-format json3 --skip-download --print-json "${videoUrl}"`;
+
+          const result = await youtubeBotBypass.executeWithRetry(command, {
+            timeout: 30000,
+            maxBuffer: 10 * 1024 * 1024,
+            maxRetries: 3,
+            baseDelay: 2000
+          });
+
+          stdout = result.stdout;
+          stderr = result.stderr;
+          usedBotBypass = true;
+          console.log(`[DlpScraper] ✓ Bot bypass successful`);
+
+        } catch (botBypassError) {
+          console.warn(`[DlpScraper] Bot bypass failed, falling back to env cookies:`, botBypassError.message);
+
+          // Fallback to env cookies
+          if (process.env.YOUTUBE_COOKIES_BASE64) {
+            const cookiesContent = Buffer.from(process.env.YOUTUBE_COOKIES_BASE64, 'base64').toString('utf-8');
+            tempCookiesPath = path.join('/tmp', `yt-cookies-${Date.now()}-${videoId}.txt`);
+            fs.writeFileSync(tempCookiesPath, cookiesContent);
+            cookiesArg = `--cookies "${tempCookiesPath}"`;
+            console.log(`[DlpScraper] Using env cookies as fallback`);
+
+            const command = `yt-dlp ${extractorArgs} ${cookiesArg} --write-auto-subs --sub-lang en --sub-format json3 --skip-download --print-json "${videoUrl}"`;
+
+            const result = await execAsync(command, {
+              timeout: 30000,
+              maxBuffer: 10 * 1024 * 1024
+            });
+
+            stdout = result.stdout;
+            stderr = result.stderr;
+          } else {
+            throw botBypassError;
+          }
+        }
+      } else {
+        // Original behavior: use env cookies only
+        if (process.env.YOUTUBE_COOKIES_BASE64) {
+          const cookiesContent = Buffer.from(process.env.YOUTUBE_COOKIES_BASE64, 'base64').toString('utf-8');
+          tempCookiesPath = path.join('/tmp', `yt-cookies-${Date.now()}-${videoId}.txt`);
+          fs.writeFileSync(tempCookiesPath, cookiesContent);
+          cookiesArg = `--cookies "${tempCookiesPath}"`;
+          console.log(`[DlpScraper] Using env cookies`);
+        }
+
+        const command = `yt-dlp ${extractorArgs} ${cookiesArg} --write-auto-subs --sub-lang en --sub-format json3 --skip-download --print-json "${videoUrl}"`;
+
+        const result = await execAsync(command, {
+          timeout: 30000,
+          maxBuffer: 10 * 1024 * 1024
+        });
+
+        stdout = result.stdout;
+        stderr = result.stderr;
       }
-
-      const command = `yt-dlp ${extractorArgs} ${cookiesArg} --write-auto-subs --sub-lang en --sub-format json3 --skip-download --print-json "${videoUrl}"`;
-
-      console.log(`[DlpScraper] DEBUG: Running command with bot bypass...`);
-
-      const { stdout, stderr } = await execAsync(command, {
-        timeout: 30000,
-        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
-      });
 
       // Clean up temp cookies file
       if (tempCookiesPath && fs.existsSync(tempCookiesPath)) {
@@ -139,8 +188,9 @@ class YouTubeDlpScraper {
         wordCount: fullText.trim().split(/\s+/).length,
         charCount: fullText.trim().length,
         language: langCode,
-        source: 'yt-dlp',
-        fetchTime: ((Date.now() - startTime) / 1000).toFixed(2)
+        source: usedBotBypass ? 'yt-dlp-bot-bypass' : 'yt-dlp',
+        fetchTime: ((Date.now() - startTime) / 1000).toFixed(2),
+        usedBotBypass
       };
 
       // Cache result
