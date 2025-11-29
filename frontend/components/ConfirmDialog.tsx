@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -27,8 +29,13 @@ export default function ConfirmDialog({
   icon
 }: ConfirmDialogProps) {
   const { t } = useTranslation('common')
+  const [mounted, setMounted] = useState(false)
 
-  if (!isOpen) return null
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!isOpen || !mounted) return null
 
   const handleConfirm = () => {
     onConfirm()
@@ -55,7 +62,7 @@ export default function ConfirmDialog({
 
   const styles = variantStyles[variant]
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
@@ -110,6 +117,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
