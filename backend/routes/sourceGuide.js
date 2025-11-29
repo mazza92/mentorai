@@ -172,7 +172,7 @@ Return ONLY valid JSON, no additional text.`;
         })
         .join('\n\n');
 
-      const promptsPrompt = `Based on the following YouTube channel content, generate 6 intelligent, specific questions that users would want to ask about this content.
+      const promptsPrompt = `Based on the following YouTube channel content, generate 4 concise, intelligent questions that users would want to ask about this content.
 
 ${languageInstruction}
 
@@ -185,14 +185,16 @@ Video Titles:
 Sample Transcript Content:
 ${transcriptContext}
 
-Generate questions that:
-- ${isFrench ? 'Sont spécifiques au contenu disponible (pas génériques)' : 'Are specific to the available content (not generic)'}
-- ${isFrench ? 'Peuvent être répondues avec les transcriptions disponibles' : 'Can be answered using the available transcripts'}
-- ${isFrench ? 'Sont actionnables et pratiques' : 'Are actionable and practical'}
-- ${isFrench ? 'Montrent la profondeur du contenu disponible' : 'Showcase the depth of available content'}
+IMPORTANT: Questions must be:
+- ${isFrench ? 'Courtes et directes (maximum 2 phrases courtes)' : 'Short and direct (max 2 short sentences)'}
+- ${isFrench ? 'Spécifiques au contenu disponible (pas génériques)' : 'Specific to the available content (not generic)'}
+- ${isFrench ? 'Actionnables et pratiques' : 'Actionable and practical'}
+- ${isFrench ? 'Formulées comme NotebookLM : concises et engageantes' : 'Phrased like NotebookLM: concise and engaging'}
 
-Return ONLY a JSON array of 6 strings (questions), nothing else:
-["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?", "Question 6?"]`;
+Example format: "How does [creator] approach [specific topic]?" or "What are the key insights about [specific topic]?"
+
+Return ONLY a JSON array of 4 concise question strings, nothing else:
+["Question 1?", "Question 2?", "Question 3?", "Question 4?"]`;
 
       try {
         const promptsResult = await model.generateContent(promptsPrompt);
