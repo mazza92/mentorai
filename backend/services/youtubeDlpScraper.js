@@ -1,5 +1,6 @@
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const axios = require('axios');
 const execAsync = promisify(exec);
 
 /**
@@ -97,12 +98,14 @@ class YouTubeDlpScraper {
       // Download the subtitle content
       console.log(`[DlpScraper] DEBUG: Downloading subtitle from: ${json3Sub.url.substring(0, 100)}...`);
 
-      const { stdout: subContent } = await execAsync(`curl -s "${json3Sub.url}"`, {
-        timeout: 10000,
-        maxBuffer: 5 * 1024 * 1024
+      const subResponse = await axios.get(json3Sub.url, {
+        timeout: 10000
       });
 
-      const subData = JSON.parse(subContent);
+      // Handle both JSON objects and JSON strings
+      const subData = typeof subResponse.data === 'string'
+        ? JSON.parse(subResponse.data)
+        : subResponse.data;
       const events = subData.events || [];
 
       // Extract segments
