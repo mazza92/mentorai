@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import { MessageSquare, Plus, Trash2, Clock, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { 
-  Conversation, 
-  loadConversations, 
+import {
+  Conversation,
+  loadConversations,
   deleteConversation,
-  createConversation 
+  createConversation
 } from '@/lib/conversationStorage'
+import ConfirmDialog from './ConfirmDialog'
 
 interface ConversationHistoryProps {
   userId: string
@@ -30,7 +31,9 @@ export default function ConversationHistory({
   const { t } = useTranslation('common')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isOpen, setIsOpen] = useState(true)
-  
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
+
   // In mobile drawer, always show content
   const displayIsOpen = isMobileDrawer ? true : isOpen
 
@@ -49,16 +52,24 @@ export default function ConversationHistory({
     onNewConversation() // This will trigger video upload flow
   }
 
-  const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
+  const handleDelete = (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation()
-    if (confirm(t('conversations.delete_confirm'))) {
-      await deleteConversation(userId, conversationId)
-      setConversations(prev => prev.filter(c => c.id !== conversationId))
-      // If deleted conversation was active, navigate to upload
-      if (currentConversationId === conversationId) {
-        onNewConversation()
-      }
+    setConversationToDelete(conversationId)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!conversationToDelete) return
+
+    await deleteConversation(userId, conversationToDelete)
+    setConversations(prev => prev.filter(c => c.id !== conversationToDelete))
+
+    // If deleted conversation was active, navigate to upload
+    if (currentConversationId === conversationToDelete) {
+      onNewConversation()
     }
+
+    setConversationToDelete(null)
   }
 
   const formatDate = (date: Date) => {
@@ -183,6 +194,21 @@ export default function ConversationHistory({
           )}
         </div>
       )}
+
+      {/* Modern Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => {
+          setDeleteConfirmOpen(false)
+          setConversationToDelete(null)
+        }}
+        onConfirm={confirmDelete}
+        title={t('conversations.delete_title')}
+        message={t('conversations.delete_message')}
+        confirmText={t('conversations.delete_button')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+      />
     </div>
   )
 }
