@@ -524,6 +524,7 @@ const QnAPanel = ({
   const [signupMessage, setSignupMessage] = useState<string | undefined>(undefined)
   const [sourceGuide, setSourceGuide] = useState<{summary: string, keyTopics: string[], suggestedPrompts?: string[]} | null>(null)
   const [loadingSourceGuide, setLoadingSourceGuide] = useState(false)
+  const [promptStartIndex, setPromptStartIndex] = useState(0) // Track which prompts to show
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   // Dynamic loading messages (NotebookLM/Claude-style)
@@ -1628,16 +1629,22 @@ const QnAPanel = ({
               </div>
             )}
 
-            {/* NotebookLM-style suggested questions - above input */}
-            {suggestedPrompts && suggestedPrompts.length > 0 && history.length === 0 && (
+            {/* NotebookLM-style suggested questions - always visible above input */}
+            {suggestedPrompts && suggestedPrompts.length > 0 && (
               <div className="mb-3 w-full max-w-full">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                  {suggestedPrompts.slice(0, 4).map((prompt: string, idx: number) => (
+                  {suggestedPrompts
+                    .slice(promptStartIndex, promptStartIndex + 2)
+                    .concat(suggestedPrompts.slice(0, Math.max(0, (promptStartIndex + 2) - suggestedPrompts.length)))
+                    .slice(0, 2)
+                    .map((prompt: string, idx: number) => (
                     <button
-                      key={idx}
+                      key={`${promptStartIndex}-${idx}`}
                       onClick={() => {
                         setQuery(prompt)
                         handleQuery(prompt)
+                        // Cycle to next 2 prompts after selection
+                        setPromptStartIndex((prev) => (prev + 2) % suggestedPrompts.length)
                       }}
                       title={prompt}
                       className="px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-all duration-200 text-left overflow-hidden text-ellipsis line-clamp-2"
