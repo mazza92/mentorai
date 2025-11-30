@@ -96,8 +96,12 @@ class YouTubeSmartBypass {
           const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
 
           if (track && track.baseUrl) {
-            // Download caption file
-            const captionResponse = await axios.get(track.baseUrl, { timeout: 10000 });
+            // Download caption file - request JSON3 format explicitly
+            const captionUrl = track.baseUrl.includes('?')
+              ? `${track.baseUrl}&fmt=json3`
+              : `${track.baseUrl}?fmt=json3`;
+
+            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
             const transcript = this.parseJSON3Captions(captionResponse.data);
 
             this.strategyStats.mobile_ios.success++;
@@ -158,7 +162,12 @@ class YouTubeSmartBypass {
           const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
 
           if (track && track.baseUrl) {
-            const captionResponse = await axios.get(track.baseUrl, { timeout: 10000 });
+            // Download caption file - request JSON3 format explicitly
+            const captionUrl = track.baseUrl.includes('?')
+              ? `${track.baseUrl}&fmt=json3`
+              : `${track.baseUrl}?fmt=json3`;
+
+            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
             const transcript = this.parseJSON3Captions(captionResponse.data);
 
             this.strategyStats.mobile_android.success++;
@@ -219,7 +228,12 @@ class YouTubeSmartBypass {
             const track = tracks.find(t => t.languageCode === 'en') || tracks[0];
 
             if (track && track.baseUrl) {
-              const captionResponse = await axios.get(track.baseUrl, { timeout: 10000 });
+              // Download caption file - request JSON3 format explicitly
+              const captionUrl = track.baseUrl.includes('?')
+                ? `${track.baseUrl}&fmt=json3`
+                : `${track.baseUrl}?fmt=json3`;
+
+              const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
               const transcript = this.parseJSON3Captions(captionResponse.data);
 
               this.strategyStats.embed.success++;
@@ -281,7 +295,12 @@ class YouTubeSmartBypass {
           const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
 
           if (track && track.baseUrl) {
-            const captionResponse = await axios.get(track.baseUrl, { timeout: 10000 });
+            // Download caption file - request JSON3 format explicitly
+            const captionUrl = track.baseUrl.includes('?')
+              ? `${track.baseUrl}&fmt=json3`
+              : `${track.baseUrl}?fmt=json3`;
+
+            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
             const transcript = this.parseJSON3Captions(captionResponse.data);
 
             this.strategyStats.tvhtml5.success++;
@@ -313,10 +332,9 @@ class YouTubeSmartBypass {
    */
   parseJSON3Captions(data) {
     try {
-      // Handle JSON3 format
-      if (typeof data === 'string' && data.trim().startsWith('{')) {
-        const json = JSON.parse(data);
-        const events = json.events || [];
+      // If data is already an object (axios parsed it)
+      if (typeof data === 'object' && data !== null) {
+        const events = data.events || [];
 
         const segments = [];
         let fullText = '';
@@ -343,25 +361,48 @@ class YouTubeSmartBypass {
         return {
           text: fullText.trim(),
           segments,
-          wordCount: fullText.trim().split(/\s+/).length
+          wordCount: fullText.trim().split(/\s+/).filter(w => w.length > 0).length
         };
+      }
+
+      // Handle JSON3 format string
+      if (typeof data === 'string' && data.trim().startsWith('{')) {
+        const json = JSON.parse(data);
+        return this.parseJSON3Captions(json); // Recursive call with parsed object
       }
 
       // Handle XML format (srv3/ttml)
       if (typeof data === 'string' && data.trim().startsWith('<')) {
+        // Parse XML captions
         const textMatches = data.match(/<text[^>]*>([^<]+)<\/text>/g) || [];
-        const fullText = textMatches.map(match => {
-          const text = match.replace(/<[^>]+>/g, '').trim();
-          return text;
-        }).join(' ');
+        const segments = [];
+        let fullText = '';
+
+        textMatches.forEach((match, index) => {
+          // Extract text content and decode HTML entities
+          const textContent = match.replace(/<text[^>]*>/, '').replace(/<\/text>/, '');
+          const decodedText = this.decodeHTMLEntities(textContent);
+
+          if (decodedText.trim()) {
+            segments.push({
+              text: decodedText.trim(),
+              start: index, // Approximate timing
+              offset: index * 1000,
+              duration: 0
+            });
+
+            fullText += decodedText + ' ';
+          }
+        });
 
         return {
           text: fullText.trim(),
-          segments: [],
-          wordCount: fullText.trim().split(/\s+/).length
+          segments,
+          wordCount: fullText.trim().split(/\s+/).filter(w => w.length > 0).length
         };
       }
 
+      console.error('[SmartBypass] Unknown caption format:', typeof data, data ? data.substring(0, 100) : 'empty');
       throw new Error('Unknown caption format');
 
     } catch (error) {
@@ -372,6 +413,26 @@ class YouTubeSmartBypass {
         wordCount: 0
       };
     }
+  }
+
+  /**
+   * Decode HTML entities in text
+   */
+  decodeHTMLEntities(text) {
+    const entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&nbsp;': ' ',
+      '&#x27;': "'",
+      '&#x2F;': '/',
+      '&#x60;': '`',
+      '&#x3D;': '='
+    };
+
+    return text.replace(/&[^;]+;/g, entity => entities[entity] || entity);
   }
 
   /**
