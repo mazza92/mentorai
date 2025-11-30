@@ -101,8 +101,18 @@ class YouTubeSmartBypass {
               ? `${track.baseUrl}&fmt=json3`
               : `${track.baseUrl}?fmt=json3`;
 
+            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
+
             const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
+
+            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
+            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
+
             const transcript = this.parseJSON3Captions(captionResponse.data);
+
+            console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
+            console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
+            console.log(`[SmartBypass] Parsed word count: ${transcript.wordCount}`);
 
             this.strategyStats.mobile_ios.success++;
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -167,8 +177,18 @@ class YouTubeSmartBypass {
               ? `${track.baseUrl}&fmt=json3`
               : `${track.baseUrl}?fmt=json3`;
 
+            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
+
             const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
+
+            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
+            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
+
             const transcript = this.parseJSON3Captions(captionResponse.data);
+
+            console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
+            console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
+            console.log(`[SmartBypass] Parsed word count: ${transcript.wordCount}`);
 
             this.strategyStats.mobile_android.success++;
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -300,8 +320,18 @@ class YouTubeSmartBypass {
               ? `${track.baseUrl}&fmt=json3`
               : `${track.baseUrl}?fmt=json3`;
 
+            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
+
             const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
+
+            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
+            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
+
             const transcript = this.parseJSON3Captions(captionResponse.data);
+
+            console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
+            console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
+            console.log(`[SmartBypass] Parsed word count: ${transcript.wordCount}`);
 
             this.strategyStats.tvhtml5.success++;
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -332,9 +362,13 @@ class YouTubeSmartBypass {
    */
   parseJSON3Captions(data) {
     try {
+      console.log(`[SmartBypass] parseJSON3Captions input type: ${typeof data}`);
+
       // If data is already an object (axios parsed it)
       if (typeof data === 'object' && data !== null) {
         const events = data.events || [];
+
+        console.log(`[SmartBypass] Parsing JSON3 object, events count: ${events.length}`);
 
         const segments = [];
         let fullText = '';
@@ -358,6 +392,8 @@ class YouTubeSmartBypass {
           }
         }
 
+        console.log(`[SmartBypass] Parsed ${segments.length} segments, fullText length: ${fullText.trim().length}`);
+
         return {
           text: fullText.trim(),
           segments,
@@ -373,15 +409,23 @@ class YouTubeSmartBypass {
 
       // Handle XML format (srv3/ttml)
       if (typeof data === 'string' && data.trim().startsWith('<')) {
-        // Parse XML captions
-        const textMatches = data.match(/<text[^>]*>([^<]+)<\/text>/g) || [];
+        console.log(`[SmartBypass] Parsing XML captions (first 500 chars): ${data.substring(0, 500)}`);
+
+        // Parse XML captions - YouTube uses both <text> and <p> tags
+        // Use [\s\S] to match any character including newlines
+        const textMatches = data.match(/<(?:text|p)[^>]*>([\s\S]+?)<\/(?:text|p)>/g) || [];
+
+        console.log(`[SmartBypass] Found ${textMatches.length} XML caption elements`);
+
         const segments = [];
         let fullText = '';
 
         textMatches.forEach((match, index) => {
           // Extract text content and decode HTML entities
-          const textContent = match.replace(/<text[^>]*>/, '').replace(/<\/text>/, '');
-          const decodedText = this.decodeHTMLEntities(textContent);
+          const textContent = match.replace(/<(?:text|p)[^>]*>/, '').replace(/<\/(?:text|p)>/, '');
+          // Replace newlines with spaces
+          const normalizedText = textContent.replace(/\n/g, ' ');
+          const decodedText = this.decodeHTMLEntities(normalizedText);
 
           if (decodedText.trim()) {
             segments.push({
@@ -394,6 +438,8 @@ class YouTubeSmartBypass {
             fullText += decodedText + ' ';
           }
         });
+
+        console.log(`[SmartBypass] Parsed ${segments.length} XML segments, fullText length: ${fullText.trim().length}`);
 
         return {
           text: fullText.trim(),
