@@ -1376,7 +1376,17 @@ Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
     const context = this.buildContextFromVideos(relevantVideos, question);
 
     // Check if we have ANY transcripts available
-    const videosWithTranscripts = relevantVideos.filter(v => v.transcript && v.transcript.length > 0);
+    const videosWithTranscripts = relevantVideos.filter(v => {
+      if (!v.transcript) return false;
+
+      // Handle transcript object (from smart bypass)
+      if (typeof v.transcript === 'object') {
+        return v.transcript.text && v.transcript.text.length > 0;
+      }
+
+      // Handle plain string transcript
+      return v.transcript.length > 0;
+    });
 
     if (videosWithTranscripts.length === 0) {
       // No transcripts available - return helpful error message
