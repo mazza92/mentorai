@@ -145,9 +145,10 @@ class YouTubeInnertubeService {
       const batchSuccess = batchResults.filter(r => r.success).length;
       console.log(`[Innertube] Batch ${i + 1} complete: ${batchSuccess}/${batch.length} successful in ${batchTime}s`);
 
-      // Small delay between batches to avoid overwhelming YouTube
+      // Delay between batches to avoid overwhelming YouTube and triggering rate limits
+      // Increased from 500ms to 2s to be more respectful to YouTube's servers
       if (i < batches.length - 1) {
-        await this.sleep(500);
+        await this.sleep(2000);
       }
     }
 
@@ -169,7 +170,7 @@ class YouTubeInnertubeService {
   async fetchChannelTranscripts(videos, options = {}) {
     const {
       maxVideos = null, // null = fetch all
-      concurrency = 10,
+      concurrency = 3, // Reduced from 10 to 3 to avoid YouTube rate limiting (429 errors)
       prioritizeBy = 'views', // 'views', 'recency', or 'duration'
       stopOnLowSuccessRate = true, // Stop if success rate < 20% to avoid wasting time
       minSampleSize = 10 // Minimum videos to try before checking success rate
