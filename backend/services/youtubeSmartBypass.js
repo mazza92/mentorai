@@ -88,6 +88,18 @@ class YouTubeSmartBypass {
         timeout: 15000
       });
 
+      // Debug logging for API response structure
+      console.log(`[SmartBypass] iOS API response has captions: ${!!response.data?.captions}`);
+      if (response.data?.captions) {
+        console.log(`[SmartBypass] Captions structure keys: ${JSON.stringify(Object.keys(response.data.captions))}`);
+      } else {
+        console.log(`[SmartBypass] Response has playabilityStatus: ${!!response.data?.playabilityStatus}`);
+        if (response.data?.playabilityStatus) {
+          console.log(`[SmartBypass] Playability status: ${response.data.playabilityStatus.status}`);
+          console.log(`[SmartBypass] Playability reason: ${response.data.playabilityStatus.reason || 'N/A'}`);
+        }
+      }
+
       if (response.data && response.data.captions) {
         const captionTracks = response.data.captions.playerCaptionsTracklistRenderer?.captionTracks || [];
 
@@ -507,8 +519,9 @@ class YouTubeSmartBypass {
 
     for (const strategy of strategies) {
       try {
-        // Add random delay to avoid rate limiting (0-2 seconds)
-        const delay = Math.random() * 2000;
+        // Add delay to avoid rate limiting (1-3 seconds to be respectful)
+        // Increased from 0-2s to reduce chance of triggering 429 errors
+        const delay = 1000 + Math.random() * 2000;
         await new Promise(resolve => setTimeout(resolve, delay));
 
         const result = await strategy();

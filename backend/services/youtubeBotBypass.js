@@ -191,7 +191,9 @@ class YouTubeBotBypass {
       const flag = 'TRUE'; // domain flag
       const path = cookie.path || '/';
       const secure = cookie.secure ? 'TRUE' : 'FALSE';
-      const expiration = cookie.expires || 0;
+      // Fix: Convert -1 or negative expires to 0 (session cookie)
+      // Puppeteer returns -1 for session cookies, but Netscape format requires 0 or positive timestamp
+      const expiration = (cookie.expires && cookie.expires > 0) ? Math.floor(cookie.expires) : 0;
       const name = cookie.name;
       const value = cookie.value;
 
@@ -299,6 +301,12 @@ class YouTubeBotBypass {
       } catch (error) {
         lastError = error;
 
+        // Check if it's a rate limit error (429)
+        const isRateLimited = error.stderr && (
+          error.stderr.includes('429') ||
+          error.stderr.includes('Too Many Requests')
+        );
+
         // Check if it's a bot detection error
         const isBotDetection = error.stderr && (
           error.stderr.includes('Sign in to confirm') ||
@@ -306,7 +314,17 @@ class YouTubeBotBypass {
           error.stderr.includes('cookies are no longer valid')
         );
 
-        if (isBotDetection) {
+        if (isRateLimited) {
+          console.warn(`[YouTubeBotBypass] ⚠️ Rate limited (429) on attempt ${attempt}`);
+
+          if (attempt < maxRetries) {
+            // Longer backoff for rate limits (10s, 30s, 60s)
+            const delay = baseDelay * 5 * Math.pow(2, attempt - 1);
+            console.log(`[YouTubeBotBypass] Waiting ${delay}ms before retry (rate limit backoff)...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        } else if (isBotDetection) {
           console.warn(`[YouTubeBotBypass] ⚠️ Bot detection on attempt ${attempt}`);
 
           if (attempt < maxRetries) {
@@ -319,7 +337,7 @@ class YouTubeBotBypass {
             continue;
           }
         } else {
-          // Not a bot detection error, don't retry
+          // Not a bot detection or rate limit error, don't retry
           throw error;
         }
       }
