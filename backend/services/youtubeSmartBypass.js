@@ -23,8 +23,9 @@ class YouTubeSmartBypass {
 
     // Strategy success tracking
     this.strategyStats = {
-      mobile_android: { success: 0, failures: 0 },  // BEST performer
-      web: { success: 0, failures: 0 },             // NEW Desktop browser
+      mobile_android: { success: 0, failures: 0 },  // BEST performer (~10%)
+      direct: { success: 0, failures: 0 },          // NEW: Direct HTML scraping
+      web: { success: 0, failures: 0 },             // NEW: Desktop browser
       embed: { success: 0, failures: 0 },
       tvhtml5: { success: 0, failures: 0 },
       mobile_ios: { success: 0, failures: 0 }       // WORST: LOGIN_REQUIRED
@@ -249,11 +250,113 @@ class YouTubeSmartBypass {
   }
 
   /**
-   * Strategy 3: Embed Player (no auth required!)
+   * Strategy 3: Direct Caption Track Scraper (Bypass APIs)
+   * Scrapes the watch page HTML to find caption track URLs directly
+   */
+  async fetchViaDirect(videoId) {
+    const startTime = Date.now();
+    console.log(`[SmartBypass] 🎯 Strategy 3: Direct Caption Scraper for ${videoId}`);
+
+    try {
+      const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+      // Fetch the watch page with realistic browser headers
+      const response = await axios.get(watchUrl, {
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1'
+        },
+        timeout: 15000
+      });
+
+      const html = response.data;
+
+      // Extract ytInitialPlayerResponse from the HTML
+      const playerResponseMatch = html.match(/var ytInitialPlayerResponse\s*=\s*({.+?});/);
+
+      if (!playerResponseMatch) {
+        throw new Error('Could not find ytInitialPlayerResponse in HTML');
+      }
+
+      const playerResponse = JSON.parse(playerResponseMatch[1]);
+
+      // Check for captions
+      if (!playerResponse.captions || !playerResponse.captions.playerCaptionsTracklistRenderer) {
+        throw new Error('No captions found in player response');
+      }
+
+      const captionTracks = playerResponse.captions.playerCaptionsTracklistRenderer.captionTracks || [];
+
+      if (captionTracks.length === 0) {
+        throw new Error('No caption tracks available');
+      }
+
+      // Get English captions or first available
+      const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
+
+      if (!track || !track.baseUrl) {
+        throw new Error('No valid caption track found');
+      }
+
+      // Download caption file
+      const captionUrl = track.baseUrl.includes('?')
+        ? `${track.baseUrl}&fmt=json3`
+        : `${track.baseUrl}?fmt=json3`;
+
+      console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
+
+      const captionResponse = await axios.get(captionUrl, {
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept': '*/*',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Referer': watchUrl,
+          'Origin': 'https://www.youtube.com'
+        },
+        timeout: 10000
+      });
+
+      console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
+      console.log(`[SmartBypass] Caption response length: ${JSON.stringify(captionResponse.data).length}`);
+
+      const transcript = this.parseJSON3Captions(captionResponse.data);
+
+      console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
+      console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
+      console.log(`[SmartBypass] Parsed word count: ${transcript.wordCount}`);
+
+      this.strategyStats.direct = this.strategyStats.direct || { success: 0, failures: 0 };
+      this.strategyStats.direct.success++;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[SmartBypass] ✅ Direct scraper worked! (${elapsed}s)`);
+
+      return {
+        success: true,
+        transcript,
+        strategy: 'direct',
+        fetchTime: elapsed
+      };
+
+    } catch (error) {
+      this.strategyStats.direct = this.strategyStats.direct || { success: 0, failures: 0 };
+      this.strategyStats.direct.failures++;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[SmartBypass] ❌ Direct scraper failed (${elapsed}s): ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Strategy 4: Embed Player (no auth required!)
    */
   async fetchViaEmbed(videoId) {
     const startTime = Date.now();
-    console.log(`[SmartBypass] 📺 Strategy 3: Embed Player for ${videoId}`);
+    console.log(`[SmartBypass] 📺 Strategy 4: Embed Player for ${videoId}`);
 
     try {
       // Embed player has different bot detection rules
@@ -316,11 +419,11 @@ class YouTubeSmartBypass {
   }
 
   /**
-   * Strategy 4: TV HTML5 Client
+   * Strategy 5: TV HTML5 Client
    */
   async fetchViaTV(videoId) {
     const startTime = Date.now();
-    console.log(`[SmartBypass] 📺 Strategy 4: TV HTML5 for ${videoId}`);
+    console.log(`[SmartBypass] 📺 Strategy 5: TV HTML5 for ${videoId}`);
 
     try {
       const url = 'https://www.youtube.com/youtubei/v1/player';
@@ -392,11 +495,11 @@ class YouTubeSmartBypass {
   }
 
   /**
-   * Strategy 5: Web Client (Desktop Browser)
+   * Strategy 6: Web Client (Desktop Browser)
    */
   async fetchViaWeb(videoId) {
     const startTime = Date.now();
-    console.log(`[SmartBypass] 💻 Strategy 5: Web Client (Desktop) for ${videoId}`);
+    console.log(`[SmartBypass] 💻 Strategy 6: Web Client (Desktop) for ${videoId}`);
 
     try {
       const url = 'https://www.youtube.com/youtubei/v1/player';
@@ -590,7 +693,13 @@ class YouTubeSmartBypass {
         };
       }
 
-      console.error('[SmartBypass] Unknown caption format:', typeof data, data ? data.substring(0, 100) : 'empty');
+      // Check if data is empty string or null
+      if (!data || (typeof data === 'string' && data.trim().length === 0)) {
+        console.error('[SmartBypass] Empty caption data received');
+        throw new Error('Empty caption data');
+      }
+
+      console.error('[SmartBypass] Unknown caption format:', typeof data, data ? String(data).substring(0, 100) : 'empty');
       throw new Error('Unknown caption format');
 
     } catch (error) {
@@ -638,10 +747,11 @@ class YouTubeSmartBypass {
     console.log(`[SmartBypass] 🎯 Fetching transcript for ${videoId} using multi-strategy bypass...`);
 
     // Strategy order (best to worst based on production success rates)
-    // Android: ~4% success, Web: new but promising, Embed/TV: 0%, iOS: 0% + LOGIN_REQUIRED
+    // Android: ~10% success, Direct: HTML scraping (very promising), Web: new desktop, others: 0%
     const strategies = [
-      () => this.fetchViaAndroid(videoId),  // BEST: 4.1% success rate
-      () => this.fetchViaWeb(videoId),      // NEW: Desktop browser, likely good
+      () => this.fetchViaAndroid(videoId),  // BEST: 10.5% success rate
+      () => this.fetchViaDirect(videoId),   // NEW: Direct HTML scraping, bypasses APIs
+      () => this.fetchViaWeb(videoId),      // NEW: Desktop browser, API-based
       () => this.fetchViaEmbed(videoId),    // Worth trying
       () => this.fetchViaTV(videoId),       // Backup
       () => this.fetchViaIOS(videoId)       // LAST: 0% + LOGIN_REQUIRED issues
