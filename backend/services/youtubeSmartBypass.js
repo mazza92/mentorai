@@ -23,11 +23,11 @@ class YouTubeSmartBypass {
 
     // Strategy success tracking
     this.strategyStats = {
-      mobile_ios: { success: 0, failures: 0 },
-      mobile_android: { success: 0, failures: 0 },
+      mobile_android: { success: 0, failures: 0 },  // BEST performer
+      web: { success: 0, failures: 0 },             // NEW Desktop browser
       embed: { success: 0, failures: 0 },
       tvhtml5: { success: 0, failures: 0 },
-      web: { success: 0, failures: 0 }
+      mobile_ios: { success: 0, failures: 0 }       // WORST: LOGIN_REQUIRED
     };
 
     // iOS client config (works ~90% of the time, bypasses most bot detection)
@@ -58,7 +58,29 @@ class YouTubeSmartBypass {
       userAgent: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebkit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1'
     };
 
+    // Web client (desktop browser) - often bypasses mobile restrictions
+    this.webClient = {
+      clientName: 'WEB',
+      clientVersion: '2.20231219.04.00',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+
+    // User agent pool for rotation
+    this.userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+    ];
+
     console.log('[SmartBypass] Multi-strategy bot evasion initialized');
+  }
+
+  /**
+   * Get random user agent
+   */
+  getRandomUserAgent() {
+    return this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
   }
 
   /**
@@ -370,6 +392,99 @@ class YouTubeSmartBypass {
   }
 
   /**
+   * Strategy 5: Web Client (Desktop Browser)
+   */
+  async fetchViaWeb(videoId) {
+    const startTime = Date.now();
+    console.log(`[SmartBypass] 💻 Strategy 5: Web Client (Desktop) for ${videoId}`);
+
+    try {
+      const url = 'https://www.youtube.com/youtubei/v1/player';
+
+      // Use random user agent for better success
+      const randomUserAgent = this.getRandomUserAgent();
+
+      const payload = {
+        videoId: videoId,
+        context: {
+          client: {
+            ...this.webClient,
+            userAgent: randomUserAgent
+          }
+        }
+      };
+
+      const response = await axios.post(url, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': randomUserAgent,
+          'X-YouTube-Client-Name': '1',
+          'X-YouTube-Client-Version': this.webClient.clientVersion,
+          'Origin': 'https://www.youtube.com',
+          'Referer': `https://www.youtube.com/watch?v=${videoId}`
+        },
+        timeout: 15000
+      });
+
+      // Debug logging
+      console.log(`[SmartBypass] Web API response has captions: ${!!response.data?.captions}`);
+      if (!response.data?.captions && response.data?.playabilityStatus) {
+        console.log(`[SmartBypass] Playability status: ${response.data.playabilityStatus.status}`);
+        console.log(`[SmartBypass] Playability reason: ${response.data.playabilityStatus.reason || 'N/A'}`);
+      }
+
+      if (response.data && response.data.captions) {
+        const captionTracks = response.data.captions.playerCaptionsTracklistRenderer?.captionTracks || [];
+
+        if (captionTracks.length > 0) {
+          const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
+
+          if (track && track.baseUrl) {
+            // Download caption file - request JSON3 format explicitly
+            const captionUrl = track.baseUrl.includes('?')
+              ? `${track.baseUrl}&fmt=json3`
+              : `${track.baseUrl}?fmt=json3`;
+
+            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
+
+            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
+
+            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
+            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
+
+            const transcript = this.parseJSON3Captions(captionResponse.data);
+
+            console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
+            console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
+            console.log(`[SmartBypass] Parsed word count: ${transcript.wordCount}`);
+
+            this.strategyStats.web = this.strategyStats.web || { success: 0, failures: 0 };
+            this.strategyStats.web.success++;
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`[SmartBypass] ✅ Web strategy worked! (${elapsed}s)`);
+
+            return {
+              success: true,
+              transcript,
+              strategy: 'web',
+              fetchTime: elapsed
+            };
+          }
+        }
+      }
+
+      throw new Error('No captions found in Web response');
+
+    } catch (error) {
+      this.strategyStats.web = this.strategyStats.web || { success: 0, failures: 0 };
+      this.strategyStats.web.failures++;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[SmartBypass] ❌ Web strategy failed (${elapsed}s): ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Parse JSON3 or XML captions to transcript
    */
   parseJSON3Captions(data) {
@@ -434,7 +549,22 @@ class YouTubeSmartBypass {
 
         textMatches.forEach((match, index) => {
           // Extract text content and decode HTML entities
-          const textContent = match.replace(/<(?:text|p)[^>]*>/, '').replace(/<\/(?:text|p)>/, '');
+          let textContent = match.replace(/<(?:text|p)[^>]*>/, '').replace(/<\/(?:text|p)>/, '');
+
+          // YouTube uses nested <s> tags for individual words/segments
+          // Example: <p><s>word1</s><s>word2</s></p>
+          // Extract all text from <s> tags or strip all tags if no <s> tags found
+          const sTagMatches = textContent.match(/<s[^>]*>([^<]*)<\/s>/g);
+          if (sTagMatches && sTagMatches.length > 0) {
+            // Extract text from each <s> tag
+            textContent = sTagMatches.map(s => {
+              return s.replace(/<s[^>]*>/, '').replace(/<\/s>/, '');
+            }).join('');
+          } else {
+            // No <s> tags, just strip all remaining tags
+            textContent = textContent.replace(/<[^>]+>/g, '');
+          }
+
           // Replace newlines with spaces
           const normalizedText = textContent.replace(/\n/g, ' ');
           const decodedText = this.decodeHTMLEntities(normalizedText);
@@ -507,22 +637,28 @@ class YouTubeSmartBypass {
 
     console.log(`[SmartBypass] 🎯 Fetching transcript for ${videoId} using multi-strategy bypass...`);
 
-    // Strategy order (best to worst based on success rates)
+    // Strategy order (best to worst based on production success rates)
+    // Android: ~4% success, Web: new but promising, Embed/TV: 0%, iOS: 0% + LOGIN_REQUIRED
     const strategies = [
-      () => this.fetchViaIOS(videoId),
-      () => this.fetchViaAndroid(videoId),
-      () => this.fetchViaEmbed(videoId),
-      () => this.fetchViaTV(videoId)
+      () => this.fetchViaAndroid(videoId),  // BEST: 4.1% success rate
+      () => this.fetchViaWeb(videoId),      // NEW: Desktop browser, likely good
+      () => this.fetchViaEmbed(videoId),    // Worth trying
+      () => this.fetchViaTV(videoId),       // Backup
+      () => this.fetchViaIOS(videoId)       // LAST: 0% + LOGIN_REQUIRED issues
     ];
 
     let lastError = null;
 
-    for (const strategy of strategies) {
+    for (let i = 0; i < strategies.length; i++) {
+      const strategy = strategies[i];
+
       try {
-        // Add delay to avoid rate limiting (1-3 seconds to be respectful)
-        // Increased from 0-2s to reduce chance of triggering 429 errors
-        const delay = 1000 + Math.random() * 2000;
-        await new Promise(resolve => setTimeout(resolve, delay));
+        // Add delay between strategies (but not before first one)
+        // Small delay to avoid overwhelming YouTube when trying multiple strategies
+        if (i > 0) {
+          const delay = 500 + Math.random() * 500; // 500-1000ms between retries
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
 
         const result = await strategy();
 
