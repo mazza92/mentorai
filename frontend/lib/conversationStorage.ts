@@ -5,10 +5,19 @@
 
 import axios from 'axios'
 
+interface Citation {
+  videoId: string
+  videoTitle: string
+  timestamp: number
+  timestampFormatted: string
+  url: string
+}
+
 export interface ConversationMessage {
   type: 'user' | 'ai'
   text: string
-  citations?: number[]
+  citations?: number[] // For single video mode
+  channelCitations?: Citation[] // For channel mode with YouTube links
   timestamp: Date
 }
 
