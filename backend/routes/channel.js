@@ -87,11 +87,30 @@ router.post('/import', async (req, res) => {
 
       for (const video of chunk) {
         const videoRef = channelRef.collection('videos').doc(video.id);
+
+        // Extract transcript text safely (avoid Firestore 1MB field limit)
+        let transcriptText = null;
+        if (video.transcript) {
+          // Handle transcript object (from smart bypass)
+          if (typeof video.transcript === 'object' && video.transcript.text) {
+            transcriptText = video.transcript.text;
+          } else if (typeof video.transcript === 'string') {
+            transcriptText = video.transcript;
+          }
+
+          // Check size - Firestore field limit is 1MB (1048576 bytes)
+          // If transcript text is too large, don't store it (use segments instead)
+          if (transcriptText && Buffer.byteLength(transcriptText, 'utf8') > 900000) {
+            console.log(`[API] ⚠️ Transcript for ${video.id} too large (${Buffer.byteLength(transcriptText, 'utf8')} bytes), skipping text field`);
+            transcriptText = null;
+          }
+        }
+
         batch.update(videoRef, {
           status: 'ready',
           hasTranscript: true,
-          transcript: video.transcript,
-          transcriptSegments: video.transcriptSegments,
+          transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
+          transcriptSegments: video.transcriptSegments, // Segments are already chunked, safe to store
           transcriptSource: video.transcriptSource,
           transcriptFetchedAt: new Date().toISOString()
         });
@@ -184,11 +203,30 @@ router.post('/import', async (req, res) => {
 
             for (const video of chunk) {
               const videoRef = channelRefBg.collection('videos').doc(video.id);
+
+              // Extract transcript text safely (avoid Firestore 1MB field limit)
+              let transcriptText = null;
+              if (video.transcript) {
+                // Handle transcript object (from smart bypass)
+                if (typeof video.transcript === 'object' && video.transcript.text) {
+                  transcriptText = video.transcript.text;
+                } else if (typeof video.transcript === 'string') {
+                  transcriptText = video.transcript;
+                }
+
+                // Check size - Firestore field limit is 1MB (1048576 bytes)
+                // If transcript text is too large, don't store it (use segments instead)
+                if (transcriptText && Buffer.byteLength(transcriptText, 'utf8') > 900000) {
+                  console.log(`[API] ⚠️ Background: Transcript for ${video.id} too large (${Buffer.byteLength(transcriptText, 'utf8')} bytes), skipping text field`);
+                  transcriptText = null;
+                }
+              }
+
               batchBg.update(videoRef, {
                 status: 'ready',
                 hasTranscript: true,
-                transcript: video.transcript,
-                transcriptSegments: video.transcriptSegments,
+                transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
+                transcriptSegments: video.transcriptSegments, // Segments are already chunked, safe to store
                 transcriptSource: video.transcriptSource,
                 transcriptFetchedAt: new Date().toISOString()
               });

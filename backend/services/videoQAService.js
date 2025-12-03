@@ -1813,11 +1813,18 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
 
     // Check transcript (if available - bonus points)
     if (video.transcript) {
-      const transcriptLower = video.transcript.toLowerCase();
-      questionWords.forEach(word => {
-        const matches = (transcriptLower.match(new RegExp(word, 'g')) || []).length;
-        score += Math.min(matches, 10); // Cap at 10 matches per word
-      });
+      // Handle both string transcripts and object transcripts with text field
+      const transcriptText = typeof video.transcript === 'object' && video.transcript.text
+        ? video.transcript.text
+        : (typeof video.transcript === 'string' ? video.transcript : null);
+
+      if (transcriptText) {
+        const transcriptLower = transcriptText.toLowerCase();
+        questionWords.forEach(word => {
+          const matches = (transcriptLower.match(new RegExp(word, 'g')) || []).length;
+          score += Math.min(matches, 10); // Cap at 10 matches per word
+        });
+      }
     }
 
     // Boost popular videos (views, likes, comments)
