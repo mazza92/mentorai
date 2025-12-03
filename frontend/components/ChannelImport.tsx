@@ -27,6 +27,7 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
   } | null>(null)
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const retryCountRef = useRef<number>(0)
 
   const isValidYouTubeChannelUrl = (url: string) => {
     // Match various YouTube channel URL formats
@@ -39,9 +40,10 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     return patterns.some(pattern => pattern.test(url))
   }
 
-  // Poll for progress updates
+  // Poll for progress updates with exponential backoff on rate limit
   useEffect(() => {
     if (!currentProjectId || !isImporting) {
+      retryCountRef.current = 0
       return
     }
 
@@ -49,6 +51,9 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
       try {
         const apiUrl = getApiUrl()
         const response = await axios.get(`${apiUrl}/api/channel/import-progress/${currentProjectId}`)
+
+        // Reset retry count on successful request
+        retryCountRef.current = 0
 
         if (response.data.success) {
           const { status, progress: progressData } = response.data.data
@@ -76,19 +81,42 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
             }
           }
         }
-      } catch (err) {
-        console.error('Error polling progress:', err)
+      } catch (err: any) {
+        // Handle 429 rate limit with exponential backoff
+        if (err.response?.status === 429) {
+          retryCountRef.current++
+          console.log(`Rate limited (attempt ${retryCountRef.current}), backing off...`)
+
+          // Stop current interval and restart with longer delay
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+          }
+
+          // Exponential backoff: 5s, 10s, 20s, max 30s
+          const backoffDelay = Math.min(5000 * Math.pow(2, retryCountRef.current - 1), 30000)
+
+          setTimeout(() => {
+            if (isImporting && currentProjectId) {
+              pollProgress()
+              pollingIntervalRef.current = setInterval(pollProgress, backoffDelay)
+            }
+          }, backoffDelay)
+        } else {
+          console.error('Error polling progress:', err)
+        }
       }
     }
 
-    // Poll immediately and then every 2 seconds
+    // Poll immediately and then every 3 seconds (slower to avoid rate limits)
     pollProgress()
-    pollingIntervalRef.current = setInterval(pollProgress, 2000)
+    pollingIntervalRef.current = setInterval(pollProgress, 3000)
 
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
       }
+      retryCountRef.current = 0
     }
   }, [currentProjectId, isImporting, onImportComplete])
 
