@@ -88,7 +88,7 @@ router.post('/import', async (req, res) => {
       for (const video of chunk) {
         const videoRef = channelRef.collection('videos').doc(video.id);
 
-        // Extract transcript text safely (avoid Firestore 1MB field limit)
+        // Extract transcript text safely (avoid Firestore 1MB document limit)
         let transcriptText = null;
         if (video.transcript) {
           // Handle transcript object (from smart bypass)
@@ -106,11 +106,36 @@ router.post('/import', async (req, res) => {
           }
         }
 
+        // Check if transcriptSegments is too large to store in document
+        // Firestore document limit is 1MB total
+        const segmentsSize = video.transcriptSegments ? Buffer.byteLength(JSON.stringify(video.transcriptSegments), 'utf8') : 0;
+        const storeSegmentsInSubcollection = segmentsSize > 700000; // 700KB threshold for safety
+
+        if (storeSegmentsInSubcollection) {
+          console.log(`[API] ⚠️ TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
+
+          // Store segments in subcollection chunks (to avoid 1MB write limit)
+          const SEGMENTS_PER_CHUNK = 100;
+          const segments = video.transcriptSegments || [];
+
+          for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
+            const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
+            const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
+            batch.set(chunkDoc, {
+              segments: segmentChunk,
+              startIndex: j,
+              endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
+            });
+          }
+        }
+
         batch.update(videoRef, {
           status: 'ready',
           hasTranscript: true,
           transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
-          transcriptSegments: video.transcriptSegments, // Segments are already chunked, safe to store
+          transcriptSegments: storeSegmentsInSubcollection ? null : video.transcriptSegments, // Only store if small enough
+          transcriptSegmentsInSubcollection: storeSegmentsInSubcollection, // Flag for retrieval
+          transcriptSegmentsCount: video.transcriptSegments?.length || 0, // Metadata
           transcriptSource: video.transcriptSource,
           transcriptFetchedAt: new Date().toISOString()
         });
@@ -204,7 +229,7 @@ router.post('/import', async (req, res) => {
             for (const video of chunk) {
               const videoRef = channelRefBg.collection('videos').doc(video.id);
 
-              // Extract transcript text safely (avoid Firestore 1MB field limit)
+              // Extract transcript text safely (avoid Firestore 1MB document limit)
               let transcriptText = null;
               if (video.transcript) {
                 // Handle transcript object (from smart bypass)
@@ -222,11 +247,36 @@ router.post('/import', async (req, res) => {
                 }
               }
 
+              // Check if transcriptSegments is too large to store in document
+              // Firestore document limit is 1MB total
+              const segmentsSize = video.transcriptSegments ? Buffer.byteLength(JSON.stringify(video.transcriptSegments), 'utf8') : 0;
+              const storeSegmentsInSubcollection = segmentsSize > 700000; // 700KB threshold for safety
+
+              if (storeSegmentsInSubcollection) {
+                console.log(`[API] ⚠️ Background: TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
+
+                // Store segments in subcollection chunks (to avoid 1MB write limit)
+                const SEGMENTS_PER_CHUNK = 100;
+                const segments = video.transcriptSegments || [];
+
+                for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
+                  const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
+                  const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
+                  batchBg.set(chunkDoc, {
+                    segments: segmentChunk,
+                    startIndex: j,
+                    endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
+                  });
+                }
+              }
+
               batchBg.update(videoRef, {
                 status: 'ready',
                 hasTranscript: true,
                 transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
-                transcriptSegments: video.transcriptSegments, // Segments are already chunked, safe to store
+                transcriptSegments: storeSegmentsInSubcollection ? null : video.transcriptSegments, // Only store if small enough
+                transcriptSegmentsInSubcollection: storeSegmentsInSubcollection, // Flag for retrieval
+                transcriptSegmentsCount: video.transcriptSegments?.length || 0, // Metadata
                 transcriptSource: video.transcriptSource,
                 transcriptFetchedAt: new Date().toISOString()
               });

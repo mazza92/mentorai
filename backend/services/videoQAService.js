@@ -1691,9 +1691,34 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
               .collection('videos')
               .doc(video.id);
 
+            // Check if we need to store segments in subcollection due to size
+            const segmentsSize = transcriptResult.segments ? Buffer.byteLength(JSON.stringify(transcriptResult.segments), 'utf8') : 0;
+            const transcriptSize = transcriptResult.text ? Buffer.byteLength(transcriptResult.text, 'utf8') : 0;
+            const storeSegmentsInSubcollection = segmentsSize > 700000; // 700KB threshold for safety
+
+            if (storeSegmentsInSubcollection) {
+              console.log(`[VideoQAService] ⚠️ TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
+
+              // Store segments in subcollection chunks
+              const SEGMENTS_PER_CHUNK = 100;
+              const segments = transcriptResult.segments || [];
+
+              for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
+                const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
+                const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
+                await chunkDoc.set({
+                  segments: segmentChunk,
+                  startIndex: j,
+                  endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
+                });
+              }
+            }
+
             await videoRef.update({
-              transcript: transcriptResult.text,
-              transcriptSegments: transcriptResult.segments, // Store segments for future queries
+              transcript: transcriptSize > 900000 ? null : { text: transcriptResult.text }, // Skip if too large
+              transcriptSegments: storeSegmentsInSubcollection ? null : transcriptResult.segments, // Store segments inline if small enough
+              transcriptSegmentsInSubcollection: storeSegmentsInSubcollection, // Flag for retrieval
+              transcriptSegmentsCount: transcriptResult.segments?.length || 0, // Metadata
               status: 'ready',
               transcriptSource: source,
               transcriptLanguage: transcriptResult.language || 'en',
@@ -1760,6 +1785,34 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
         id: doc.id,
         ...doc.data()
       }));
+
+      // Fetch transcriptSegments from subcollection for videos that have them there
+      for (const video of videos) {
+        if (video.transcriptSegmentsInSubcollection) {
+          try {
+            const segmentsSnapshot = await firestore.collection('channels')
+              .doc(channelId)
+              .collection('videos')
+              .doc(video.id)
+              .collection('transcriptChunks')
+              .orderBy('startIndex')
+              .get();
+
+            const allSegments = [];
+            segmentsSnapshot.docs.forEach(doc => {
+              const chunk = doc.data();
+              if (chunk.segments) {
+                allSegments.push(...chunk.segments);
+              }
+            });
+
+            video.transcriptSegments = allSegments;
+            console.log(`[VideoQAService] ✓ Fetched ${allSegments.length} segments from subcollection for ${video.id}`);
+          } catch (error) {
+            console.error(`[VideoQAService] ✗ Failed to fetch segments from subcollection for ${video.id}:`, error);
+          }
+        }
+      }
     }
 
     // Filter out error videos
