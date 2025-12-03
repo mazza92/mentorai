@@ -1613,7 +1613,7 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
       return {
         answer: answer, // Original markdown with <cite> tags
         answerHtml: answerHtml, // HTML version for frontend
-        citations: citations, // Structured citations with URLs and timestamps
+        channelCitations: citations, // Structured citations with URLs and timestamps for channel mode
         sources: sources,
         videosAnalyzed: relevantVideos.length
       };
