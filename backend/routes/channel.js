@@ -114,19 +114,22 @@ router.post('/import', async (req, res) => {
         if (storeSegmentsInSubcollection) {
           console.log(`[API] ⚠️ TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
 
-          // Store segments in subcollection chunks (to avoid 1MB write limit)
+          // Store segments in subcollection chunks (commit separately to avoid batch size limit)
           const SEGMENTS_PER_CHUNK = 100;
           const segments = video.transcriptSegments || [];
 
+          // Commit subcollection chunks in separate batches to avoid "Transaction too big" error
           for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
             const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
             const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
-            batch.set(chunkDoc, {
+            // Use individual set() instead of batch to avoid transaction size limit
+            await chunkDoc.set({
               segments: segmentChunk,
               startIndex: j,
               endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
             });
           }
+          console.log(`[API] ✓ Stored ${segments.length} segments in ${Math.ceil(segments.length / SEGMENTS_PER_CHUNK)} chunks for ${video.id}`);
         }
 
         batch.update(videoRef, {
@@ -255,19 +258,22 @@ router.post('/import', async (req, res) => {
               if (storeSegmentsInSubcollection) {
                 console.log(`[API] ⚠️ Background: TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
 
-                // Store segments in subcollection chunks (to avoid 1MB write limit)
+                // Store segments in subcollection chunks (commit separately to avoid batch size limit)
                 const SEGMENTS_PER_CHUNK = 100;
                 const segments = video.transcriptSegments || [];
 
+                // Commit subcollection chunks in separate batches to avoid "Transaction too big" error
                 for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
                   const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
                   const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
-                  batchBg.set(chunkDoc, {
+                  // Use individual set() instead of batch to avoid transaction size limit
+                  await chunkDoc.set({
                     segments: segmentChunk,
                     startIndex: j,
                     endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
                   });
                 }
+                console.log(`[API] ✓ Background: Stored ${segments.length} segments in ${Math.ceil(segments.length / SEGMENTS_PER_CHUNK)} chunks for ${video.id}`);
               }
 
               batchBg.update(videoRef, {
