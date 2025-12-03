@@ -596,6 +596,9 @@ const QnAPanel = ({
         hasTranscriptText: !!project.transcript?.text
       });
 
+      // Only fetch if we haven't already fetched (prevents infinite loop)
+      if (sourceGuide || loadingSourceGuide) return
+
       // If project already has cached source guide, use it
       if (project.sourceGuide) {
         console.log('Using cached source guide from project:', project.sourceGuide);
@@ -605,9 +608,6 @@ const QnAPanel = ({
         });
         return;
       }
-
-      // Only fetch if we haven't already fetched
-      if (sourceGuide || loadingSourceGuide) return
 
       // For single videos, need transcript. For channels, can generate without transcript.
       const hasRequiredData = project.type === 'channel'
