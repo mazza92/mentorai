@@ -69,6 +69,16 @@ const channelLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Very high rate limit for status polling endpoints - 5000 per 15 minutes
+// Frontend polls every 1-2 seconds during import, needs ~1800-3600 requests for 60min import
+const statusPollingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5000, // 333 requests/minute = ~2 requests/second (allows frequent polling)
+  message: { error: 'Status polling limit exceeded. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Middleware
 // Strip trailing slashes from CORS origin to avoid mismatch issues
 const corsOrigin = (process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -106,8 +116,19 @@ const tempDir = path.join(__dirname, 'temp');
   }
 });
 
-// Apply general rate limiter to all API routes
-app.use('/api/', apiLimiter);
+// Apply general rate limiter to all API routes EXCEPT status polling
+// Status polling endpoints need higher limits since frontend polls frequently during imports
+app.use('/api/', (req, res, next) => {
+  // Skip general rate limiter for status polling endpoints
+  if (req.path.includes('/status/')) {
+    return next();
+  }
+  return apiLimiter(req, res, next);
+});
+
+// Status polling endpoints - very high rate limit for frequent polling
+app.use('/api/channel/status', statusPollingLimiter, require('./routes/channel'));
+app.use('/api/upload-youtube/status', statusPollingLimiter, require('./routes/uploadYoutube'));
 
 // Routes with specific rate limits
 app.use('/api/upload', uploadLimiter, require('./routes/upload'));
