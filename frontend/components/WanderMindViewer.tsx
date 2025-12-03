@@ -842,10 +842,12 @@ const QnAPanel = ({
       // We just need to track that citations exist
     }
 
-    // Remove ALL cite tags from text for display (we'll show them as chips below)
+    // Remove ALL cite tags and old bracket format citations from text (we'll show them as chips below)
     text = text.replace(/<cite[^>]*>[\s]*<\/cite>/gi, '')
     text = text.replace(/<cite[^>]*>/gi, '')
     text = text.replace(/<\/cite>/gi, '')
+    // Remove old bracket format: [Vidéo 10, 21:42] or [Video 10, 21:42]
+    text = text.replace(/\[(?:Vidéo|Video)\s+\d+,\s+\d+:\d+\]/gi, '')
 
     // Extract all citations from text and remove them from content
     const citationRegex = /\[(\d{1,2}):(\d{2})\]/g
