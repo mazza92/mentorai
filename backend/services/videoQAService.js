@@ -1456,7 +1456,8 @@ CRITICAL MARKDOWN FORMATTING RULES:
 5. Each bullet should be a complete, detailed sentence with specific advice
 6. Include concrete steps, techniques, and examples from the transcripts
 7. NEVER output just headings without bullet points
-8. DO NOT include inline video references like "(Video 5)" or "(Video 1, Video 2)"
+8. CITE SOURCES: At the end of each statement that comes from a specific video, add a citation using this EXACT format: <cite video="X" time="MM:SS"></cite> where X is the video number (1, 2, 3...) and MM:SS is the timestamp from the transcript segment. Example: "The creator recommends using AI for content creation<cite video="1" time="12:34"></cite>."
+9. IMPORTANT: Only cite when you have an actual timestamp from the transcript segments provided. DO NOT make up citations.
 
 FORMATTING STRUCTURE (YOU MUST FOLLOW):
 ## Main Topic
@@ -1488,13 +1489,41 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
       const response = await result.response;
       const answer = response.text();
 
+      // Parse citations from the answer BEFORE cleaning
+      const citationRegex = /<cite video="(\d+)" time="(\d+):(\d+)"><\/cite>/g;
+      const citations = [];
+      let match;
+
+      while ((match = citationRegex.exec(answer)) !== null) {
+        const videoIndex = parseInt(match[1], 10) - 1; // Convert to 0-indexed
+        const minutes = parseInt(match[2], 10);
+        const seconds = parseInt(match[3], 10);
+        const timestamp = minutes * 60 + seconds;
+
+        // Map to actual video
+        if (videoIndex >= 0 && videoIndex < relevantVideos.length) {
+          const video = relevantVideos[videoIndex];
+          citations.push({
+            videoId: video.videoId,
+            videoTitle: video.title,
+            timestamp: timestamp,
+            timestampFormatted: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+            url: `https://www.youtube.com/watch?v=${video.videoId}&t=${timestamp}s`
+          });
+        }
+      }
+
+      console.log(`[VideoQAService] Parsed ${citations.length} citations from answer`);
+
       // Convert markdown to HTML for better frontend rendering
       let answerHtml;
       try {
         // Clean up the markdown before conversion
         let cleanedMarkdown = answer
-          // Remove inline video references like (Video 5, Video 4)
+          // Remove old-style inline video references like (Video 5, Video 4) and (Vidéo 1)
+          .replace(/\(Vidéo\s+\d+(?:,\s*Vidéo\s+\d+)*\)/gi, '')
           .replace(/\(Video\s+\d+(?:,\s*Video\s+\d+)*\)/gi, '')
+          // Keep <cite> tags for frontend to render as clickable chips
           // Ensure proper spacing between sections
           .replace(/\n\n\n+/g, '\n\n')
           // Ensure headings have proper line breaks
@@ -1521,8 +1550,9 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
         }));
 
       return {
-        answer: answer, // Original markdown
+        answer: answer, // Original markdown with <cite> tags
         answerHtml: answerHtml, // HTML version for frontend
+        citations: citations, // Structured citations with URLs and timestamps
         sources: sources,
         videosAnalyzed: relevantVideos.length
       };
