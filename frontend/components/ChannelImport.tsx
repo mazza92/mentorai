@@ -255,15 +255,49 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
               {progress.fetched} / {progress.total}
             </span>
           </div>
-          <div className="w-full bg-blue-100 rounded-full h-2.5">
+          <div className="w-full bg-blue-100 rounded-full h-2.5 mb-3">
             <div
               className="bg-gradient-to-r from-blue-600 to-purple-600 h-2.5 rounded-full transition-all duration-300"
               style={{ width: `${(progress.fetched / progress.total) * 100}%` }}
             />
           </div>
-          <p className="text-blue-600 text-xs mt-2">
-            You can start asking questions once the first videos are ready!
-          </p>
+
+          {/* Show "Start Now" button if we have enough initial videos */}
+          {progress.fetched >= 10 && currentProjectId && (
+            <div className="space-y-2">
+              <p className="text-blue-700 text-sm font-medium">
+                {progress.fetched} videos ready! You can start asking questions now.
+              </p>
+              <button
+                onClick={() => {
+                  // Stop polling
+                  if (pollingIntervalRef.current) {
+                    clearInterval(pollingIntervalRef.current)
+                    pollingIntervalRef.current = null
+                  }
+                  setIsImporting(false)
+
+                  // Redirect immediately
+                  if (onImportComplete && currentProjectId) {
+                    onImportComplete(currentProjectId, currentProjectId)
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-2.5 px-4 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Start using channel now
+              </button>
+              <p className="text-blue-600 text-xs text-center">
+                More videos will continue processing in the background
+              </p>
+            </div>
+          )}
+
+          {!currentProjectId && (
+            <p className="text-blue-600 text-xs mt-2">
+              Preparing channel... This may take a moment for large channels.
+            </p>
+          )}
         </div>
       )}
 
