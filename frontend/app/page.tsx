@@ -3,12 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
-import VideoUpload from '@/components/VideoUpload'
 import ChannelImport from '@/components/ChannelImport'
 import WanderMindViewer from '@/components/WanderMindViewer'
 import ModernHeader from '@/components/ModernHeader'
 import ConversationHistory from '@/components/ConversationHistory'
-import { Zap, Clock, User, LogOut, Upload, Youtube } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
 import axios from 'axios'
@@ -22,7 +21,6 @@ export default function Home() {
   const [currentProject, setCurrentProject] = useState<string | null>(null)
   const [userId, setUserId] = useState<string>('anonymous')
   const [isInitialized, setIsInitialized] = useState(false)
-  const [uploadMode, setUploadMode] = useState<'video' | 'channel'>('video')
 
   // Function to check URL and update project
   const checkUrlAndSetProject = (effectiveUserId?: string) => {
@@ -313,42 +311,9 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Mode Selector */}
-              <div className="flex gap-4 mb-8 max-w-2xl mx-auto">
-                <button
-                  onClick={() => setUploadMode('video')}
-                  className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
-                    uploadMode === 'video'
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  <Upload className="w-5 h-5" />
-                  {t('upload_mode.single_video') || 'Single Video'}
-                </button>
-
-                <button
-                  onClick={() => setUploadMode('channel')}
-                  className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
-                    uploadMode === 'channel'
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  <Youtube className="w-5 h-5" />
-                  {t('upload_mode.full_channel') || 'Full Channel'}
-                  <span className="bg-yellow-400 text-yellow-900 text-xs px-2 py-1 rounded-full font-bold">
-                    NEW
-                  </span>
-                </button>
-              </div>
-
+              {/* Channel Import Only (MVP) */}
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 md:p-10 border border-slate-200/60 shadow-xl shadow-slate-200/50">
-                {uploadMode === 'video' ? (
-                  <VideoUpload userId={userId} onUploadComplete={handleProjectCreated} />
-                ) : (
-                  <ChannelImport userId={userId} onImportComplete={handleProjectCreated} />
-                )}
+                <ChannelImport userId={userId} onImportComplete={handleProjectCreated} />
               </div>
             </div>
           </main>
