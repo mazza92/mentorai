@@ -46,6 +46,9 @@ RUN npm install
 # Copy application code
 COPY . .
 
+# Set Node.js memory limit to 2GB (default is 512MB which causes OOM errors)
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+
 # Expose port
 EXPOSE 8080
 
