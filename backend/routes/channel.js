@@ -73,13 +73,19 @@ router.post('/import', async (req, res) => {
       { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
     );
 
-    // Save initial transcripts to channels collection
+    // Save initial transcripts to channels collection in chunks to avoid 10MB batch limit
     const { firestore: firestoreForUpdate } = getFirestore();
     const channelRef = firestoreForUpdate.collection('channels').doc(quickImport.channelId);
-    const batch = firestoreForUpdate.batch();
 
-    for (const video of initialVideos) {
-      if (video.hasTranscript) {
+    // Process in smaller chunks (2 videos per batch to stay well under 10MB limit)
+    const BATCH_SIZE = 2;
+    const videosWithTranscripts = initialVideos.filter(v => v.hasTranscript);
+
+    for (let i = 0; i < videosWithTranscripts.length; i += BATCH_SIZE) {
+      const chunk = videosWithTranscripts.slice(i, i + BATCH_SIZE);
+      const batch = firestoreForUpdate.batch();
+
+      for (const video of chunk) {
         const videoRef = channelRef.collection('videos').doc(video.id);
         batch.update(videoRef, {
           status: 'ready',
@@ -90,9 +96,11 @@ router.post('/import', async (req, res) => {
           transcriptFetchedAt: new Date().toISOString()
         });
       }
+
+      await batch.commit();
+      console.log(`[API] ✓ Saved chunk ${Math.floor(i / BATCH_SIZE) + 1} (${chunk.length} transcripts)`);
     }
 
-    await batch.commit();
     console.log(`[API] ✓ Saved ${initialTranscripts.successful} transcripts to Firestore`);
 
     // Step 3: Create project with "partial" or "ready" status
@@ -162,13 +170,19 @@ router.post('/import', async (req, res) => {
             { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
           );
 
-          // Save remaining transcripts to channels collection
+          // Save remaining transcripts to channels collection in chunks to avoid 10MB batch limit
           const { firestore: firestoreBg } = getFirestore();
           const channelRefBg = firestoreBg.collection('channels').doc(quickImport.channelId);
-          const batchBg = firestoreBg.batch();
 
-          for (const video of remainingVideos) {
-            if (video.hasTranscript) {
+          // Process in smaller chunks (2 videos per batch to stay well under 10MB limit)
+          const BATCH_SIZE_BG = 2;
+          const remainingWithTranscripts = remainingVideos.filter(v => v.hasTranscript);
+
+          for (let i = 0; i < remainingWithTranscripts.length; i += BATCH_SIZE_BG) {
+            const chunk = remainingWithTranscripts.slice(i, i + BATCH_SIZE_BG);
+            const batchBg = firestoreBg.batch();
+
+            for (const video of chunk) {
               const videoRef = channelRefBg.collection('videos').doc(video.id);
               batchBg.update(videoRef, {
                 status: 'ready',
@@ -179,9 +193,11 @@ router.post('/import', async (req, res) => {
                 transcriptFetchedAt: new Date().toISOString()
               });
             }
+
+            await batchBg.commit();
+            console.log(`[API] ✓ Background: Saved chunk ${Math.floor(i / BATCH_SIZE_BG) + 1} (${chunk.length} transcripts)`);
           }
 
-          await batchBg.commit();
           console.log(`[API] ✓ Saved ${remainingTranscripts.successful} remaining transcripts to Firestore`);
 
           // Calculate final stats (transcripts already stored in channels collection)
