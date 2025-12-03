@@ -30,10 +30,19 @@ interface TranscriptLine {
   text: string
 }
 
+interface Citation {
+  videoId: string
+  videoTitle: string
+  timestamp: number
+  timestampFormatted: string
+  url: string
+}
+
 interface QAMessage {
   type: 'user' | 'ai'
   text: string
-  citations?: number[]
+  citations?: number[] // For single video mode (timestamps in seconds)
+  channelCitations?: Citation[] // For channel mode (video URLs with timestamps)
   timestamp: Date
 }
 
@@ -569,6 +578,7 @@ const QnAPanel = ({
           type: msg.type as 'user' | 'ai',
           text: msg.text,
           citations: msg.citations,
+          channelCitations: msg.channelCitations,
           timestamp: msg.timestamp
         })))
       } else {
@@ -663,6 +673,7 @@ const QnAPanel = ({
               type: msg.type,
               text: msg.text,
               citations: msg.citations,
+              channelCitations: msg.channelCitations,
               timestamp: msg.timestamp
             })),
             // Only update timestamp if messages actually changed
@@ -738,14 +749,14 @@ const QnAPanel = ({
       })
 
       if (response.data.success) {
-        const { answer, answerHtml, citations, questionsRemaining } = response.data
+        const { answer, answerHtml, citations, channelCitations, questionsRemaining } = response.data
 
         // Update questions remaining counter
         if (questionsRemaining !== null && questionsRemaining !== undefined) {
           setQuestionsRemaining(questionsRemaining)
         }
 
-        // Find the first citation to highlight
+        // Find the first citation to highlight (for single video mode)
         if (citations && citations.length > 0) {
           setHighlightedTime(citations[0])
         }
@@ -755,6 +766,7 @@ const QnAPanel = ({
           type: 'ai',
           text: answerHtml || answer || '', // Use HTML if available for proper formatting
           citations: citations || [],
+          channelCitations: channelCitations || [], // Channel citations with video URLs
           timestamp: new Date()
         }
         setHistory(prev => [...prev, aiEntry])
@@ -813,14 +825,24 @@ const QnAPanel = ({
   }
 
   // Format AI answer with markdown, emojis, and grouped citations
-  const formatAiAnswer = (text: string, citations?: number[]) => {
+  const formatAiAnswer = (text: string, citations?: number[], channelCitations?: Citation[]) => {
     if (!text) return null
 
     // Check if text is HTML (backend sends HTML for better formatting)
     const isHtml = text.includes('<p>') || text.includes('<ul>') || text.includes('<ol>') || text.includes('<li>') ||
                    text.includes('<strong>') || text.includes('<em>') || text.includes('<b>') || text.includes('<i>')
 
-    // Remove ALL cite tags as a safety measure (backend should have done this, but double-check)
+    // Parse channel citations from <cite> tags (for channel Q&A)
+    const parsedChannelCitations: Citation[] = []
+    const citeRegex = /<cite video="(\d+)" time="(\d+):(\d+)"><\/cite>/g;
+    let citeMatch;
+
+    while ((citeMatch = citeRegex.exec(text)) !== null) {
+      // Note: video number is not used here since we'll get the actual citations from the API response
+      // We just need to track that citations exist
+    }
+
+    // Remove ALL cite tags from text for display (we'll show them as chips below)
     text = text.replace(/<cite[^>]*>[\s]*<\/cite>/gi, '')
     text = text.replace(/<cite[^>]*>/gi, '')
     text = text.replace(/<\/cite>/gi, '')
@@ -857,6 +879,7 @@ const QnAPanel = ({
             className="qa-formatted-content"
             dangerouslySetInnerHTML={{ __html: cleanedText }}
           />
+          {/* Single video citations (for single video mode) */}
           {uniqueCitations.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-200">
               <span className="text-xs font-semibold text-slate-500 mr-1">References:</span>
@@ -869,6 +892,27 @@ const QnAPanel = ({
                 >
                   {citation.original}
                 </button>
+              ))}
+            </div>
+          )}
+          {/* Channel citations (for channel mode with YouTube links) */}
+          {channelCitations && channelCitations.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-200">
+              <span className="text-xs font-semibold text-slate-500 mr-1">Sources:</span>
+              {channelCitations.map((citation, idx) => (
+                <a
+                  key={idx}
+                  href={citation.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-1.5 text-xs px-2.5 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 text-blue-600 rounded-lg transition-all duration-150 border border-blue-200/60 hover:border-blue-300 hover:shadow-sm font-medium"
+                  title={`${citation.videoTitle} @ ${citation.timestampFormatted}`}
+                >
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 0a10 10 0 100 20 10 10 0 000-20zm7.5 10.5l-3 3v-2h-4v-3h4v-2l3 3z"/>
+                  </svg>
+                  {citation.timestampFormatted}
+                </a>
               ))}
             </div>
           )}
@@ -898,6 +942,7 @@ const QnAPanel = ({
     return (
       <div className="space-y-3">
         {formattedContent}
+        {/* Single video citations (for single video mode) */}
         {uniqueCitations.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-200">
             <span className="text-xs font-semibold text-slate-500 mr-1">References:</span>
@@ -910,6 +955,27 @@ const QnAPanel = ({
               >
                 {citation.original}
               </button>
+            ))}
+          </div>
+        )}
+        {/* Channel citations (for channel mode with YouTube links) */}
+        {channelCitations && channelCitations.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-200">
+            <span className="text-xs font-semibold text-slate-500 mr-1">Sources:</span>
+            {channelCitations.map((citation, idx) => (
+              <a
+                key={idx}
+                href={citation.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-1.5 text-xs px-2.5 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 text-blue-600 rounded-lg transition-all duration-150 border border-blue-200/60 hover:border-blue-300 hover:shadow-sm font-medium"
+                title={`${citation.videoTitle} @ ${citation.timestampFormatted}`}
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 0a10 10 0 100 20 10 10 0 000-20zm7.5 10.5l-3 3v-2h-4v-3h4v-2l3 3z"/>
+                </svg>
+                {citation.timestampFormatted}
+              </a>
             ))}
           </div>
         )}
@@ -1594,7 +1660,7 @@ const QnAPanel = ({
                 }`}>
                   {item.type === 'ai' ? (
                     <div className="ai-response">
-                      {formatAiAnswer(item.text, item.citations)}
+                      {formatAiAnswer(item.text, item.citations, item.channelCitations)}
                     </div>
                   ) : (
                     <p className="text-white font-medium text-sm lg:text-base leading-relaxed">{item.text}</p>
