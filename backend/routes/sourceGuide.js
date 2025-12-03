@@ -172,7 +172,7 @@ Return ONLY valid JSON, no additional text.`;
         })
         .join('\n\n');
 
-      const promptsPrompt = `Based on the following YouTube channel content, generate 4 concise, intelligent questions that users would want to ask about this content.
+      const promptsPrompt = `Based on the following YouTube channel content, generate 4 ultra-concise, actionable questions that users would want to ask.
 
 ${languageInstruction}
 
@@ -185,15 +185,18 @@ Video Titles:
 Sample Transcript Content:
 ${transcriptContext}
 
-IMPORTANT: Questions must be:
-- ${isFrench ? 'Courtes et directes (maximum 2 phrases courtes)' : 'Short and direct (max 2 short sentences)'}
-- ${isFrench ? 'Spécifiques au contenu disponible (pas génériques)' : 'Specific to the available content (not generic)'}
-- ${isFrench ? 'Actionnables et pratiques' : 'Actionable and practical'}
-- ${isFrench ? 'Formulées comme NotebookLM : concises et engageantes' : 'Phrased like NotebookLM: concise and engaging'}
+CRITICAL REQUIREMENTS - Questions MUST be:
+- ${isFrench ? 'UNE SEULE PHRASE courte (maximum 10-12 mots)' : 'ONE SHORT SENTENCE only (max 10-12 words)'}
+- ${isFrench ? 'Pas de questions longues ou paragraphes' : 'NO long questions or paragraphs'}
+- ${isFrench ? 'Spécifiques et actionnables' : 'Specific and actionable'}
+- ${isFrench ? 'Style NotebookLM : direct et engageant' : 'NotebookLM style: direct and engaging'}
 
-Example format: "How does [creator] approach [specific topic]?" or "What are the key insights about [specific topic]?"
+${isFrench ? 'Exemples FRANÇAIS:' : 'Example questions in ENGLISH:'}
+${isFrench ? '- "Quelles sont les meilleures techniques SEO ?"' : '- "What are the key SEO optimization tips?"'}
+${isFrench ? '- "Comment améliorer mon référencement ?"' : '- "How can I improve my content strategy?"'}
+${isFrench ? '- "Quels outils recommandez-vous ?"' : '- "What tools does the creator recommend?"'}
 
-Return ONLY a JSON array of 4 concise question strings, nothing else:
+Return ONLY a JSON array of 4 SHORT question strings (max 10-12 words each):
 ["Question 1?", "Question 2?", "Question 3?", "Question 4?"]`;
 
       try {

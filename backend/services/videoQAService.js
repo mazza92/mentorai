@@ -1171,31 +1171,32 @@ References: [timestamps]
           return this.getDefaultPrompts();
         }
 
-        const prompt = `Based on this video content, generate 3-4 smart, specific suggested questions that would be most useful for someone who just watched this video.
+        const prompt = `Based on this video content, generate 3-4 ultra-concise, actionable questions that would be most useful for someone who just watched this video.
 
-REQUIREMENTS:
-1. Questions should be SPECIFIC to the actual content (not generic like "what are the key topics")
-2. Questions should be ACTIONABLE and help the viewer learn or implement what was taught
-3. Use natural language - how real people would ask
-4. Mix different types: how-to, explanation, benefits, comparisons
-5. Make them concise (5-12 words each)
-6. Focus on the most important or interesting parts
+CRITICAL REQUIREMENTS:
+1. ULTRA-CONCISE: ONE sentence only, maximum 10-12 words per question
+2. NO long questions or paragraph-style questions
+3. SPECIFIC to the actual content (not generic like "what are the key topics")
+4. ACTIONABLE and help the viewer learn or implement what was taught
+5. Natural language - how real people would ask
+6. Mix different types: how-to, explanation, benefits, comparisons
+7. NotebookLM style: short, direct, engaging
 
-EXAMPLES OF GOOD PROMPTS (specific to content):
+EXAMPLES OF PERFECT PROMPTS (short and specific):
 - "How do I install Claude Code in Cursor?"
 - "What makes Opus 4 better than other models?"
 - "Is the $100/month pricing worth it?"
-- "What are the 3 Facebook ad strategies you mentioned?"
+- "What are the 3 Facebook ad strategies?"
 
-EXAMPLES OF BAD PROMPTS (too generic):
-- "What are the main points?"
-- "Summarize the video"
-- "What should I know?"
+EXAMPLES OF BAD PROMPTS:
+- "What are the main points?" (too generic)
+- "Can you explain in detail how the creator approaches content strategy and what specific steps they recommend for beginners?" (WAY too long - must be under 12 words)
+- "Summarize the video" (not specific)
 
 VIDEO CONTENT:
 ${context}
 
-Generate 3-4 suggested questions as a JSON array. Output ONLY valid JSON:
+Generate 3-4 SHORT suggested questions (max 10-12 words each) as a JSON array. Output ONLY valid JSON:
 ["question 1", "question 2", "question 3"]`;
 
         console.log('Generating suggested prompts with Gemini...');
