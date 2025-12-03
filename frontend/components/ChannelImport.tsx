@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { Youtube, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +21,12 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     videoCount?: number
     status?: string
   } | null>(null)
+  const [progress, setProgress] = useState<{
+    fetched: number
+    total: number
+  } | null>(null)
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const isValidYouTubeChannelUrl = (url: string) => {
     // Match various YouTube channel URL formats
@@ -32,6 +38,59 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     ]
     return patterns.some(pattern => pattern.test(url))
   }
+
+  // Poll for progress updates
+  useEffect(() => {
+    if (!currentProjectId || !isImporting) {
+      return
+    }
+
+    const pollProgress = async () => {
+      try {
+        const apiUrl = getApiUrl()
+        const response = await axios.get(`${apiUrl}/api/channel/import-progress/${currentProjectId}`)
+
+        if (response.data.success) {
+          const { status, progress: progressData } = response.data.data
+
+          setProgress(progressData)
+
+          // If completed, stop polling and redirect
+          if (status === 'ready') {
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current)
+              pollingIntervalRef.current = null
+            }
+            setIsImporting(false)
+            setImportStatus({
+              channelName: response.data.data.channelName,
+              videoCount: response.data.data.videoCount,
+              status: 'Complete'
+            })
+
+            // Redirect after completion
+            if (onImportComplete) {
+              setTimeout(() => {
+                onImportComplete(currentProjectId, currentProjectId)
+              }, 1500)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error polling progress:', err)
+      }
+    }
+
+    // Poll immediately and then every 2 seconds
+    pollProgress()
+    pollingIntervalRef.current = setInterval(pollProgress, 2000)
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+    }
+  }, [currentProjectId, isImporting, onImportComplete])
 
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,6 +108,8 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     setIsImporting(true)
     setError(null)
     setImportStatus(null)
+    setProgress(null)
+    setCurrentProjectId(null)
 
     try {
       const apiUrl = getApiUrl()
@@ -63,18 +124,32 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
       if (response.data.success) {
         const data = response.data.data
 
-        setImportStatus({
-          channelName: data.channelName,
-          videoCount: data.videoCount,
-          status: data.status === 'partial' ? 'Processing additional videos...' : 'Complete'
+        // Set project ID to start polling
+        setCurrentProjectId(data.projectId)
+
+        // Set initial progress
+        setProgress({
+          fetched: data.transcriptsAvailable || 0,
+          total: data.videoCount
         })
 
-        // Redirect to channel project (shorter delay)
-        if (onImportComplete) {
-          setTimeout(() => {
-            onImportComplete(data.channelId, data.projectId)
-          }, 1500)
+        // If already complete (small channel), show success immediately
+        if (data.status === 'ready') {
+          setImportStatus({
+            channelName: data.channelName,
+            videoCount: data.videoCount,
+            status: 'Complete'
+          })
+          setIsImporting(false)
+
+          // Redirect to channel project
+          if (onImportComplete) {
+            setTimeout(() => {
+              onImportComplete(data.channelId, data.projectId)
+            }, 1500)
+          }
         }
+        // Otherwise, polling will handle the rest
       }
 
     } catch (err: any) {
@@ -90,8 +165,8 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
       } else {
         setError('Failed to import channel. Please check the URL and try again.')
       }
-    } finally {
       setIsImporting(false)
+      setCurrentProjectId(null)
     }
   }
 
@@ -139,6 +214,30 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
           )}
         </button>
       </form>
+
+      {/* Progress Bar */}
+      {isImporting && progress && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              <span className="text-blue-900 font-medium">Processing channel transcripts...</span>
+            </div>
+            <span className="text-blue-700 text-sm font-semibold">
+              {progress.fetched} / {progress.total}
+            </span>
+          </div>
+          <div className="w-full bg-blue-100 rounded-full h-2.5">
+            <div
+              className="bg-gradient-to-r from-blue-600 to-purple-600 h-2.5 rounded-full transition-all duration-300"
+              style={{ width: `${(progress.fetched / progress.total) * 100}%` }}
+            />
+          </div>
+          <p className="text-blue-600 text-xs mt-2">
+            You can start asking questions once the first videos are ready!
+          </p>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
