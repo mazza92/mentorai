@@ -279,6 +279,16 @@ router.post('/import', async (req, res) => {
             });
 
             console.log(`[API] ✓ Background: Saved transcript ${i + 1}/${remainingWithTranscripts.length} for ${video.id}`);
+
+            // Update progress in real-time for frontend polling
+            const currentProgress = initialTranscripts.successful + (i + 1);
+            await projectRef.update({
+              transcriptProgress: {
+                fetched: currentProgress,
+                total: quickImport.videoCount
+              },
+              updatedAt: FieldValue.serverTimestamp()
+            });
           }
 
           console.log(`[API] ✓ Saved ${remainingTranscripts.successful} remaining transcripts to Firestore`);
@@ -329,6 +339,47 @@ router.post('/import', async (req, res) => {
       });
     }
 
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/channel/import-progress/:projectId
+ * Get real-time progress of channel import
+ */
+router.get('/import-progress/:projectId', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const { firestore } = getFirestore();
+    const projectRef = firestore.collection('projects').doc(projectId);
+    const projectDoc = await projectRef.get();
+
+    if (!projectDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Project not found'
+      });
+    }
+
+    const project = projectDoc.data();
+
+    res.json({
+      success: true,
+      data: {
+        status: project.status,
+        progress: project.transcriptProgress || { fetched: 0, total: 0 },
+        transcriptStats: project.transcriptStats,
+        channelName: project.title,
+        videoCount: project.videoCount
+      }
+    });
+
+  } catch (error) {
+    console.error('[API] Get import progress error:', error);
     res.status(500).json({
       success: false,
       error: error.message
