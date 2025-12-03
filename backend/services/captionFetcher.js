@@ -129,8 +129,8 @@ if __name__ == '__main__':
    * @param {number} concurrency - Max parallel requests
    * @returns {Promise<Array>} Results array
    */
-  async fetchMultiple(videoIds, concurrency = 10) {
-    console.log(`[CaptionFetcher] 📦 Batch fetching ${videoIds.length} transcripts...`);
+  async fetchMultiple(videoIds, concurrency = 3) {
+    console.log(`[CaptionFetcher] 📦 Batch fetching ${videoIds.length} transcripts (concurrency: ${concurrency})...`);
 
     const results = [];
     const chunks = this.chunkArray(videoIds, concurrency);
