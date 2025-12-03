@@ -1490,11 +1490,15 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
       const answer = response.text();
 
       // Parse citations from the answer BEFORE cleaning
-      const citationRegex = /<cite video="(\d+)" time="(\d+):(\d+)"><\/cite>/g;
+      // Support both new format: <cite video="X" time="MM:SS"></cite>
+      // AND old format: [Vidéo X, MM:SS] or [Video X, MM:SS] for backwards compatibility
       const citations = [];
+
+      // New format: <cite video="1" time="12:34"></cite>
+      const citeRegex = /<cite video="(\d+)" time="(\d+):(\d+)"><\/cite>/g;
       let match;
 
-      while ((match = citationRegex.exec(answer)) !== null) {
+      while ((match = citeRegex.exec(answer)) !== null) {
         const videoIndex = parseInt(match[1], 10) - 1; // Convert to 0-indexed
         const minutes = parseInt(match[2], 10);
         const seconds = parseInt(match[3], 10);
@@ -1513,6 +1517,32 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
         }
       }
 
+      // Old format fallback: [Vidéo 10, 21:42] or [Video 10, 21:42]
+      const oldFormatRegex = /\[(?:Vidéo|Video)\s+(\d+),\s+(\d+):(\d+)\]/gi;
+
+      while ((match = oldFormatRegex.exec(answer)) !== null) {
+        const videoIndex = parseInt(match[1], 10) - 1; // Convert to 0-indexed
+        const minutes = parseInt(match[2], 10);
+        const seconds = parseInt(match[3], 10);
+        const timestamp = minutes * 60 + seconds;
+
+        // Map to actual video
+        if (videoIndex >= 0 && videoIndex < relevantVideos.length) {
+          const video = relevantVideos[videoIndex];
+          // Check for duplicates before adding
+          const exists = citations.some(c => c.videoId === video.videoId && c.timestamp === timestamp);
+          if (!exists) {
+            citations.push({
+              videoId: video.videoId,
+              videoTitle: video.title,
+              timestamp: timestamp,
+              timestampFormatted: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+              url: `https://www.youtube.com/watch?v=${video.videoId}&t=${timestamp}s`
+            });
+          }
+        }
+      }
+
       console.log(`[VideoQAService] Parsed ${citations.length} citations from answer`);
 
       // Convert markdown to HTML for better frontend rendering
@@ -1523,7 +1553,10 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
           // Remove old-style inline video references like (Video 5, Video 4) and (Vidéo 1)
           .replace(/\(Vidéo\s+\d+(?:,\s*Vidéo\s+\d+)*\)/gi, '')
           .replace(/\(Video\s+\d+(?:,\s*Video\s+\d+)*\)/gi, '')
-          // Keep <cite> tags for frontend to render as clickable chips
+          // Remove old bracket format citations [Vidéo 10, 21:42] since we'll show them as chips
+          .replace(/\[(?:Vidéo|Video)\s+\d+,\s+\d+:\d+\]/gi, '')
+          // Remove <cite> tags from text (we'll show citations as chips below)
+          .replace(/<cite[^>]*>[\s]*<\/cite>/gi, '')
           // Ensure proper spacing between sections
           .replace(/\n\n\n+/g, '\n\n')
           // Ensure headings have proper line breaks
