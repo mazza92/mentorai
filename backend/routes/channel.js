@@ -53,7 +53,7 @@ router.post('/import', async (req, res) => {
     const quickImport = await simpleChannelService.importChannel(channelId, userId, {
       fetchTranscripts: false, // Don't fetch transcripts yet
       maxVideosToTranscribe: null,
-      concurrency: 10
+      concurrency: 3 // Reduced from 10 to avoid YouTube 429 rate limiting
     });
 
     if (!quickImport.success) {
@@ -70,7 +70,7 @@ router.post('/import', async (req, res) => {
 
     const initialTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
       initialVideos,
-      { concurrency: 10, prioritizeBy: 'views' }
+      { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
     );
 
     // Save initial transcripts to channels collection
@@ -159,7 +159,7 @@ router.post('/import', async (req, res) => {
 
           const remainingTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
             remainingVideos,
-            { concurrency: 10, prioritizeBy: 'views' }
+            { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
           );
 
           // Save remaining transcripts to channels collection

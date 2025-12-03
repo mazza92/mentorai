@@ -46,7 +46,7 @@ class SimpleChannelService {
     const {
       fetchTranscripts = true, // Enable Innertube caption scraping
       maxVideosToTranscribe = null, // null = all videos, or limit for testing
-      concurrency = 10 // Parallel caption fetches
+      concurrency = 3 // Parallel caption fetches (reduced from 10 to avoid YouTube 429 rate limiting)
     } = options;
 
     try {
