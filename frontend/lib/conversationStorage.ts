@@ -34,6 +34,10 @@ export interface Conversation {
 
 const STORAGE_KEY_PREFIX = 'wandercut_conversations_'
 const MAX_CONVERSATIONS = 100 // Limit total conversations per user
+const CACHE_TTL = 30000 // Cache for 30 seconds to prevent excessive API calls
+
+// Simple in-memory cache to prevent excessive API requests
+const conversationsCache = new Map<string, { data: Conversation[], timestamp: number }>()
 
 /**
  * Check if user is logged in (Supabase configured and userId is a Supabase UUID)
@@ -69,18 +73,24 @@ function getStorageKey(userId: string): string {
 }
 
 /**
- * Load all conversations for a user
+ * Load all conversations for a user (with caching to prevent excessive API calls)
  */
 export async function loadConversations(userId: string): Promise<Conversation[]> {
+  // Check cache first
+  const cached = conversationsCache.get(userId)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data
+  }
+
   // If user is logged in, use backend API
   if (isUserLoggedIn(userId)) {
     try {
       const apiUrl = getApiUrl()
       const response = await axios.get(`${apiUrl}/api/conversations/${userId}`)
       const conversations = (response.data.conversations || []) as Conversation[]
-      
+
       // Convert date strings back to Date objects
-      return conversations.map(conv => ({
+      const processed = conversations.map(conv => ({
         ...conv,
         createdAt: new Date(conv.createdAt),
         updatedAt: new Date(conv.updatedAt),
@@ -89,15 +99,29 @@ export async function loadConversations(userId: string): Promise<Conversation[]>
           timestamp: new Date(msg.timestamp)
         }))
       }))
-    } catch (error) {
+
+      // Cache the result
+      conversationsCache.set(userId, { data: processed, timestamp: Date.now() })
+
+      return processed
+    } catch (error: any) {
       console.error('Error loading conversations from API:', error)
+
+      // If it's a rate limit error and we have stale cache, use it
+      if (error.response?.status === 429 && cached) {
+        console.log('Using stale cache due to rate limit')
+        return cached.data
+      }
+
       // Fallback to localStorage
       return loadConversationsFromLocalStorage(userId)
     }
   }
-  
+
   // Anonymous user - use localStorage
-  return loadConversationsFromLocalStorage(userId)
+  const localData = loadConversationsFromLocalStorage(userId)
+  conversationsCache.set(userId, { data: localData, timestamp: Date.now() })
+  return localData
 }
 
 /**
@@ -130,6 +154,9 @@ function loadConversationsFromLocalStorage(userId: string): Conversation[] {
  * Save a conversation
  */
 export async function saveConversation(conversation: Conversation, userId: string): Promise<void> {
+  // Invalidate cache when saving
+  conversationsCache.delete(userId)
+
   // If user is logged in, use backend API
   if (isUserLoggedIn(userId)) {
     try {
@@ -221,6 +248,9 @@ export async function loadConversation(userId: string, conversationId: string): 
  * Delete a conversation
  */
 export async function deleteConversation(userId: string, conversationId: string): Promise<void> {
+  // Invalidate cache when deleting
+  conversationsCache.delete(userId)
+
   // If user is logged in, use backend API
   if (isUserLoggedIn(userId)) {
     try {
@@ -236,7 +266,7 @@ export async function deleteConversation(userId: string, conversationId: string)
       return
     }
   }
-  
+
   // Anonymous user - use localStorage
   deleteConversationFromLocalStorage(userId, conversationId)
 }
