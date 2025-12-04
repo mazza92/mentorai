@@ -219,16 +219,15 @@ router.post('/import', async (req, res) => {
         });
 
         console.log(`[API] ✅ All transcripts complete for ${channelId} (${allTranscripts.successful}/${allTranscripts.total})`);
-        } catch (error) {
-          console.error(`[API] ❌ Background transcript fetch failed:`, error);
-          await projectRef.update({
-            status: 'error',
-            error: error.message,
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        }
-      });
-    }
+      } catch (error) {
+        console.error(`[API] ❌ Background transcript fetch failed:`, error);
+        await projectRef.update({
+          status: 'error',
+          error: error.message,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+    });
 
   } catch (error) {
     console.error('[API] Channel import error:', error);
