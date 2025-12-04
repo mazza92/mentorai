@@ -1,81 +1,63 @@
 /**
  * WanderCut Pricing Tiers Configuration
- * Simplified 2-Tier Pricing for Better Conversion
+ * MVP Focus: Channel Upload Only (USP)
  *
- * Cost Analysis (Gemini-only):
- * - Video processing: ~$0.09 per video (transcription + analysis)
- * - Question: ~$0.015 per question (with optimizations)
+ * Cost Analysis (On-Demand Transcript Fetching):
+ * - Channel import (metadata): ~€0.01 (negligible)
+ * - Question cost: ~€0.015 per question (Gemini API + 3 on-demand transcript fetches)
  *
- * Target: 60-75% profit margin
+ * Target: 70% profit margin
  */
 
 const PRICING_TIERS = {
-  anonymous: {
-    id: 'anonymous',
-    name: 'Trial (No Signup)',
-    price: 0,
-    priceId: '',
-    features: {
-      videosPerMonth: 1,
-      questionsPerMonth: 3,
-      videoQuality: '720p',
-      features: [
-        '1 video upload',
-        '3 questions total',
-        'All AI features',
-        'No signup required'
-      ]
-    },
-    // Cost calculation: 1 video × $0.09 + 3 questions × $0.015 = $0.09 + $0.045 = $0.135
-    estimatedCost: 0.14,
-    margin: -100 // Validation/acquisition cost
-  },
-
   free: {
     id: 'free',
     name: 'Free',
     price: 0,
     priceId: '', // No Stripe price ID for free tier
     features: {
-      videosPerMonth: 3,
-      questionsPerMonth: 15,
-      videoQuality: '720p',
+      channelsPerMonth: 2,
+      questionsPerMonth: 10, // 5 questions per channel average
+      questionsPerChannel: 5, // Soft limit per channel
       features: [
-        '3 videos per month',
-        '15 questions per month',
-        'All AI features',
+        '2 channel uploads per month',
+        '10 questions total (5 per channel)',
+        'On-demand transcript fetching',
+        'All AI-powered insights',
         'Community support'
       ]
     },
-    // Cost calculation: 3 videos × $0.09 + 15 questions × $0.015 = $0.27 + $0.225 = $0.495
-    estimatedCost: 0.50,
+    // Cost calculation: 2 channels × €0.01 + 10 questions × €0.015 = €0.02 + €0.15 = €0.17
+    estimatedCost: 0.17,
+    estimatedCostEUR: 0.17,
     margin: -100 // Acquisition cost
   },
 
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 19,
+    price: 24.99,
+    priceEUR: 24.99,
     priceId: process.env.STRIPE_PRO_PRICE_ID || 'price_pro',
     popular: true,
     features: {
-      videosPerMonth: 50,
-      questionsPerMonth: 10000, // Effectively unlimited
-      videoQuality: '1080p',
+      channelsPerMonth: 15,
+      questionsPerMonth: 500, // ~33 questions per channel on average
+      questionsPerChannel: null, // No per-channel limit
       features: [
-        '50 videos per month',
-        'Unlimited questions',
-        'All AI features',
+        '15 channel uploads per month',
+        '500 questions per month',
+        'On-demand transcript fetching',
+        'All AI-powered insights',
         'Priority support',
         'Export transcripts',
         'Early access to new features'
       ]
     },
-    // Estimated cost: 50 videos × $0.09 + avg 200 questions × $0.015 = $4.50 + $3.00 = $7.50
-    // Conservative estimate with higher usage: 50 videos + 500 questions = $4.50 + $7.50 = $12.00
-    estimatedCost: 7.50,
-    estimatedCostHeavyUser: 12.00,
-    margin: 61 // (19 - 7.50) / 19 = 61%
+    // Cost calculation: 15 channels × €0.01 + 500 questions × €0.015 = €0.15 + €7.50 = €7.65
+    estimatedCost: 7.65,
+    estimatedCostEUR: 7.65,
+    margin: 69 // (24.99 - 7.65) / 24.99 = 69%
   }
 };
 
@@ -97,22 +79,30 @@ function getAllTiers() {
 }
 
 /**
- * Check if user can process a video based on tier limits
+ * Check if user can import a channel based on tier limits
  * @param {string} tier - User's tier
- * @param {number} videosThisMonth - Videos processed this month
- * @returns {object} { canProcess: boolean, limit: number, remaining: number }
+ * @param {number} channelsThisMonth - Channels imported this month
+ * @returns {object} { canImport: boolean, limit: number, remaining: number }
  */
-function canProcessVideo(tier, videosThisMonth) {
+function canImportChannel(tier, channelsThisMonth) {
   const config = getTierConfig(tier);
-  const limit = config.features.videosPerMonth;
-  const remaining = Math.max(0, limit - videosThisMonth);
+  const limit = config.features.channelsPerMonth;
+  const remaining = Math.max(0, limit - channelsThisMonth);
 
   return {
-    canProcess: videosThisMonth < limit,
+    canImport: channelsThisMonth < limit,
     limit,
     remaining,
-    used: videosThisMonth
+    used: channelsThisMonth
   };
+}
+
+/**
+ * Legacy function - kept for backward compatibility
+ * @deprecated Use canImportChannel instead
+ */
+function canProcessVideo(tier, videosThisMonth) {
+  return canImportChannel(tier, videosThisMonth);
 }
 
 /**
@@ -149,7 +139,8 @@ module.exports = {
   PRICING_TIERS,
   getTierConfig,
   getAllTiers,
-  canProcessVideo,
+  canImportChannel,
+  canProcessVideo, // Legacy - use canImportChannel
   canAskQuestion,
   getUsagePercentage
 };

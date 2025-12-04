@@ -1,6 +1,7 @@
 const { Firestore } = require('@google-cloud/firestore');
 const {
   canProcessVideo,
+  canImportChannel,
   canAskQuestion,
 } = require('../config/pricing');
 const { mockUsers } = require('../utils/mockStorage');
@@ -116,7 +117,66 @@ async function checkQuestionQuota(userId) {
 }
 
 /**
+ * Check if user can import a channel
+ * @param {string} userId - User ID
+ * @returns {Promise<object>} - { canImport, tier, channelsThisMonth, limit, remaining }
+ */
+async function checkChannelQuota(userId) {
+  try {
+    if (useMockMode || !firestore) {
+      const user = mockUsers.get(userId) || { tier: 'free', channelsThisMonth: 0 };
+      const result = canImportChannel(user.tier, user.channelsThisMonth || 0);
+      return {
+        canImport: result.canImport,
+        tier: user.tier,
+        channelsThisMonth: result.used,
+        limit: result.limit,
+        remaining: result.remaining
+      };
+    }
+
+    const userDoc = await firestore.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      const result = canImportChannel('free', 0);
+      return {
+        canImport: true,
+        tier: 'free',
+        channelsThisMonth: 0,
+        limit: result.limit,
+        remaining: result.remaining
+      };
+    }
+
+    const user = userDoc.data();
+    const tier = user.tier || 'free';
+    const channelsThisMonth = user.channelsThisMonth || 0;
+
+    const result = canImportChannel(tier, channelsThisMonth);
+
+    return {
+      canImport: result.canImport,
+      tier,
+      channelsThisMonth: result.used,
+      limit: result.limit,
+      remaining: result.remaining
+    };
+  } catch (error) {
+    console.error('Error checking channel quota:', error.message);
+    const result = canImportChannel('free', 0);
+    return {
+      canImport: true,
+      tier: 'free',
+      channelsThisMonth: 0,
+      limit: result.limit,
+      remaining: result.remaining
+    };
+  }
+}
+
+/**
  * Check if user can upload/process a video
+ * @deprecated Use checkChannelQuota for MVP (channel-only uploads)
  * @param {string} userId - User ID (or sessionId for anonymous)
  * @returns {Promise<object>} - { canProcess, tier, videosThisMonth, limit, remaining, requiresSignup }
  */
@@ -239,6 +299,47 @@ async function incrementVideoCount(userId) {
 }
 
 /**
+ * Increment channel import count for a user
+ * @param {string} userId - User ID
+ * @returns {Promise<boolean>} - Success status
+ */
+async function incrementChannelCount(userId) {
+  try {
+    if (useMockMode || !firestore) {
+      let user = mockUsers.get(userId) || { userId, tier: 'free', channelsThisMonth: 0, questionsThisMonth: 0 };
+      user.channelsThisMonth = (user.channelsThisMonth || 0) + 1;
+      mockUsers.set(userId, user);
+      return true;
+    }
+
+    const userDoc = await firestore.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      await firestore.collection('users').doc(userId).set({
+        userId,
+        tier: 'free',
+        channelsThisMonth: 1,
+        questionsThisMonth: 0,
+        createdAt: new Date(),
+        lastResetDate: new Date(),
+      });
+      return true;
+    }
+
+    const currentCount = userDoc.data().channelsThisMonth || 0;
+    await firestore.collection('users').doc(userId).update({
+      channelsThisMonth: currentCount + 1,
+      updatedAt: new Date(),
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error incrementing channel count:', error.message);
+    return false;
+  }
+}
+
+/**
  * Increment question count for a user
  * @param {string} userId - User ID (or sessionId for anonymous)
  * @returns {Promise<boolean>} - Success status
@@ -316,8 +417,10 @@ async function getRemainingQuestions(userId) {
 module.exports = {
   checkQuestionQuota,
   checkVideoQuota,
+  checkChannelQuota,
   incrementQuestionCount,
   incrementVideoCount,
+  incrementChannelCount,
   getRemainingQuestions,
   isAnonymousUser
 };

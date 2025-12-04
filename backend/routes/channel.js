@@ -35,6 +35,23 @@ router.post('/import', async (req, res) => {
       });
     }
 
+    // Check channel import quota
+    const quotaCheck = await userService.checkChannelQuota(userId);
+
+    if (!quotaCheck.canImport) {
+      return res.status(403).json({
+        success: false,
+        error: 'Channel import limit reached',
+        message: `You have reached your monthly limit of ${quotaCheck.limit} channel imports. Upgrade to Pro for more!`,
+        quota: {
+          used: quotaCheck.channelsThisMonth,
+          limit: quotaCheck.limit,
+          remaining: quotaCheck.remaining,
+          tier: quotaCheck.tier
+        }
+      });
+    }
+
     // Extract channel ID from URL
     let channelId = channelUrl;
 
@@ -89,6 +106,9 @@ router.post('/import', async (req, res) => {
     });
 
     console.log(`[API] ✓ Project created as ready - transcripts will be fetched on-demand when questions are asked`);
+
+    // Increment channel count for quota tracking
+    await userService.incrementChannelCount(userId);
 
     // Step 3: Return immediately - channel ready to use!
     res.json({
