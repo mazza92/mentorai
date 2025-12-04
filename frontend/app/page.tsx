@@ -51,17 +51,18 @@ export default function Home() {
     // Check if Supabase is configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    
+
     if (!supabaseUrl || !supabaseAnonKey) {
       // Supabase not configured - use fallback anonymous mode with sessionManager
       const sessionId = getSessionId()
       setUserId(sessionId)
-      
+
       // PRIORITY: Check URL params FIRST (for conversation switching)
       if (checkUrlAndSetProject(sessionId)) {
+        setIsInitialized(true)
         return // URL param takes priority
       }
-      
+
       // Only restore from localStorage on initial load (when currentProject is null)
       // Don't restore if we're in the middle of uploading
       if (!currentProject && typeof window !== 'undefined') {
@@ -73,6 +74,7 @@ export default function Home() {
             : 'currentProject'
           const storedProject = localStorage.getItem(storageKey)
           if (storedProject) {
+            console.log('[Page] Restoring project from localStorage:', storedProject)
             setCurrentProject(storedProject)
           }
         }
@@ -270,7 +272,24 @@ export default function Home() {
   // Helper function for conversation selection
   const handleSelectConversation = (conversation: Conversation) => {
     if (typeof window !== 'undefined') {
-      window.location.href = `/?project=${conversation.projectId}`
+      console.log('[Page] Switching to conversation:', conversation.projectId)
+
+      // Update URL without full page reload
+      const newUrl = `/?project=${conversation.projectId}`
+      window.history.pushState({ projectId: conversation.projectId }, '', newUrl)
+
+      // Clear upload flag
+      sessionStorage.removeItem('isUploadingVideo')
+
+      // Update project state directly
+      setCurrentProject(conversation.projectId)
+
+      // Save to localStorage
+      const storageKey = userId && userId !== 'anonymous'
+        ? `currentProject_${userId}`
+        : (user ? `currentProject_${user.id}` : 'currentProject')
+      localStorage.setItem(storageKey, conversation.projectId)
+      console.log('[Page] Project state updated successfully')
     }
   }
 
