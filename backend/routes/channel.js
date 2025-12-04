@@ -49,9 +49,9 @@ router.post('/import', async (req, res) => {
 
     console.log(`[API] Resolved channel ID: ${channelId}`);
 
-    // Step 1: Quick import - get channel info and video list (no transcripts yet)
+    // Step 1: Quick import - get channel info and video list (no transcripts, returns in 1-2s)
     const quickImport = await simpleChannelService.importChannel(channelId, userId, {
-      fetchTranscripts: false, // Don't fetch transcripts yet
+      fetchTranscripts: false, // Don't fetch ANY transcripts - do it all in background
       maxVideosToTranscribe: null,
       concurrency: 3 // Reduced from 10 to avoid YouTube 429 rate limiting
     });
@@ -63,94 +63,10 @@ router.post('/import', async (req, res) => {
     // Sort videos by view count (most viewed first)
     const sortedVideos = (quickImport.videos || []).sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
 
-    // Step 2: Fetch first 15 most viewed videos (15-30s wait)
-    console.log(`[API] 📝 Fetching initial sample (15 most viewed videos)...`);
-    const initialSampleSize = 15;
-    const initialVideos = sortedVideos.slice(0, initialSampleSize);
-
-    const initialTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
-      initialVideos,
-      { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
-    );
-
-    // Save initial transcripts to channels collection in chunks to avoid 10MB batch limit
-    const { firestore: firestoreForUpdate } = getFirestore();
-    const channelRef = firestoreForUpdate.collection('channels').doc(quickImport.channelId);
-
-    // Process videos one at a time to avoid Firestore transaction size limits
-    // (especially for large transcripts with subcollection chunks)
-    const videosWithTranscripts = initialVideos.filter(v => v.hasTranscript);
-
-    for (let i = 0; i < videosWithTranscripts.length; i++) {
-      const video = videosWithTranscripts[i];
-      const videoRef = channelRef.collection('videos').doc(video.id);
-
-      // Extract transcript text safely (avoid Firestore 1MB document limit)
-      let transcriptText = null;
-      if (video.transcript) {
-        // Handle transcript object (from smart bypass)
-        if (typeof video.transcript === 'object' && video.transcript.text) {
-          transcriptText = video.transcript.text;
-        } else if (typeof video.transcript === 'string') {
-          transcriptText = video.transcript;
-        }
-
-        // Check size - Firestore field limit is 1MB (1048576 bytes)
-        // If transcript text is too large, don't store it (use segments instead)
-        if (transcriptText && Buffer.byteLength(transcriptText, 'utf8') > 900000) {
-          console.log(`[API] ⚠️ Transcript for ${video.id} too large (${Buffer.byteLength(transcriptText, 'utf8')} bytes), skipping text field`);
-          transcriptText = null;
-        }
-      }
-
-      // Check if transcriptSegments is too large to store in document
-      // Firestore document limit is 1MB total
-      const segmentsSize = video.transcriptSegments ? Buffer.byteLength(JSON.stringify(video.transcriptSegments), 'utf8') : 0;
-      const storeSegmentsInSubcollection = segmentsSize > 700000; // 700KB threshold for safety
-
-      if (storeSegmentsInSubcollection) {
-        console.log(`[API] ⚠️ TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
-
-        // Store segments in subcollection chunks (commit separately to avoid batch size limit)
-        const SEGMENTS_PER_CHUNK = 100;
-        const segments = video.transcriptSegments || [];
-
-        // Commit subcollection chunks individually
-        for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
-          const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
-          const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
-          await chunkDoc.set({
-            segments: segmentChunk,
-            startIndex: j,
-            endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
-          });
-        }
-        console.log(`[API] ✓ Stored ${segments.length} segments in ${Math.ceil(segments.length / SEGMENTS_PER_CHUNK)} chunks for ${video.id}`);
-      }
-
-      // Update video document individually (not in batch)
-      await videoRef.update({
-        status: 'ready',
-        hasTranscript: true,
-        transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
-        transcriptSegments: storeSegmentsInSubcollection ? null : video.transcriptSegments, // Only store if small enough
-        transcriptSegmentsInSubcollection: storeSegmentsInSubcollection, // Flag for retrieval
-        transcriptSegmentsCount: video.transcriptSegments?.length || 0, // Metadata
-        transcriptSource: video.transcriptSource,
-        transcriptFetchedAt: new Date().toISOString()
-      });
-
-      console.log(`[API] ✓ Saved transcript ${i + 1}/${videosWithTranscripts.length} for ${video.id}`);
-    }
-
-    console.log(`[API] ✓ Saved ${initialTranscripts.successful} transcripts to Firestore`);
-
-    // Step 3: Create project with "partial" or "ready" status
+    // Step 2: Create project with "processing" status immediately
     const { firestore } = getFirestore();
     const projectId = quickImport.channelId;
     const projectRef = firestore.collection('projects').doc(projectId);
-
-    const isPartial = sortedVideos.length > initialSampleSize;
 
     await projectRef.set({
       id: projectId,
@@ -159,27 +75,25 @@ router.post('/import', async (req, res) => {
       title: quickImport.channelName,
       author: quickImport.channelName,
       videoCount: quickImport.videoCount,
-      status: isPartial ? 'partial' : 'ready',
+      status: 'processing', // Processing transcripts in background
       transcriptProgress: {
-        fetched: initialTranscripts.successful,
+        fetched: 0,
         total: quickImport.videoCount
       },
-      // Don't store transcripts here - they're in channels/{channelId}/videos
-      // This keeps document under 1MB Firestore limit
       transcriptStats: {
-        successful: initialTranscripts.successful,
-        failed: initialTranscripts.failed,
-        total: initialTranscripts.total,
-        isPartial
+        successful: 0,
+        failed: 0,
+        total: quickImport.videoCount,
+        isPartial: true
       },
       userId,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    console.log(`[API] ✓ Initial sample complete: ${initialTranscripts.successful}/${initialSampleSize} transcripts fetched`);
+    console.log(`[API] ✓ Project created, starting background transcript fetch for ${quickImport.videoCount} videos`);
 
-    // Step 4: Return immediately with initial transcripts
+    // Step 3: Return immediately to frontend (no waiting for transcripts!)
     res.json({
       success: true,
       data: {
@@ -189,130 +103,122 @@ router.post('/import', async (req, res) => {
         channelTitle: quickImport.channelName,
         videoCount: quickImport.videoCount,
         totalVideos: quickImport.videoCount,
-        status: isPartial ? 'partial' : 'ready',
-        transcriptsAvailable: initialTranscripts.successful,
+        status: 'processing',
+        transcriptsAvailable: 0,
         transcripts: {
-          successful: initialTranscripts.successful,
-          failed: initialTranscripts.failed,
-          total: initialTranscripts.total
+          successful: 0,
+          failed: 0,
+          total: quickImport.videoCount
         }
       }
     });
 
-    // Step 5: Continue fetching remaining videos in background (non-blocking)
-    if (isPartial) {
-      setImmediate(async () => {
-        try {
-          console.log(`[API] 📝 Starting background fetch for remaining ${sortedVideos.length - initialSampleSize} videos...`);
+    // Step 4: Start background transcript fetching for ALL videos (non-blocking)
+    setImmediate(async () => {
+      try {
+        console.log(`[API] 📝 Starting background transcript fetch for all ${sortedVideos.length} videos...`);
 
-          const remainingVideos = sortedVideos.slice(initialSampleSize);
+        const { firestore: firestoreBg } = getFirestore();
+        const channelRefBg = firestoreBg.collection('channels').doc(quickImport.channelId);
 
-          const remainingTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
-            remainingVideos,
-            { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
-          );
+        // Fetch transcripts for ALL videos in batches (concurrency 3 to avoid rate limits)
+        const allTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
+          sortedVideos,
+          { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
+        );
 
-          // Save remaining transcripts to channels collection in chunks to avoid 10MB batch limit
-          const { firestore: firestoreBg } = getFirestore();
-          const channelRefBg = firestoreBg.collection('channels').doc(quickImport.channelId);
+        // Process videos one at a time to avoid Firestore transaction size limits
+        const videosWithTranscripts = sortedVideos.filter(v => v.hasTranscript);
 
-          // Process in smaller chunks (2 videos per batch to stay well under 10MB limit)
-          // Process videos one at a time to avoid Firestore transaction size limits
-          const remainingWithTranscripts = remainingVideos.filter(v => v.hasTranscript);
+        for (let i = 0; i < videosWithTranscripts.length; i++) {
+          const video = videosWithTranscripts[i];
+          const videoRef = channelRefBg.collection('videos').doc(video.id);
 
-          for (let i = 0; i < remainingWithTranscripts.length; i++) {
-            const video = remainingWithTranscripts[i];
-            const videoRef = channelRefBg.collection('videos').doc(video.id);
-
-            // Extract transcript text safely (avoid Firestore 1MB document limit)
-            let transcriptText = null;
-            if (video.transcript) {
-              // Handle transcript object (from smart bypass)
-              if (typeof video.transcript === 'object' && video.transcript.text) {
-                transcriptText = video.transcript.text;
-              } else if (typeof video.transcript === 'string') {
-                transcriptText = video.transcript;
-              }
-
-              // Check size - Firestore field limit is 1MB (1048576 bytes)
-              // If transcript text is too large, don't store it (use segments instead)
-              if (transcriptText && Buffer.byteLength(transcriptText, 'utf8') > 900000) {
-                console.log(`[API] ⚠️ Background: Transcript for ${video.id} too large (${Buffer.byteLength(transcriptText, 'utf8')} bytes), skipping text field`);
-                transcriptText = null;
-              }
+          // Extract transcript text safely (avoid Firestore 1MB document limit)
+          let transcriptText = null;
+          if (video.transcript) {
+            // Handle transcript object (from smart bypass)
+            if (typeof video.transcript === 'object' && video.transcript.text) {
+              transcriptText = video.transcript.text;
+            } else if (typeof video.transcript === 'string') {
+              transcriptText = video.transcript;
             }
 
-            // Check if transcriptSegments is too large to store in document
-            // Firestore document limit is 1MB total
-            const segmentsSize = video.transcriptSegments ? Buffer.byteLength(JSON.stringify(video.transcriptSegments), 'utf8') : 0;
-            const storeSegmentsInSubcollection = segmentsSize > 700000; // 700KB threshold for safety
-
-            if (storeSegmentsInSubcollection) {
-              console.log(`[API] ⚠️ Background: TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
-
-              // Store segments in subcollection chunks individually
-              const SEGMENTS_PER_CHUNK = 100;
-              const segments = video.transcriptSegments || [];
-
-              for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
-                const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
-                const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
-                await chunkDoc.set({
-                  segments: segmentChunk,
-                  startIndex: j,
-                  endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
-                });
-              }
-              console.log(`[API] ✓ Background: Stored ${segments.length} segments in ${Math.ceil(segments.length / SEGMENTS_PER_CHUNK)} chunks for ${video.id}`);
+            // Check size - Firestore field limit is 1MB (1048576 bytes)
+            // If transcript text is too large, don't store it (use segments instead)
+            if (transcriptText && Buffer.byteLength(transcriptText, 'utf8') > 900000) {
+              console.log(`[API] ⚠️ Background: Transcript for ${video.id} too large (${Buffer.byteLength(transcriptText, 'utf8')} bytes), skipping text field`);
+              transcriptText = null;
             }
-
-            // Update video document individually (not in batch)
-            await videoRef.update({
-              status: 'ready',
-              hasTranscript: true,
-              transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
-              transcriptSegments: storeSegmentsInSubcollection ? null : video.transcriptSegments, // Only store if small enough
-              transcriptSegmentsInSubcollection: storeSegmentsInSubcollection, // Flag for retrieval
-              transcriptSegmentsCount: video.transcriptSegments?.length || 0, // Metadata
-              transcriptSource: video.transcriptSource,
-              transcriptFetchedAt: new Date().toISOString()
-            });
-
-            console.log(`[API] ✓ Background: Saved transcript ${i + 1}/${remainingWithTranscripts.length} for ${video.id}`);
-
-            // Update progress in real-time for frontend polling
-            const currentProgress = initialTranscripts.successful + (i + 1);
-            await projectRef.update({
-              transcriptProgress: {
-                fetched: currentProgress,
-                total: quickImport.videoCount
-              },
-              updatedAt: FieldValue.serverTimestamp()
-            });
           }
 
-          console.log(`[API] ✓ Saved ${remainingTranscripts.successful} remaining transcripts to Firestore`);
+          // Check if transcriptSegments is too large to store in document
+          // Firestore document limit is 1MB total
+          const segmentsSize = video.transcriptSegments ? Buffer.byteLength(JSON.stringify(video.transcriptSegments), 'utf8') : 0;
+          const storeSegmentsInSubcollection = segmentsSize > 700000; // 700KB threshold for safety
 
-          // Calculate final stats (transcripts already stored in channels collection)
-          const totalStats = {
-            successful: initialTranscripts.successful + remainingTranscripts.successful,
-            failed: initialTranscripts.failed + remainingTranscripts.failed,
-            total: initialTranscripts.total + remainingTranscripts.total,
-            isPartial: false
-          };
+          if (storeSegmentsInSubcollection) {
+            console.log(`[API] ⚠️ Background: TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
 
-          // Update project status (transcripts are in channels/{channelId}/videos)
-          await projectRef.update({
+            // Store segments in subcollection chunks individually
+            const SEGMENTS_PER_CHUNK = 100;
+            const segments = video.transcriptSegments || [];
+
+            for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
+              const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
+              const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
+              await chunkDoc.set({
+                segments: segmentChunk,
+                startIndex: j,
+                endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
+              });
+            }
+            console.log(`[API] ✓ Background: Stored ${segments.length} segments in ${Math.ceil(segments.length / SEGMENTS_PER_CHUNK)} chunks for ${video.id}`);
+          }
+
+          // Update video document individually (not in batch)
+          await videoRef.update({
             status: 'ready',
-            transcriptStats: totalStats,
+            hasTranscript: true,
+            transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
+            transcriptSegments: storeSegmentsInSubcollection ? null : video.transcriptSegments, // Only store if small enough
+            transcriptSegmentsInSubcollection: storeSegmentsInSubcollection, // Flag for retrieval
+            transcriptSegmentsCount: video.transcriptSegments?.length || 0, // Metadata
+            transcriptSource: video.transcriptSource,
+            transcriptFetchedAt: new Date().toISOString()
+          });
+
+          console.log(`[API] ✓ Background: Saved transcript ${i + 1}/${videosWithTranscripts.length} for ${video.id}`);
+
+          // Update progress in real-time for frontend polling
+          await projectRef.update({
             transcriptProgress: {
-              fetched: totalStats.successful,
+              fetched: (i + 1),
               total: quickImport.videoCount
             },
             updatedAt: FieldValue.serverTimestamp()
           });
+        }
 
-          console.log(`[API] ✅ All transcripts complete for ${channelId} (${totalStats.successful}/${totalStats.total})`);
+        console.log(`[API] ✓ Saved ${allTranscripts.successful} transcripts to Firestore`);
+
+        // Update project status to ready (transcripts are in channels/{channelId}/videos)
+        await projectRef.update({
+          status: 'ready',
+          transcriptStats: {
+            successful: allTranscripts.successful,
+            failed: allTranscripts.failed,
+            total: allTranscripts.total,
+            isPartial: false
+          },
+          transcriptProgress: {
+            fetched: allTranscripts.successful,
+            total: quickImport.videoCount
+          },
+          updatedAt: FieldValue.serverTimestamp()
+        });
+
+        console.log(`[API] ✅ All transcripts complete for ${channelId} (${allTranscripts.successful}/${allTranscripts.total})`);
         } catch (error) {
           console.error(`[API] ❌ Background transcript fetch failed:`, error);
           await projectRef.update({
