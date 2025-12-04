@@ -187,8 +187,8 @@ function checkQuestionQuota(sessionId) {
     return {
       canAsk: false,
       questionsUsed: 0,
-      limit: 3,
-      remaining: 3,
+      limit: 1,
+      remaining: 1,
       requiresSignup: true,
       tier: 'anonymous'
     };
