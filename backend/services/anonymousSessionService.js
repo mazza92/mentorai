@@ -40,13 +40,21 @@ function extractFingerprint(sessionId) {
 }
 
 /**
- * Check if fingerprint has already been used
+ * Check if fingerprint has already been used by a DIFFERENT session
+ * @param {string} fingerprint - Browser fingerprint
+ * @param {string} currentSessionId - Current session ID trying to use this fingerprint
+ * @returns {boolean} True if fingerprint is used by a different session
  */
-function isFingerprintUsed(fingerprint) {
+function isFingerprintUsed(fingerprint, currentSessionId) {
   if (!fingerprint) return false;
 
   const usage = fingerprintUsage.get(fingerprint);
   if (!usage) return false;
+
+  // Allow the SAME session to reuse its own fingerprint
+  if (usage.sessionId === currentSessionId) {
+    return false;
+  }
 
   // Check if fingerprint usage is expired
   const now = new Date();
@@ -57,6 +65,7 @@ function isFingerprintUsed(fingerprint) {
     return false;
   }
 
+  // Different session using the same fingerprint - potential VPN bypass
   return true;
 }
 
@@ -72,9 +81,9 @@ function getSession(sessionId) {
 
   // Extract and track fingerprint
   const fingerprint = extractFingerprint(sessionId);
-  if (fingerprint && isFingerprintUsed(fingerprint)) {
-    // Fingerprint already used - return a "used" session to block access
-    console.log(`⚠️ Fingerprint already used: ${fingerprint.substring(0, 8)}... (VPN/cookie bypass attempt blocked)`);
+  if (fingerprint && isFingerprintUsed(fingerprint, sessionId)) {
+    // Fingerprint already used by DIFFERENT session - return a "used" session to block access
+    console.log(`⚠️ Fingerprint already used by different session: ${fingerprint.substring(0, 8)}... (VPN/cookie bypass attempt blocked)`);
     return {
       sessionId,
       tier: 'anonymous',
