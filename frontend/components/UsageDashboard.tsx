@@ -12,9 +12,9 @@ interface UsageDashboardProps {
 
 interface UsageData {
   tier: string
-  videosThisMonth: number
-  videosLimit: number
-  videosRemaining: number
+  channelsThisMonth: number
+  channelsLimit: number
+  channelsRemaining: number
   questionsThisMonth: number
   questionsLimit: number
   questionsRemaining: number
@@ -47,17 +47,17 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
       const userResponse = await axios.get(`${apiUrl}/api/user/${userId}`)
       const user = userResponse.data.user
 
-      // Fetch video and question quota
-      const [videoQuota, questionQuota] = await Promise.all([
-        axios.post(`${apiUrl}/api/user/${userId}/check-video`),
+      // Fetch channel and question quota
+      const [channelQuota, questionQuota] = await Promise.all([
+        axios.post(`${apiUrl}/api/user/${userId}/check-channel`),
         axios.post(`${apiUrl}/api/user/${userId}/check-question`)
       ])
 
       setUsage({
         tier: user.tier || 'free',
-        videosThisMonth: videoQuota.data.videosThisMonth,
-        videosLimit: videoQuota.data.limit,
-        videosRemaining: videoQuota.data.remaining,
+        channelsThisMonth: channelQuota.data.channelsThisMonth,
+        channelsLimit: channelQuota.data.limit,
+        channelsRemaining: channelQuota.data.remaining,
         questionsThisMonth: questionQuota.data.questionsThisMonth,
         questionsLimit: questionQuota.data.limit,
         questionsRemaining: questionQuota.data.remaining
@@ -112,7 +112,7 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
     )
   }
 
-  const videoPercentage = getUsagePercentage(usage.videosThisMonth, usage.videosLimit)
+  const channelPercentage = getUsagePercentage(usage.channelsThisMonth, usage.channelsLimit)
   const questionPercentage = getUsagePercentage(usage.questionsThisMonth, usage.questionsLimit)
 
   if (compact) {
@@ -128,21 +128,21 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
         </div>
 
         <div className="space-y-2">
-          {/* Videos */}
+          {/* Channels */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center">
                 <Video className="w-3 h-3 text-slate-500 mr-1" />
-                <span className="text-xs text-slate-600">Videos</span>
+                <span className="text-xs text-slate-600">Channels</span>
               </div>
               <span className="text-xs font-semibold text-slate-700">
-                {usage.videosThisMonth}/{usage.videosLimit}
+                {usage.channelsThisMonth}/{usage.channelsLimit}
               </span>
             </div>
             <div className="w-full bg-slate-200 rounded-full h-1.5">
               <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(videoPercentage)}`}
-                style={{ width: `${videoPercentage}%`, minWidth: videoPercentage > 0 ? '2px' : '0px' }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(channelPercentage)}`}
+                style={{ width: `${channelPercentage}%`, minWidth: channelPercentage > 0 ? '2px' : '0px' }}
               />
             </div>
           </div>
@@ -196,7 +196,7 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
       </div>
 
       <div className="space-y-6">
-        {/* Videos */}
+        {/* Channels */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center">
@@ -204,28 +204,28 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
                 <Video className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Videos Processed</h3>
+                <h3 className="font-semibold text-slate-900">Channels Imported</h3>
                 <p className="text-xs text-slate-500">Monthly limit</p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-slate-900">
-                {usage.videosThisMonth}<span className="text-base text-slate-500">/{usage.videosLimit}</span>
+                {usage.channelsThisMonth}<span className="text-base text-slate-500">/{usage.channelsLimit}</span>
               </p>
-              <p className={`text-xs font-medium ${getStatusColor(videoPercentage).split(' ')[0]}`}>
-                {usage.videosRemaining} remaining
+              <p className={`text-xs font-medium ${getStatusColor(channelPercentage).split(' ')[0]}`}>
+                {usage.channelsRemaining} remaining
               </p>
             </div>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-3">
             <div
-              className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(videoPercentage)}`}
-              style={{ width: `${videoPercentage}%`, minWidth: videoPercentage > 0 ? '4px' : '0px' }}
+              className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(channelPercentage)}`}
+              style={{ width: `${channelPercentage}%`, minWidth: channelPercentage > 0 ? '4px' : '0px' }}
             />
           </div>
-          {videoPercentage >= 80 && (
+          {channelPercentage >= 80 && (
             <p className="text-xs text-amber-600 mt-2">
-              ⚠️ You're running low on video quota. Consider upgrading to process more videos.
+              ⚠️ You're running low on channel quota. Consider upgrading to import more channels.
             </p>
           )}
         </div>
@@ -266,14 +266,14 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
       </div>
 
       {/* Upgrade CTA */}
-      {usage.tier === 'free' && (videoPercentage >= 50 || questionPercentage >= 50) && (
+      {usage.tier === 'free' && (channelPercentage >= 50 || questionPercentage >= 50) && (
         <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
           <div className="flex items-start">
             <TrendingUp className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h4 className="font-semibold text-slate-900 mb-1">Upgrade for More</h4>
               <p className="text-sm text-slate-600 mb-3">
-                Get up to 200 videos and 1000 questions per month with our paid plans.
+                Get up to 15 channels and 500 questions per month with Pro plan.
               </p>
               <Link
                 href="/pricing"

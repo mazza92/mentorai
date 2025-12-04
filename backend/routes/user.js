@@ -4,6 +4,7 @@ const {
   getTierConfig,
   getAllTiers,
   canProcessVideo,
+  canImportChannel,
   canAskQuestion,
   getUsagePercentage
 } = require('../config/pricing');
@@ -415,6 +416,69 @@ router.post('/:userId/check-video', async (req, res) => {
     }
     console.error('Error checking video quota:', error);
     res.status(500).json({ error: 'Failed to check video quota', details: error.message });
+  }
+});
+
+// Check if user can import a channel (based on tier limits)
+router.post('/:userId/check-channel', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Use mock mode if Firestore is not available
+    if (useMockMode || !process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID === 'your_project_id') {
+      const user = mockUsers.get(userId) || { tier: 'free', channelsThisMonth: 0 };
+      const result = canImportChannel(user.tier, user.channelsThisMonth || 0);
+      return res.json({
+        canImport: result.canImport,
+        tier: user.tier,
+        channelsThisMonth: result.used,
+        limit: result.limit,
+        remaining: result.remaining
+      });
+    }
+
+    const userDoc = await firestore.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      const result = canImportChannel('free', 0);
+      return res.json({
+        canImport: true,
+        tier: 'free',
+        channelsThisMonth: 0,
+        limit: result.limit,
+        remaining: result.remaining
+      });
+    }
+
+    const user = userDoc.data();
+    const tier = user.tier || 'free';
+    const channelsThisMonth = user.channelsThisMonth || 0;
+
+    const result = canImportChannel(tier, channelsThisMonth);
+
+    res.json({
+      canImport: result.canImport,
+      tier,
+      channelsThisMonth: result.used,
+      limit: result.limit,
+      remaining: result.remaining
+    });
+  } catch (error) {
+    // Fallback to mock mode
+    if (error.code === 'ENOTFOUND' || error.message.includes('credentials')) {
+      const { userId } = req.params;
+      const user = mockUsers.get(userId) || { tier: 'free', channelsThisMonth: 0 };
+      const result = canImportChannel(user.tier, user.channelsThisMonth || 0);
+      return res.json({
+        canImport: result.canImport,
+        tier: user.tier,
+        channelsThisMonth: result.used,
+        limit: result.limit,
+        remaining: result.remaining
+      });
+    }
+    console.error('Error checking channel quota:', error);
+    res.status(500).json({ error: 'Failed to check channel quota', details: error.message });
   }
 });
 
