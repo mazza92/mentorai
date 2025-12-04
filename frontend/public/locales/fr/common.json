@@ -50,8 +50,11 @@
     "manage_subscription": "Gérer votre abonnement",
     "features": {
       "videos_per_month": "{{count}} vidéos par mois",
+      "channels_per_month": "{{count}} imports de chaînes par mois",
       "questions_per_month": "{{count}} questions par mois",
+      "questions_per_channel": "{{count}} questions par chaîne",
       "unlimited_questions": "Questions illimitées",
+      "on_demand_transcripts": "Récupération de transcriptions à la demande",
       "all_ai_features": "Toutes les fonctionnalités IA",
       "community_support": "Support communautaire",
       "priority_support": "Support prioritaire",

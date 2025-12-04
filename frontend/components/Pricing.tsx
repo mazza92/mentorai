@@ -28,26 +28,27 @@ export default function Pricing() {
   const plans: PricingPlan[] = [
     {
       name: t('pricing.free_tier'),
-      price: '$0',
+      price: '€0',
       priceId: '',
       description: t('pricing.free_description'),
       features: [
-        t('pricing.features.videos_per_month', { count: 3 }),
-        t('pricing.features.questions_per_month', { count: 15 }),
-        t('pricing.features.all_ai_features'),
+        t('pricing.features.channels_per_month', { count: 2 }),
+        t('pricing.features.questions_per_month', { count: 10 }),
+        t('pricing.features.questions_per_channel', { count: 5 }),
+        t('pricing.features.on_demand_transcripts'),
         t('pricing.features.community_support'),
       ],
       icon: <Zap className="w-6 h-6" />,
     },
     {
       name: t('pricing.pro_tier'),
-      price: '$19',
+      price: '€24.99',
       priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
       description: t('pricing.pro_description'),
       features: [
-        t('pricing.features.videos_per_month', { count: 50 }),
-        t('pricing.features.unlimited_questions'),
-        t('pricing.features.all_ai_features'),
+        t('pricing.features.channels_per_month', { count: 15 }),
+        t('pricing.features.questions_per_month', { count: 500 }),
+        t('pricing.features.on_demand_transcripts'),
         t('pricing.features.priority_support'),
         t('pricing.features.export_transcripts'),
         t('pricing.features.early_access'),
@@ -179,7 +180,7 @@ export default function Pricing() {
 
                 <div className="mb-6">
                   <span className="text-3xl font-bold text-slate-900">{plan.price}</span>
-                  {plan.price !== '$0' && <span className="text-slate-600 ml-2">/month</span>}
+                  {plan.price !== '€0' && <span className="text-slate-600 ml-2">/month</span>}
                 </div>
 
                 <ul className="space-y-3 mb-8">
