@@ -63,7 +63,7 @@ router.post('/import', async (req, res) => {
     // Sort videos by view count (most viewed first)
     const sortedVideos = (quickImport.videos || []).sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
 
-    // Step 2: Create project with "processing" status immediately
+    // Step 2: Create project as "ready" immediately (transcripts fetched on-demand)
     const { firestore } = getFirestore();
     const projectId = quickImport.channelId;
     const projectRef = firestore.collection('projects').doc(projectId);
@@ -75,25 +75,22 @@ router.post('/import', async (req, res) => {
       title: quickImport.channelName,
       author: quickImport.channelName,
       videoCount: quickImport.videoCount,
-      status: 'processing', // Processing transcripts in background
-      transcriptProgress: {
-        fetched: 0,
-        total: quickImport.videoCount
-      },
+      status: 'ready', // Ready immediately - transcripts fetched on-demand when questions asked
       transcriptStats: {
         successful: 0,
         failed: 0,
         total: quickImport.videoCount,
-        isPartial: true
+        isPartial: false
       },
+      lazyLoadTranscripts: true, // Flag indicating transcripts are fetched on-demand
       userId,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    console.log(`[API] ✓ Project created, starting background transcript fetch for ${quickImport.videoCount} videos`);
+    console.log(`[API] ✓ Project created as ready - transcripts will be fetched on-demand when questions are asked`);
 
-    // Step 3: Return immediately to frontend (no waiting for transcripts!)
+    // Step 3: Return immediately - channel ready to use!
     res.json({
       success: true,
       data: {
@@ -103,8 +100,8 @@ router.post('/import', async (req, res) => {
         channelTitle: quickImport.channelName,
         videoCount: quickImport.videoCount,
         totalVideos: quickImport.videoCount,
-        status: 'processing',
-        transcriptsAvailable: 0,
+        status: 'ready', // Ready immediately!
+        lazyLoadTranscripts: true, // Transcripts fetched on-demand
         transcripts: {
           successful: 0,
           failed: 0,
@@ -113,121 +110,7 @@ router.post('/import', async (req, res) => {
       }
     });
 
-    // Step 4: Start background transcript fetching for ALL videos (non-blocking)
-    setImmediate(async () => {
-      try {
-        console.log(`[API] 📝 Starting background transcript fetch for all ${sortedVideos.length} videos...`);
-
-        const { firestore: firestoreBg } = getFirestore();
-        const channelRefBg = firestoreBg.collection('channels').doc(quickImport.channelId);
-
-        // Fetch transcripts for ALL videos in batches (concurrency 3 to avoid rate limits)
-        const allTranscripts = await youtubeInnertubeService.fetchChannelTranscripts(
-          sortedVideos,
-          { concurrency: 3, prioritizeBy: 'views' } // Reduced from 10 to avoid YouTube 429 rate limiting
-        );
-
-        // Process videos one at a time to avoid Firestore transaction size limits
-        const videosWithTranscripts = sortedVideos.filter(v => v.hasTranscript);
-
-        for (let i = 0; i < videosWithTranscripts.length; i++) {
-          const video = videosWithTranscripts[i];
-          const videoRef = channelRefBg.collection('videos').doc(video.id);
-
-          // Extract transcript text safely (avoid Firestore 1MB document limit)
-          let transcriptText = null;
-          if (video.transcript) {
-            // Handle transcript object (from smart bypass)
-            if (typeof video.transcript === 'object' && video.transcript.text) {
-              transcriptText = video.transcript.text;
-            } else if (typeof video.transcript === 'string') {
-              transcriptText = video.transcript;
-            }
-
-            // Check size - Firestore field limit is 1MB (1048576 bytes)
-            // If transcript text is too large, don't store it (use segments instead)
-            if (transcriptText && Buffer.byteLength(transcriptText, 'utf8') > 900000) {
-              console.log(`[API] ⚠️ Background: Transcript for ${video.id} too large (${Buffer.byteLength(transcriptText, 'utf8')} bytes), skipping text field`);
-              transcriptText = null;
-            }
-          }
-
-          // Check if transcriptSegments is too large to store in document
-          // Firestore document limit is 1MB total
-          const segmentsSize = video.transcriptSegments ? Buffer.byteLength(JSON.stringify(video.transcriptSegments), 'utf8') : 0;
-          const storeSegmentsInSubcollection = segmentsSize > 700000; // 700KB threshold for safety
-
-          if (storeSegmentsInSubcollection) {
-            console.log(`[API] ⚠️ Background: TranscriptSegments for ${video.id} too large (${segmentsSize} bytes), storing in subcollection`);
-
-            // Store segments in subcollection chunks individually
-            const SEGMENTS_PER_CHUNK = 100;
-            const segments = video.transcriptSegments || [];
-
-            for (let j = 0; j < segments.length; j += SEGMENTS_PER_CHUNK) {
-              const segmentChunk = segments.slice(j, j + SEGMENTS_PER_CHUNK);
-              const chunkDoc = videoRef.collection('transcriptChunks').doc(`chunk_${j}`);
-              await chunkDoc.set({
-                segments: segmentChunk,
-                startIndex: j,
-                endIndex: Math.min(j + SEGMENTS_PER_CHUNK - 1, segments.length - 1)
-              });
-            }
-            console.log(`[API] ✓ Background: Stored ${segments.length} segments in ${Math.ceil(segments.length / SEGMENTS_PER_CHUNK)} chunks for ${video.id}`);
-          }
-
-          // Update video document individually (not in batch)
-          await videoRef.update({
-            status: 'ready',
-            hasTranscript: true,
-            transcript: transcriptText ? { text: transcriptText } : null, // Store only text, not full object with words
-            transcriptSegments: storeSegmentsInSubcollection ? null : video.transcriptSegments, // Only store if small enough
-            transcriptSegmentsInSubcollection: storeSegmentsInSubcollection, // Flag for retrieval
-            transcriptSegmentsCount: video.transcriptSegments?.length || 0, // Metadata
-            transcriptSource: video.transcriptSource,
-            transcriptFetchedAt: new Date().toISOString()
-          });
-
-          console.log(`[API] ✓ Background: Saved transcript ${i + 1}/${videosWithTranscripts.length} for ${video.id}`);
-
-          // Update progress in real-time for frontend polling
-          await projectRef.update({
-            transcriptProgress: {
-              fetched: (i + 1),
-              total: quickImport.videoCount
-            },
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        }
-
-        console.log(`[API] ✓ Saved ${allTranscripts.successful} transcripts to Firestore`);
-
-        // Update project status to ready (transcripts are in channels/{channelId}/videos)
-        await projectRef.update({
-          status: 'ready',
-          transcriptStats: {
-            successful: allTranscripts.successful,
-            failed: allTranscripts.failed,
-            total: allTranscripts.total,
-            isPartial: false
-          },
-          transcriptProgress: {
-            fetched: allTranscripts.successful,
-            total: quickImport.videoCount
-          },
-          updatedAt: FieldValue.serverTimestamp()
-        });
-
-        console.log(`[API] ✅ All transcripts complete for ${channelId} (${allTranscripts.successful}/${allTranscripts.total})`);
-      } catch (error) {
-        console.error(`[API] ❌ Background transcript fetch failed:`, error);
-        await projectRef.update({
-          status: 'error',
-          error: error.message,
-          updatedAt: FieldValue.serverTimestamp()
-        });
-      }
-    });
+    console.log(`[API] ✅ Channel import complete for ${channelId} (${quickImport.videoCount} videos) - ready for questions!`);
 
   } catch (error) {
     console.error('[API] Channel import error:', error);
