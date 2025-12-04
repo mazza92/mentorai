@@ -161,10 +161,10 @@
   },
 
   "signup_wall": {
-    "video_title": "Essai gratuit terminé !",
-    "video_message": "Vous avez utilisé {{limit}} import de chaîne gratuit. Inscrivez-vous pour obtenir 2 imports de chaînes par mois !",
-    "question_title": "Essai gratuit terminé !",
-    "question_message": "Vous avez utilisé vos {{limit}} questions gratuites. Inscrivez-vous pour obtenir 10 questions par mois !",
+    "video_title": "Essayez avant de vous inscrire !",
+    "video_message": "Vous avez utilisé votre 1 import de chaîne gratuit. Inscrivez-vous pour obtenir 2 imports de chaînes par mois !",
+    "question_title": "Inscrivez-vous pour continuer",
+    "question_message": "Vous avez utilisé votre 1 question gratuite. Inscrivez-vous pour obtenir 10 questions par mois !",
     "uploads_used": "Chaînes importées",
     "questions_used": "Questions utilisées",
     "what_you_get": "Ce que vous obtenez en vous inscrivant :",

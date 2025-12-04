@@ -118,10 +118,23 @@ async function checkQuestionQuota(userId) {
 
 /**
  * Check if user can import a channel
- * @param {string} userId - User ID
+ * @param {string} userId - User ID (or sessionId for anonymous)
  * @returns {Promise<object>} - { canImport, tier, channelsThisMonth, limit, remaining }
  */
 async function checkChannelQuota(userId) {
+  // Handle anonymous users
+  if (isAnonymousUser(userId)) {
+    const result = anonymousSessionService.checkChannelQuota(userId);
+    return {
+      canImport: result.canImport,
+      tier: result.tier,
+      channelsThisMonth: result.channelsUsed,
+      limit: result.limit,
+      remaining: result.remaining,
+      requiresSignup: result.requiresSignup
+    };
+  }
+
   try {
     if (useMockMode || !firestore) {
       const user = mockUsers.get(userId) || { tier: 'free', channelsThisMonth: 0 };
@@ -300,10 +313,15 @@ async function incrementVideoCount(userId) {
 
 /**
  * Increment channel import count for a user
- * @param {string} userId - User ID
+ * @param {string} userId - User ID (or sessionId for anonymous)
  * @returns {Promise<boolean>} - Success status
  */
 async function incrementChannelCount(userId) {
+  // Handle anonymous users
+  if (isAnonymousUser(userId)) {
+    return anonymousSessionService.incrementChannelCount(userId);
+  }
+
   try {
     if (useMockMode || !firestore) {
       let user = mockUsers.get(userId) || { userId, tier: 'free', channelsThisMonth: 0, questionsThisMonth: 0 };
