@@ -53,7 +53,7 @@
       "channels_per_month": "{{count}} channel uploads per month",
       "questions_per_month": "{{count}} questions per month",
       "questions_per_channel": "{{count}} questions per channel",
-      "unlimited_questions": "Unlimited questions",
+      "unlimited_questions": "500 questions",
       "on_demand_transcripts": "On-demand transcript fetching",
       "all_ai_features": "All AI features",
       "community_support": "Community support",
@@ -90,10 +90,10 @@
     "send": "Send",
     "processing": "Processing...",
     "questions_remaining": "{{count}} questions remaining this month",
-    "questions_remaining_warning": "⚠️ {{count}} questions remaining this month. Upgrade to Pro for unlimited questions!",
-    "upgrade_for_more": "Upgrade to Pro for unlimited questions",
+    "questions_remaining_warning": "⚠️ {{count}} questions remaining this month. Upgrade to Pro for 500 questions!",
+    "upgrade_for_more": "Upgrade to Pro for 500 questions",
     "limit_reached": "Question limit reached",
-    "limit_message": "You've reached your monthly question limit. Upgrade to Pro for unlimited questions."
+    "limit_message": "You've reached your monthly question limit. Upgrade to Pro for 500 questions."
   },
 
   "upload": {
@@ -161,14 +161,14 @@
 
   "signup_wall": {
     "video_title": "Free Trial Complete!",
-    "video_message": "You've used your 1 free upload. Sign up to get 3 uploads per month!",
+    "video_message": "You've used your 1 free channel. Sign up to get 2 channel imports per month!",
     "question_title": "Free Trial Complete!",
-    "question_message": "You've used your 3 free questions. Sign up to get 15 questions per month!",
-    "uploads_used": "Uploads used",
+    "question_message": "You've used your 3 free questions. Sign up to get 10 questions per month!",
+    "uploads_used": "Channels imported",
     "questions_used": "Questions used",
     "what_you_get": "What you get when you sign up:",
-    "benefit_videos": "3 uploads per month",
-    "benefit_questions": "15 questions per month",
+    "benefit_videos": "2 channel imports per month",
+    "benefit_questions": "10 questions per month",
     "benefit_ai": "All AI features",
     "benefit_free": "Free forever",
     "sign_up_button": "Sign Up Free",
