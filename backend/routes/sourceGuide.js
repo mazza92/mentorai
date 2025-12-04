@@ -159,18 +159,22 @@ Return ONLY valid JSON, no additional text.`;
     // Generate intelligent suggested prompts based on actual available content
     let suggestedPrompts = [];
     const videosWithTranscripts = videos.filter(v => v.transcript);
+    const hasLazyLoading = project.lazyLoadTranscripts === true;
 
-    if (videosWithTranscripts.length > 0) {
-      console.log('[SourceGuide] Generating suggested prompts from', videosWithTranscripts.length, 'videos with transcripts');
+    // For channels with lazy loading OR channels with some transcripts
+    if (videosWithTranscripts.length > 0 || (hasLazyLoading && videos.length > 0)) {
+      console.log('[SourceGuide] Generating suggested prompts from', videosWithTranscripts.length, 'videos with transcripts', hasLazyLoading ? '(lazy loading enabled)' : '');
 
-      // Get sample transcript content to understand what we can answer
-      const transcriptContext = videosWithTranscripts
-        .slice(0, 5)
-        .map(v => {
-          const transcriptText = typeof v.transcript === 'object' ? v.transcript.text : v.transcript;
-          return `"${v.title}": ${transcriptText.substring(0, 400)}...`;
-        })
-        .join('\n\n');
+      // Get sample transcript content if available (for lazy loading, we generate from titles/descriptions)
+      const transcriptContext = videosWithTranscripts.length > 0
+        ? videosWithTranscripts
+            .slice(0, 5)
+            .map(v => {
+              const transcriptText = typeof v.transcript === 'object' ? v.transcript.text : v.transcript;
+              return `"${v.title}": ${transcriptText.substring(0, 400)}...`;
+            })
+            .join('\n\n')
+        : '';
 
       const promptsPrompt = `Based on the following YouTube channel content, generate 4 ultra-concise, actionable questions that users would want to ask.
 
@@ -182,8 +186,9 @@ Key Topics: ${sourceGuide.keyTopics.join(', ')}
 Video Titles:
 - ${videoTitles}
 
-Sample Transcript Content:
-${transcriptContext}
+${descriptionSamples ? `Video Descriptions:\n${descriptionSamples}\n` : ''}
+
+${transcriptContext ? `Sample Transcript Content:\n${transcriptContext}` : ''}
 
 CRITICAL REQUIREMENTS - Questions MUST be:
 - ${isFrench ? 'UNE SEULE PHRASE courte (maximum 10-12 mots)' : 'ONE SHORT SENTENCE only (max 10-12 words)'}
@@ -228,7 +233,8 @@ Return ONLY a JSON array of 4 SHORT question strings (max 10-12 words each):
         );
       }
     } else {
-      // No transcripts - guide user to understand why
+      // No transcripts and no lazy loading - channel actually has no content
+      console.log('[SourceGuide] No transcripts available and lazy loading disabled');
       suggestedPrompts = isFrench
         ? ['Pourquoi les transcriptions ne sont-elles pas disponibles ?']
         : ['Why are transcripts not available?'];
