@@ -1476,7 +1476,14 @@ FORMATTING STRUCTURE (YOU MUST FOLLOW):
 
 IMPORTANT: Provide FULL detailed answers with ALL actionable content. Your response MUST be 500+ words with comprehensive details.
 
-${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponses détaillées et complètes.' : 'Always respond in English with detailed, complete answers.'}`,
+${detectedLanguage === 'fr' ? `
+🇫🇷 LANGUAGE REQUIREMENT - CRITICAL:
+YOU MUST RESPOND IN FRENCH (FRANÇAIS) AT ALL TIMES.
+NO MATTER WHAT, YOUR ENTIRE RESPONSE MUST BE IN FRENCH.
+EVEN IF THE VIDEO CONTENT IS IN ENGLISH, TRANSLATE IT TO FRENCH.
+NEVER SWITCH TO ENGLISH - STAY IN FRENCH FOR THE ENTIRE RESPONSE.
+Répondez TOUJOURS en français avec des réponses détaillées et complètes.
+` : 'Always respond in English with detailed, complete answers.'}`,
         generationConfig: {
           temperature: 0.7, // Balanced creativity for detailed responses
           maxOutputTokens: 8192, // Allow long, comprehensive answers
@@ -2079,8 +2086,20 @@ ${stats.length > 0 ? `Stats: ${stats.join(', ')}` : ''}`;
     // Language-specific instructions
     const isFrench = language === 'fr';
     const languageInstruction = isFrench
-      ? `IMPORTANT: L'utilisateur parle français. Répondez TOUJOURS en français, même si le contenu des vidéos est en anglais. Traduisez les informations nécessaires.`
-      : `IMPORTANT: Always respond in English.`;
+      ? `🇫🇷 LANGUE REQUISE: FRANÇAIS
+
+ATTENTION CRITIQUE: L'utilisateur parle français. Vous DEVEZ répondre UNIQUEMENT en français.
+- Répondez TOUJOURS et ENTIÈREMENT en français
+- NE CHANGEZ JAMAIS vers l'anglais, même au milieu de la réponse
+- Traduisez toutes les informations des vidéos en français
+- Chaque mot, chaque phrase, chaque titre doit être en français
+- RESTEZ EN FRANÇAIS du début à la fin de votre réponse
+
+Cette règle est ABSOLUE et ne peut pas être ignorée.`
+      : `LANGUAGE REQUIREMENT: ENGLISH
+
+CRITICAL: The user speaks English. You MUST respond ONLY in English.
+Always respond entirely in English for the complete response.`;
 
     const formatExample = `
 **REQUIRED FORMAT EXAMPLE** (provide THIS level of detail):
