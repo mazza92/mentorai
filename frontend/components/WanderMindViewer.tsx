@@ -844,13 +844,17 @@ const QnAPanel = ({
 
     // Convert citations to clickable links instead of removing them
     if (channelCitations && channelCitations.length > 0) {
+      console.log('[WanderMind] Converting citations to links:', channelCitations.length, 'citations')
+
       // Time range format: [VIDEO 3, 1:04-1:08]
       text = text.replace(/\[(?:Vidéo|Video|VIDEO)\s+(\d+),\s+(\d+):(\d+)-\d+:\d+\]/gi, (match, videoNum, mins, secs) => {
         const timestamp = parseInt(mins) * 60 + parseInt(secs)
         const citation = channelCitations.find(c => c.timestamp === timestamp)
         if (citation) {
+          console.log('[WanderMind] Matched time-range citation:', match, '→', citation.url)
           return `<a href="${citation.url}" target="_blank" rel="noopener noreferrer" class="inline-citation-link" title="${citation.videoTitle} @ ${citation.timestampFormatted}">${match}</a>`
         }
+        console.log('[WanderMind] No citation found for timestamp:', timestamp, 'in match:', match)
         return match
       })
 
@@ -859,33 +863,43 @@ const QnAPanel = ({
         const timestamp = parseInt(mins) * 60 + parseInt(secs)
         const citation = channelCitations.find(c => c.timestamp === timestamp)
         if (citation) {
+          console.log('[WanderMind] Matched single citation:', match, '→', citation.url)
           return `<a href="${citation.url}" target="_blank" rel="noopener noreferrer" class="inline-citation-link" title="${citation.videoTitle} @ ${citation.timestampFormatted}">${match}</a>`
         }
+        console.log('[WanderMind] No citation found for timestamp:', timestamp, 'in match:', match)
         return match
       })
+    } else {
+      console.log('[WanderMind] No channelCitations provided, skipping inline link conversion')
     }
 
     // Remove only empty cite tags
     text = text.replace(/<cite[^>]*>[\s]*<\/cite>/gi, '')
 
     // Extract all citations from text and remove them from content
+    // NOTE: For channel mode, we use channelCitations with YouTube URLs
+    // For single video mode, we parse [MM:SS] timestamps from text
     const citationRegex = /\[(\d{1,2}):(\d{2})\]/g
     const foundCitations: Array<{time: number, original: string}> = []
     let match
 
-    // Collect all citations
-    while ((match = citationRegex.exec(text)) !== null) {
-      const minutes = parseInt(match[1], 10)
-      const seconds = parseInt(match[2], 10)
-      const timeInSeconds = minutes * 60 + seconds
-      foundCitations.push({
-        time: timeInSeconds,
-        original: match[0]
-      })
+    // Only collect [MM:SS] citations if this is single video mode (no channelCitations)
+    if (!channelCitations || channelCitations.length === 0) {
+      while ((match = citationRegex.exec(text)) !== null) {
+        const minutes = parseInt(match[1], 10)
+        const seconds = parseInt(match[2], 10)
+        const timeInSeconds = minutes * 60 + seconds
+        foundCitations.push({
+          time: timeInSeconds,
+          original: match[0]
+        })
+      }
     }
 
-    // Remove citations from text for cleaner display
-    const cleanedText = text.replace(/\[\d{1,2}:\d{2}\]/g, '').trim()
+    // Remove single-video style citations from text for cleaner display (only if not channel mode)
+    const cleanedText = (!channelCitations || channelCitations.length === 0)
+      ? text.replace(/\[\d{1,2}:\d{2}\]/g, '').trim()
+      : text
 
     // Group citations by removing duplicates and sorting
     const uniqueCitations = Array.from(
