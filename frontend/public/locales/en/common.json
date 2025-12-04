@@ -50,8 +50,11 @@
     "manage_subscription": "Manage your subscription",
     "features": {
       "videos_per_month": "{{count}} videos per month",
+      "channels_per_month": "{{count}} channel uploads per month",
       "questions_per_month": "{{count}} questions per month",
+      "questions_per_channel": "{{count}} questions per channel",
       "unlimited_questions": "Unlimited questions",
+      "on_demand_transcripts": "On-demand transcript fetching",
       "all_ai_features": "All AI features",
       "community_support": "Community support",
       "priority_support": "Priority support",
