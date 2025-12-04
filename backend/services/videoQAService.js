@@ -1517,8 +1517,34 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
         }
       }
 
-      // Old format fallback 1: [Vidéo 10, 21:42] or [Video 10, 21:42] with brackets
-      const bracketFormatRegex = /\[(?:Vidéo|Video)\s+(\d+),\s+(\d+):(\d+)\]/gi;
+      // Format with time range: [VIDEO 3, 1:04-1:08] (use start time)
+      const rangeFormatRegex = /\[(?:Vidéo|Video|VIDEO)\s+(\d+),\s+(\d+):(\d+)-\d+:\d+\]/gi;
+
+      while ((match = rangeFormatRegex.exec(answer)) !== null) {
+        const videoIndex = parseInt(match[1], 10) - 1; // Convert to 0-indexed
+        const minutes = parseInt(match[2], 10);
+        const seconds = parseInt(match[3], 10);
+        const timestamp = minutes * 60 + seconds;
+
+        // Map to actual video
+        if (videoIndex >= 0 && videoIndex < relevantVideos.length) {
+          const video = relevantVideos[videoIndex];
+          // Check for duplicates before adding
+          const exists = citations.some(c => c.videoId === video.videoId && c.timestamp === timestamp);
+          if (!exists) {
+            citations.push({
+              videoId: video.videoId,
+              videoTitle: video.title,
+              timestamp: timestamp,
+              timestampFormatted: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+              url: `https://www.youtube.com/watch?v=${video.videoId}&t=${timestamp}s`
+            });
+          }
+        }
+      }
+
+      // Format without time range: [Vidéo 10, 21:42] or [Video 10, 21:42] with brackets
+      const bracketFormatRegex = /\[(?:Vidéo|Video|VIDEO)\s+(\d+),\s+(\d+):(\d+)\]/gi;
 
       while ((match = bracketFormatRegex.exec(answer)) !== null) {
         const videoIndex = parseInt(match[1], 10) - 1; // Convert to 0-indexed
@@ -1576,10 +1602,9 @@ ${detectedLanguage === 'fr' ? 'Répondez TOUJOURS en français avec des réponse
       try {
         // Clean up the markdown before conversion
         let cleanedMarkdown = answer
-          // Remove bracket format citations [Vidéo 10, 21:42] since we'll show them as chips
-          .replace(/\[(?:Vidéo|Video)\s+\d+,\s+\d+:\d+\]/gi, '')
-          // Remove parentheses format citations (Vidéo 6, 1:28) since we'll show them as chips
-          .replace(/\((?:Vidéo|Video)\s+\d+,\s+\d+:\d+\)/gi, '')
+          // DON'T remove time-range citations [VIDEO 3, 1:04-1:08] - convert them to links on frontend
+          // DON'T remove bracket format citations [Vidéo 10, 21:42] - convert them to links on frontend
+          // DON'T remove parentheses format citations (Vidéo 6, 1:28) - convert them to links on frontend
           // Remove old-style inline video references without timestamps like (Video 5, Video 4) and (Vidéo 1)
           .replace(/\(Vidéo\s+\d+(?:,\s*Vidéo\s+\d+)*\)/gi, '')
           .replace(/\(Video\s+\d+(?:,\s*Video\s+\d+)*\)/gi, '')
