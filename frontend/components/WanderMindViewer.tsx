@@ -842,14 +842,31 @@ const QnAPanel = ({
       // We just need to track that citations exist
     }
 
-    // Remove ALL cite tags and old citation formats from text (we'll show them as chips below)
+    // Convert citations to clickable links instead of removing them
+    if (channelCitations && channelCitations.length > 0) {
+      // Time range format: [VIDEO 3, 1:04-1:08]
+      text = text.replace(/\[(?:Vidéo|Video|VIDEO)\s+(\d+),\s+(\d+):(\d+)-\d+:\d+\]/gi, (match, videoNum, mins, secs) => {
+        const timestamp = parseInt(mins) * 60 + parseInt(secs)
+        const citation = channelCitations.find(c => c.timestamp === timestamp)
+        if (citation) {
+          return `<a href="${citation.url}" target="_blank" rel="noopener noreferrer" class="inline-citation-link" title="${citation.videoTitle} @ ${citation.timestampFormatted}">${match}</a>`
+        }
+        return match
+      })
+
+      // Single timestamp format: [Vidéo 10, 21:42] or [Video 10, 21:42]
+      text = text.replace(/\[(?:Vidéo|Video|VIDEO)\s+(\d+),\s+(\d+):(\d+)\]/gi, (match, videoNum, mins, secs) => {
+        const timestamp = parseInt(mins) * 60 + parseInt(secs)
+        const citation = channelCitations.find(c => c.timestamp === timestamp)
+        if (citation) {
+          return `<a href="${citation.url}" target="_blank" rel="noopener noreferrer" class="inline-citation-link" title="${citation.videoTitle} @ ${citation.timestampFormatted}">${match}</a>`
+        }
+        return match
+      })
+    }
+
+    // Remove only empty cite tags
     text = text.replace(/<cite[^>]*>[\s]*<\/cite>/gi, '')
-    text = text.replace(/<cite[^>]*>/gi, '')
-    text = text.replace(/<\/cite>/gi, '')
-    // Remove bracket format citations: [Vidéo 10, 21:42] or [Video 10, 21:42]
-    text = text.replace(/\[(?:Vidéo|Video)\s+\d+,\s+\d+:\d+\]/gi, '')
-    // Remove parentheses format citations: (Vidéo 6, 1:28) or (Video 4, 2:56)
-    text = text.replace(/\((?:Vidéo|Video)\s+\d+,\s+\d+:\d+\)/gi, '')
 
     // Extract all citations from text and remove them from content
     const citationRegex = /\[(\d{1,2}):(\d{2})\]/g
@@ -2332,6 +2349,22 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
           border-radius: 0.25rem;
           font-size: 0.875em;
           font-family: monospace;
+        }
+        .inline-citation-link {
+          color: #2563eb;
+          text-decoration: none;
+          border-bottom: 1px solid #93c5fd;
+          padding: 0.125rem 0.25rem;
+          border-radius: 0.25rem;
+          transition: all 0.15s ease;
+          font-weight: 500;
+          background: linear-gradient(to right, #eff6ff, #dbeafe);
+        }
+        .inline-citation-link:hover {
+          color: #1d4ed8;
+          border-bottom-color: #2563eb;
+          background: linear-gradient(to right, #dbeafe, #bfdbfe);
+          box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
         }
       `}} />
       <div className="h-full bg-gradient-to-br from-white to-slate-50 text-slate-900 font-sans flex flex-col overflow-hidden relative">
