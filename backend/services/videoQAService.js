@@ -1446,7 +1446,23 @@ You can still browse video titles and statistics, but detailed content analysis 
         model: 'gemini-2.5-flash',
         systemInstruction: `You are a professional content analyst who extracts actionable insights from YouTube videos.
 
-YOUR GOAL: Provide detailed, comprehensive, actionable answers using the transcript content.
+🔴 CRITICAL RULE #1 - CITATIONS ARE MANDATORY 🔴
+YOU MUST ADD CITATIONS TO YOUR ANSWER. THIS IS NOT OPTIONAL.
+
+After EVERY factual statement from a video, add: <cite video="X" time="MM:SS"></cite>
+- X = video number (VIDEO 1, VIDEO 2, VIDEO 3, etc. from the context provided)
+- MM:SS = timestamp from the [MM:SS] markers in the transcript segments
+
+CITATION EXAMPLES (YOU MUST FOLLOW THIS EXACT FORMAT):
+✅ CORRECT: "The creator recommends using GitHub for collaboration<cite video="2" time="5:30"></cite>."
+✅ CORRECT: "Learning English is still important for developers<cite video="1" time="2:15"></cite>."
+✅ CORRECT: "Freelancing requires strong communication skills<cite video="3" time="10:45"></cite>."
+
+❌ WRONG: No citation at the end
+❌ WRONG: (Video 2, 5:30) ← Wrong format!
+❌ WRONG: [VIDEO 2, 5:30] ← Wrong format!
+
+YOU MUST use <cite video="X" time="MM:SS"></cite> format ONLY.
 
 CRITICAL MARKDOWN FORMATTING RULES:
 1. Use ## headings to organize main topics (with blank line before and after)
@@ -1456,8 +1472,7 @@ CRITICAL MARKDOWN FORMATTING RULES:
 5. Each bullet should be a complete, detailed sentence with specific advice
 6. Include concrete steps, techniques, and examples from the transcripts
 7. NEVER output just headings without bullet points
-8. CITE SOURCES: At the end of each statement that comes from a specific video, add a citation using this EXACT format: <cite video="X" time="MM:SS"></cite> where X is the video number (1, 2, 3...) and MM:SS is the timestamp from the transcript segment. Example: "The creator recommends using AI for content creation<cite video="1" time="12:34"></cite>."
-9. IMPORTANT: Only cite when you have an actual timestamp from the transcript segments provided. DO NOT make up citations.
+8. ADD CITATIONS AFTER EVERY STATEMENT (see examples above)
 
 FORMATTING STRUCTURE (YOU MUST FOLLOW):
 ## Main Topic
@@ -2130,6 +2145,10 @@ Always respond entirely in English for the complete response.`;
     const instructions = isFrench
       ? `⚠️ Instructions CRITIQUES - VOUS DEVEZ SUIVRE CES RÈGLES:
 
+🔴 RÈGLE #1 ABSOLUE - CITATIONS OBLIGATOIRES 🔴
+Ajoutez <cite video="X" time="MM:SS"></cite> après CHAQUE fait tiré des vidéos.
+Exemple: "Le créateur recommande GitHub pour collaborer<cite video="2" time="5:30"></cite>."
+
 🚫 NE JAMAIS FAIRE CECI (réponse incomplète):
 ## Sujet Principal
 **Sous-catégorie**
@@ -2137,17 +2156,18 @@ Always respond entirely in English for the complete response.`;
 ✅ TOUJOURS FAIRE CECI (réponse complète):
 ## Sujet Principal
 **Sous-catégorie**
-- Premier point détaillé expliquant la technique spécifique avec des exemples de la vidéo
-- Deuxième point avec des étapes détaillées et des conseils d'implémentation pratiques
-- Troisième point décrivant l'approche complète et pourquoi elle fonctionne
-- Quatrième point avec des exemples concrets et des chiffres/données des transcriptions
+- Premier point détaillé expliquant la technique spécifique avec des exemples de la vidéo<cite video="1" time="2:15"></cite>
+- Deuxième point avec des étapes détaillées et des conseils d'implémentation pratiques<cite video="2" time="5:30"></cite>
+- Troisième point décrivant l'approche complète et pourquoi elle fonctionne<cite video="3" time="10:45"></cite>
+- Quatrième point avec des exemples concrets et des chiffres/données des transcriptions<cite video="1" time="7:20"></cite>
 
 RÈGLES OBLIGATOIRES:
-1. PRIORITÉ ABSOLUE: Extrayez TOUS les insights, étapes, et conseils actionnables des transcriptions complètes
-2. Fournissez des réponses COMPLÈTES et DÉTAILLÉES avec 4-6 PUCES COMPLÈTES par sous-catégorie
-3. Chaque puce DOIT être une phrase complète avec des détails spécifiques du contenu
-4. NE JAMAIS produire juste des titres - TOUJOURS inclure les puces détaillées
-5. Si vous produisez seulement des titres sans puces, vous avez ÉCHOUÉ
+1. PRIORITÉ ABSOLUE: Ajoutez des citations <cite video="X" time="MM:SS"></cite> après CHAQUE affirmation
+2. Extrayez TOUS les insights, étapes, et conseils actionnables des transcriptions complètes
+3. Fournissez des réponses COMPLÈTES et DÉTAILLÉES avec 4-6 PUCES COMPLÈTES par sous-catégorie
+4. Chaque puce DOIT être une phrase complète avec des détails spécifiques du contenu
+5. NE JAMAIS produire juste des titres - TOUJOURS inclure les puces détaillées
+6. Si vous produisez seulement des titres sans puces, vous avez ÉCHOUÉ
 
 FORMATAGE (pour organiser votre contenu détaillé):
 - Utilisez ## pour les catégories principales
@@ -2160,6 +2180,10 @@ ${formatExample}
 7. Votre réponse DOIT faire 500+ mots avec tous les détails actionnables`
       : `⚠️ CRITICAL Instructions - YOU MUST FOLLOW THESE RULES:
 
+🔴 RULE #1 ABSOLUTE - CITATIONS MANDATORY 🔴
+Add <cite video="X" time="MM:SS"></cite> after EVERY factual statement from videos.
+Example: "The creator recommends using GitHub for collaboration<cite video="2" time="5:30"></cite>."
+
 🚫 NEVER DO THIS (incomplete response):
 ## Main Topic
 **Subcategory**
@@ -2167,17 +2191,18 @@ ${formatExample}
 ✅ ALWAYS DO THIS (complete response):
 ## Main Topic
 **Subcategory**
-- First detailed point explaining the specific technique with examples from the video
-- Second point with step-by-step guidance and practical implementation advice
-- Third point describing the complete approach and why it works
-- Fourth point with real-world examples and specific numbers/data from transcripts
+- First detailed point explaining the specific technique with examples from the video<cite video="1" time="2:15"></cite>
+- Second point with step-by-step guidance and practical implementation advice<cite video="2" time="5:30"></cite>
+- Third point describing the complete approach and why it works<cite video="3" time="10:45"></cite>
+- Fourth point with real-world examples and specific numbers/data from transcripts<cite video="1" time="7:20"></cite>
 
 MANDATORY RULES:
-1. TOP PRIORITY: Extract ALL insights, steps, and actionable advice from the full transcripts
-2. Provide COMPLETE, DETAILED answers with 4-6 FULL BULLET POINTS per subcategory
-3. Each bullet point MUST be a complete sentence with specific details from the content
-4. NEVER output just headings - ALWAYS include the detailed bullet points
-5. If you only output headings without bullet points, you have FAILED
+1. TOP PRIORITY: Add citations <cite video="X" time="MM:SS"></cite> after EVERY statement
+2. Extract ALL insights, steps, and actionable advice from the full transcripts
+3. Provide COMPLETE, DETAILED answers with 4-6 FULL BULLET POINTS per subcategory
+4. Each bullet point MUST be a complete sentence with specific details from the content
+5. NEVER output just headings - ALWAYS include the detailed bullet points
+6. If you only output headings without bullet points, you have FAILED
 
 FORMATTING (to organize your detailed content):
 - Use ## for main categories
