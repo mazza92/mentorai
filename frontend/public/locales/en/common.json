@@ -160,10 +160,10 @@
   },
 
   "signup_wall": {
-    "video_title": "Free Trial Complete!",
-    "video_message": "You've used your 1 free channel. Sign up to get 2 channel imports per month!",
-    "question_title": "Free Trial Complete!",
-    "question_message": "You've used your 3 free questions. Sign up to get 10 questions per month!",
+    "video_title": "Try Before You Sign Up!",
+    "video_message": "You've used your 1 free channel import. Sign up to get 2 channel imports per month!",
+    "question_title": "Sign Up to Continue",
+    "question_message": "You've used your 1 free question. Sign up to get 10 questions per month!",
     "uploads_used": "Channels imported",
     "questions_used": "Questions used",
     "what_you_get": "What you get when you sign up:",

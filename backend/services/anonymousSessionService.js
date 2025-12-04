@@ -3,8 +3,8 @@
  *
  * Tracks usage for anonymous users (no signup) before showing signup wall.
  * Uses sessionId + fingerprint to track:
- * - Video uploads (limit: 1)
- * - Questions asked (limit: 3)
+ * - Channel imports (limit: 1)
+ * - Questions asked (limit: 1)
  *
  * VPN/Cookie Bypass Protection:
  * - Extracts fingerprint from sessionId (embedded in session format)
@@ -15,7 +15,7 @@
  * Current implementation uses in-memory Map (resets on server restart).
  */
 
-const { canProcessVideo, canAskQuestion } = require('../config/pricing');
+const { canProcessVideo, canImportChannel, canAskQuestion } = require('../config/pricing');
 
 // In-memory session store (replace with Redis in production)
 const anonymousSessions = new Map();
@@ -78,8 +78,8 @@ function getSession(sessionId) {
     return {
       sessionId,
       tier: 'anonymous',
-      videosUploaded: 1, // Already "used" to block uploads
-      questionsAsked: 3, // Already "used" to block questions
+      channelsImported: 1, // Already "used" to block channel imports
+      questionsAsked: 1, // Already "used" to block questions
       createdAt: new Date(),
       lastActivity: new Date(),
       fingerprintBlocked: true
@@ -92,7 +92,7 @@ function getSession(sessionId) {
     session = {
       sessionId,
       tier: 'anonymous',
-      videosUploaded: 0,
+      channelsImported: 0,
       questionsAsked: 0,
       createdAt: new Date(),
       lastActivity: new Date(),
@@ -118,7 +118,7 @@ function getSession(sessionId) {
   const sessionAge = now - new Date(session.createdAt);
   if (sessionAge > SESSION_EXPIRY_MS) {
     // Reset session
-    session.videosUploaded = 0;
+    session.channelsImported = 0;
     session.questionsAsked = 0;
     session.createdAt = new Date();
   }
@@ -127,17 +127,17 @@ function getSession(sessionId) {
 }
 
 /**
- * Check if anonymous user can upload a video
+ * Check if anonymous user can import a channel
  * @param {string} sessionId - Browser session ID
- * @returns {object} { canUpload, videosUsed, limit, remaining, requiresSignup }
+ * @returns {object} { canImport, channelsUsed, limit, remaining, requiresSignup }
  */
-function checkVideoQuota(sessionId) {
+function checkChannelQuota(sessionId) {
   const session = getSession(sessionId);
 
   if (!session) {
     return {
-      canUpload: false,
-      videosUsed: 0,
+      canImport: false,
+      channelsUsed: 0,
       limit: 1,
       remaining: 1,
       requiresSignup: true,
@@ -145,14 +145,32 @@ function checkVideoQuota(sessionId) {
     };
   }
 
-  const result = canProcessVideo('anonymous', session.videosUploaded);
+  const result = canImportChannel('anonymous', session.channelsImported);
 
   return {
-    canUpload: result.canProcess,
-    videosUsed: result.used,
+    canImport: result.canImport,
+    channelsUsed: result.used,
     limit: result.limit,
     remaining: result.remaining,
-    requiresSignup: !result.canProcess, // Show signup wall if limit reached
+    requiresSignup: !result.canImport, // Show signup wall if limit reached
+    tier: 'anonymous'
+  };
+}
+
+/**
+ * Check if anonymous user can upload a video (legacy - kept for backwards compatibility)
+ * @deprecated Use checkChannelQuota instead
+ * @param {string} sessionId - Browser session ID
+ * @returns {object} { canUpload, videosUsed, limit, remaining, requiresSignup }
+ */
+function checkVideoQuota(sessionId) {
+  const result = checkChannelQuota(sessionId);
+  return {
+    canUpload: result.canImport,
+    videosUsed: result.channelsUsed,
+    limit: result.limit,
+    remaining: result.remaining,
+    requiresSignup: result.requiresSignup,
     tier: 'anonymous'
   };
 }
@@ -189,24 +207,34 @@ function checkQuestionQuota(sessionId) {
 }
 
 /**
- * Increment video upload count for anonymous session
+ * Increment channel import count for anonymous session
  * @param {string} sessionId - Browser session ID
  * @returns {boolean} Success status
  */
-function incrementVideoCount(sessionId) {
+function incrementChannelCount(sessionId) {
   const session = getSession(sessionId);
 
   if (!session) {
     return false;
   }
 
-  session.videosUploaded++;
+  session.channelsImported++;
   session.lastActivity = new Date();
   anonymousSessions.set(sessionId, session);
 
-  console.log(`Anonymous session ${sessionId}: ${session.videosUploaded} video(s) uploaded`);
+  console.log(`Anonymous session ${sessionId}: ${session.channelsImported} channel(s) imported`);
 
   return true;
+}
+
+/**
+ * Increment video upload count for anonymous session (legacy)
+ * @deprecated Use incrementChannelCount instead
+ * @param {string} sessionId - Browser session ID
+ * @returns {boolean} Success status
+ */
+function incrementVideoCount(sessionId) {
+  return incrementChannelCount(sessionId);
 }
 
 /**
@@ -272,7 +300,7 @@ function getSessionStats() {
     totalSessions: anonymousSessions.size,
     sessions: Array.from(anonymousSessions.values()).map(s => ({
       sessionId: s.sessionId.substring(0, 8) + '...', // Partial ID for privacy
-      videosUploaded: s.videosUploaded,
+      channelsImported: s.channelsImported,
       questionsAsked: s.questionsAsked,
       createdAt: s.createdAt,
       lastActivity: s.lastActivity
@@ -282,9 +310,11 @@ function getSessionStats() {
 
 module.exports = {
   getSession,
-  checkVideoQuota,
+  checkChannelQuota,
+  checkVideoQuota, // Legacy
   checkQuestionQuota,
-  incrementVideoCount,
+  incrementChannelCount,
+  incrementVideoCount, // Legacy
   incrementQuestionCount,
   cleanupExpiredSessions,
   getSessionStats

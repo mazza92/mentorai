@@ -10,6 +10,27 @@
  */
 
 const PRICING_TIERS = {
+  anonymous: {
+    id: 'anonymous',
+    name: 'Anonymous',
+    price: 0,
+    priceId: '', // No Stripe - teaser tier before signup
+    features: {
+      channelsPerMonth: 1,
+      questionsPerMonth: 1,
+      questionsPerChannel: 1,
+      features: [
+        '1 channel upload (teaser)',
+        '1 question (teaser)',
+        'Sign up for more'
+      ]
+    },
+    // Cost calculation: 1 channel × €0.01 + 1 question × €0.015 = €0.01 + €0.015 = €0.025
+    estimatedCost: 0.025,
+    estimatedCostEUR: 0.025,
+    margin: -100 // Teaser/acquisition cost
+  },
+
   free: {
     id: 'free',
     name: 'Free',
