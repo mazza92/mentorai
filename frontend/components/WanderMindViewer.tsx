@@ -781,8 +781,8 @@ const QnAPanel = ({
         // Check if signup is required (anonymous user hit limit)
         if (errorData.requiresSignup) {
           setSignupQuotaUsage({
-            used: errorData.questionsThisMonth || 3,
-            limit: errorData.limit || 3
+            used: errorData.questionsThisMonth || 1,
+            limit: errorData.limit || 1
           })
           setSignupMessage(errorData.message)
           setShowSignupWall(true)
