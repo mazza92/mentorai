@@ -18,43 +18,23 @@ export default function UpgradeModal({ isOpen, onClose, reason, currentUsage }: 
 
   const plans = [
     {
-      name: 'Starter',
-      price: '$15',
-      icon: <Zap className="w-5 h-5" />,
-      color: 'from-blue-500 to-cyan-500',
-      features: reason === 'video'
-        ? ['25 videos/month', '100 questions/month']
-        : ['100 questions/month', '25 videos/month'],
-      highlighted: false
-    },
-    {
-      name: 'Creator',
-      price: '$35',
-      icon: <Crown className="w-5 h-5" />,
-      color: 'from-purple-500 to-pink-500',
-      features: reason === 'video'
-        ? ['75 videos/month', '300 questions/month', 'Priority support']
-        : ['300 questions/month', '75 videos/month', 'Priority support'],
-      highlighted: true
-    },
-    {
       name: 'Pro',
-      price: '$89',
-      icon: <Rocket className="w-5 h-5" />,
-      color: 'from-orange-500 to-red-500',
+      price: '€24.99',
+      icon: <Crown className="w-5 h-5" />,
+      color: 'from-blue-500 to-purple-500',
       features: reason === 'video'
-        ? ['200 videos/month', '1000 questions/month', 'API access']
-        : ['1000 questions/month', '200 videos/month', 'API access'],
-      highlighted: false
+        ? ['15 channel imports/month', '500 questions/month', 'On-demand transcripts', 'Priority support', 'Export transcripts', 'Early access to features']
+        : ['500 questions/month', '15 channel imports/month', 'On-demand transcripts', 'Priority support', 'Export transcripts', 'Early access to features'],
+      highlighted: true
     }
   ]
 
   const title = reason === 'video'
-    ? 'Video Limit Reached'
+    ? 'Channel Limit Reached'
     : 'Question Limit Reached'
 
   const description = reason === 'video'
-    ? `You've processed ${currentUsage?.used || 0}/${currentUsage?.limit || 0} videos this month. Upgrade to process more videos and unlock unlimited learning.`
+    ? `You've imported ${currentUsage?.used || 0}/${currentUsage?.limit || 0} channels this month. Upgrade to import more channels and unlock unlimited learning.`
     : `You've asked ${currentUsage?.used || 0}/${currentUsage?.limit || 0} questions this month. Upgrade to ask more questions and get deeper insights.`
 
   return (
@@ -138,8 +118,8 @@ export default function UpgradeModal({ isOpen, onClose, reason, currentUsage }: 
                   <Zap className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="font-medium text-slate-900 text-sm">Process More Videos</h4>
-                  <p className="text-xs text-slate-600">Learn from unlimited YouTube content</p>
+                  <h4 className="font-medium text-slate-900 text-sm">Import More Channels</h4>
+                  <p className="text-xs text-slate-600">Learn from entire YouTube channels</p>
                 </div>
               </div>
               <div className="flex items-start">
