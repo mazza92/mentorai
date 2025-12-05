@@ -46,7 +46,7 @@ export default function Auth() {
 
         if (result.error) {
           // Check for specific error codes
-          if (result.error.code === 'email_already_exists' || 
+          if (result.error.code === 'email_already_exists' ||
               result.error.message?.includes('already registered') ||
               result.error.message?.includes('already exists')) {
             setError(result.error.message || t('auth.error_email_exists'))
@@ -60,24 +60,16 @@ export default function Auth() {
             setError(result.error.message)
           }
         } else {
-          // Check if email was actually sent (user exists but no session means email wasn't sent)
-          if (result.data?.user && !result.data?.session) {
-            // User exists but no email sent - this shouldn't happen with our new logic, but handle it
-            setError('This email is already registered. Please sign in instead.')
-            setTimeout(() => {
-              setIsSignUp(false)
-            }, 3000)
-          } else {
-            // Signup successful - show success message
-            setSuccess(t('auth.success_check_email'))
-            setEmail('')
-            setPassword('')
+          // Signup successful - Supabase returns user but no session until email is confirmed
+          // This is NORMAL behavior for email confirmation flow
+          setSuccess(t('auth.success_check_email'))
+          setEmail('')
+          setPassword('')
 
-            // Track signup event
-            trackEvent('sign_up', {
-              method: 'email'
-            })
-          }
+          // Track signup event
+          trackEvent('sign_up', {
+            method: 'email'
+          })
         }
       } else {
         const result = await signIn(email, password)
