@@ -535,6 +535,7 @@ const QnAPanel = ({
   const [loadingSourceGuide, setLoadingSourceGuide] = useState(false)
   const [promptStartIndex, setPromptStartIndex] = useState(0) // Track which prompts to show
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const lastMessageRef = useRef<HTMLDivElement>(null)
 
   // Dynamic loading messages (NotebookLM/Claude-style)
   const loadingMessages = [
@@ -688,9 +689,18 @@ const QnAPanel = ({
     saveConversationData()
   }, [history, currentConversationId, projectId, userId])
 
-  // Scrolls chat to the bottom on new message
+  // Scrolls to show the start of new messages (better UX for reading AI replies)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (history.length > 0) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        lastMessageRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',  // Show the beginning of the message
+          inline: 'nearest'
+        })
+      }, 100)
+    }
   }, [history])
 
   const handleQuery = async (userQuery: string) => {
@@ -1687,10 +1697,14 @@ const QnAPanel = ({
             {/* Removed Lurnia greeting - only Source Guide needed */}
 
             {history.map((item, index) => (
-              <div key={index} className={`flex ${item.type === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
+              <div
+                key={index}
+                ref={index === history.length - 1 ? lastMessageRef : null}
+                className={`flex ${item.type === 'user' ? 'justify-end' : 'justify-start'} w-full`}
+              >
                 <div className={`max-w-[85%] lg:max-w-[75%] p-3 lg:p-4 rounded-2xl shadow-sm ${
-                  item.type === 'user' 
-                    ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white rounded-br-sm lg:rounded-br-none shadow-lg' 
+                  item.type === 'user'
+                    ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white rounded-br-sm lg:rounded-br-none shadow-lg'
                     : 'bg-slate-50 text-slate-900 rounded-tl-sm lg:rounded-tl-none border border-slate-200/80'
                 }`}>
                   {item.type === 'ai' ? (

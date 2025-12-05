@@ -176,6 +176,30 @@
     "maybe_later": "Peut-être plus tard"
   },
 
+  "upload_mode": {
+    "single_video": "Vidéo seule",
+    "full_channel": "Chaîne complète"
+  },
+
+  "channel": {
+    "import_title": "Importer une chaîne YouTube",
+    "import_subtitle": "Transformez la bibliothèque d'un créateur en votre mentor personnalisé",
+    "import_button": "Importer la chaîne",
+    "importing": "Importation de la chaîne...",
+    "import_failed": "Échec de l'importation",
+    "import_success": "Chaîne importée !",
+    "redirecting": "Redirection vers votre chaîne...",
+    "error_enter_url": "Veuillez entrer une URL de chaîne YouTube valide",
+    "error_invalid_url": "Veuillez entrer une URL de chaîne YouTube valide (ex. : youtube.com/@nomdelachaine)",
+    "error_timeout": "Délai d'attente dépassé. La chaîne est peut-être trop grande. Veuillez réessayer.",
+    "error_failed": "Échec de l'importation de la chaîne. Vérifiez l'URL et réessayez.",
+    "how_it_works": "Comment ça marche :",
+    "step_1": "Nous analysons la chaîne entière (3-5 secondes)",
+    "step_2": "Vous pouvez commencer à poser des questions immédiatement",
+    "step_3": "L'IA synthétise les réponses à travers toutes les vidéos",
+    "example_channels": "Exemples de chaînes :"
+  },
+
   "common": {
     "loading": "Chargement...",
     "back": "Retour",
