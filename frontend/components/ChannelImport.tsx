@@ -5,6 +5,7 @@ import axios from 'axios'
 import { Youtube, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getApiUrl } from '@/lib/apiUrl'
+import { trackEvent } from '@/components/GoogleAnalytics'
 import SignupWall from './SignupWall'
 import UpgradeModal from './UpgradeModal'
 
@@ -163,6 +164,14 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
 
       if (response.data.success) {
         const data = response.data.data
+
+        // Track channel import event
+        trackEvent('channel_import', {
+          channel_id: data.channelId,
+          channel_name: data.channelName,
+          video_count: data.videoCount,
+          user_tier: userId === 'anonymous' || userId.startsWith('anon_') ? 'anonymous' : 'registered'
+        })
 
         // Set project ID to start polling
         setCurrentProjectId(data.projectId)

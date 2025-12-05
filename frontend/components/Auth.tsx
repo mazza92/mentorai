@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
+import { trackEvent } from '@/components/GoogleAnalytics'
 import { Loader2, Mail, Lock, LogIn, UserPlus, Chrome, Zap, Sparkles, Video, MessageSquare, CheckCircle2, ArrowRight } from 'lucide-react'
 
 export default function Auth() {
@@ -70,6 +72,11 @@ export default function Auth() {
             setSuccess(t('auth.success_check_email'))
             setEmail('')
             setPassword('')
+
+            // Track signup event
+            trackEvent('sign_up', {
+              method: 'email'
+            })
           }
         }
       } else {
@@ -80,7 +87,12 @@ export default function Auth() {
         } else {
           // Sign-in successful - redirect immediately
           setSuccess('Signing you in...')
-          
+
+          // Track login event
+          trackEvent('login', {
+            method: 'email'
+          })
+
           // Force redirect - use window.location for more reliable navigation
           setTimeout(() => {
             window.location.href = '/'
@@ -99,6 +111,11 @@ export default function Auth() {
     setLoading(true)
     setError(null)
     try {
+      // Track Google sign-in attempt
+      trackEvent('login', {
+        method: 'google'
+      })
+
       await signInWithGoogle()
       // OAuth redirect will happen, so we don't need to set loading to false
       // The user will be redirected to Google, then back to /auth/callback
@@ -332,7 +349,14 @@ export default function Auth() {
 
           {/* Footer */}
           <p className="mt-6 text-center text-xs text-slate-500">
-            {t('auth.terms_notice')}
+            By continuing, you agree to our{' '}
+            <Link href="/terms" className="text-blue-600 hover:text-blue-700 underline">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="text-blue-600 hover:text-blue-700 underline">
+              Privacy Policy
+            </Link>
           </p>
         </div>
       </div>
