@@ -278,8 +278,8 @@ export default function TermsOfService() {
               If you have questions about these Terms, please contact us:
             </p>
             <div className="bg-purple-50 p-4 rounded-lg">
-              <p className="text-slate-700"><strong>Email:</strong> <a href="mailto:support@lurnia.app" className="text-purple-600 hover:underline">support@lurnia.app</a></p>
-              <p className="text-slate-700"><strong>Legal:</strong> <a href="mailto:legal@lurnia.app" className="text-purple-600 hover:underline">legal@lurnia.app</a></p>
+              <p className="text-slate-700"><strong>Email:</strong> <a href="mailto:team@lurnia.app" className="text-purple-600 hover:underline">team@lurnia.app</a></p>
+              <p className="text-slate-700"><strong>Website:</strong> <a href="https://lurnia.app" className="text-purple-600 hover:underline">lurnia.app</a></p>
             </div>
           </section>
         </div>

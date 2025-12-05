@@ -206,8 +206,8 @@ export default function CookiePolicy() {
               If you have questions about our use of cookies, please contact us:
             </p>
             <div className="bg-orange-50 p-4 rounded-lg">
-              <p className="text-slate-700"><strong>Email:</strong> <a href="mailto:privacy@lurnia.app" className="text-orange-600 hover:underline">privacy@lurnia.app</a></p>
-              <p className="text-slate-700"><strong>Support:</strong> <a href="mailto:support@lurnia.app" className="text-orange-600 hover:underline">support@lurnia.app</a></p>
+              <p className="text-slate-700"><strong>Email:</strong> <a href="mailto:team@lurnia.app" className="text-orange-600 hover:underline">team@lurnia.app</a></p>
+              <p className="text-slate-700"><strong>Website:</strong> <a href="https://lurnia.app" className="text-orange-600 hover:underline">lurnia.app</a></p>
             </div>
           </section>
         </div>

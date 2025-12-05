@@ -42,7 +42,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="mailto:support@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2">
+                <a href="mailto:team@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2">
                   <Mail className="w-4 h-4" />
                   Support
                 </a>
@@ -80,17 +80,17 @@ export default function Footer() {
             <h3 className="text-white font-semibold mb-4">Company</h3>
             <ul className="space-y-3">
               <li>
-                <a href="mailto:contact@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm">
+                <a href="mailto:team@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm">
                   Contact Us
                 </a>
               </li>
               <li>
-                <a href="mailto:support@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm">
+                <a href="mailto:team@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm">
                   Customer Support
                 </a>
               </li>
               <li>
-                <a href="mailto:legal@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm">
+                <a href="mailto:team@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm">
                   Legal Inquiries
                 </a>
               </li>
