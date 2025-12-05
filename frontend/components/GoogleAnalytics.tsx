@@ -1,10 +1,10 @@
 'use client'
 
 import Script from 'next/script'
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
-export default function GoogleAnalytics() {
+function GoogleAnalyticsTracking() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
@@ -24,6 +24,13 @@ export default function GoogleAnalytics() {
       })
     }
   }, [pathname, searchParams, GA_MEASUREMENT_ID])
+
+  return null
+}
+
+export default function GoogleAnalytics() {
+  // Get GA4 measurement ID from environment variables
+  const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
   // Don't render if GA_MEASUREMENT_ID is not set
   if (!GA_MEASUREMENT_ID) {
@@ -70,6 +77,10 @@ export default function GoogleAnalytics() {
           `,
         }}
       />
+      {/* Track page views with Suspense boundary */}
+      <Suspense fallback={null}>
+        <GoogleAnalyticsTracking />
+      </Suspense>
     </>
   )
 }
