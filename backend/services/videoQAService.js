@@ -1529,12 +1529,13 @@ Répondez TOUJOURS en français avec des réponses détaillées et complètes.
         // Map to actual video
         if (videoIndex >= 0 && videoIndex < relevantVideos.length) {
           const video = relevantVideos[videoIndex];
+          const videoId = video.videoId || video.id; // Fallback to id if videoId is missing
           citations.push({
-            videoId: video.videoId,
+            videoId: videoId,
             videoTitle: video.title,
             timestamp: timestamp,
             timestampFormatted: `${minutes}:${seconds.toString().padStart(2, '0')}`,
-            url: `https://www.youtube.com/watch?v=${video.videoId}&t=${timestamp}s`
+            url: `https://www.youtube.com/watch?v=${videoId}&t=${timestamp}s`
           });
         }
       }
@@ -1551,15 +1552,16 @@ Répondez TOUJOURS en français avec des réponses détaillées et complètes.
         // Map to actual video
         if (videoIndex >= 0 && videoIndex < relevantVideos.length) {
           const video = relevantVideos[videoIndex];
+          const videoId = video.videoId || video.id; // Fallback to id if videoId is missing
           // Check for duplicates before adding
-          const exists = citations.some(c => c.videoId === video.videoId && c.timestamp === timestamp);
+          const exists = citations.some(c => c.videoId === videoId && c.timestamp === timestamp);
           if (!exists) {
             citations.push({
-              videoId: video.videoId,
+              videoId: videoId,
               videoTitle: video.title,
               timestamp: timestamp,
               timestampFormatted: `${minutes}:${seconds.toString().padStart(2, '0')}`,
-              url: `https://www.youtube.com/watch?v=${video.videoId}&t=${timestamp}s`
+              url: `https://www.youtube.com/watch?v=${videoId}&t=${timestamp}s`
             });
           }
         }
@@ -1577,15 +1579,16 @@ Répondez TOUJOURS en français avec des réponses détaillées et complètes.
         // Map to actual video
         if (videoIndex >= 0 && videoIndex < relevantVideos.length) {
           const video = relevantVideos[videoIndex];
+          const videoId = video.videoId || video.id; // Fallback to id if videoId is missing
           // Check for duplicates before adding
-          const exists = citations.some(c => c.videoId === video.videoId && c.timestamp === timestamp);
+          const exists = citations.some(c => c.videoId === videoId && c.timestamp === timestamp);
           if (!exists) {
             citations.push({
-              videoId: video.videoId,
+              videoId: videoId,
               videoTitle: video.title,
               timestamp: timestamp,
               timestampFormatted: `${minutes}:${seconds.toString().padStart(2, '0')}`,
-              url: `https://www.youtube.com/watch?v=${video.videoId}&t=${timestamp}s`
+              url: `https://www.youtube.com/watch?v=${videoId}&t=${timestamp}s`
             });
           }
         }
@@ -1603,15 +1606,16 @@ Répondez TOUJOURS en français avec des réponses détaillées et complètes.
         // Map to actual video
         if (videoIndex >= 0 && videoIndex < relevantVideos.length) {
           const video = relevantVideos[videoIndex];
+          const videoId = video.videoId || video.id; // Fallback to id if videoId is missing
           // Check for duplicates before adding
-          const exists = citations.some(c => c.videoId === video.videoId && c.timestamp === timestamp);
+          const exists = citations.some(c => c.videoId === videoId && c.timestamp === timestamp);
           if (!exists) {
             citations.push({
-              videoId: video.videoId,
+              videoId: videoId,
               videoTitle: video.title,
               timestamp: timestamp,
               timestampFormatted: `${minutes}:${seconds.toString().padStart(2, '0')}`,
-              url: `https://www.youtube.com/watch?v=${video.videoId}&t=${timestamp}s`
+              url: `https://www.youtube.com/watch?v=${videoId}&t=${timestamp}s`
             });
           }
         }
@@ -1648,14 +1652,17 @@ Répondez TOUJOURS en français avec des réponses détaillées et complètes.
       // 4. Build sources from relevant videos (all videos with transcripts contributed)
       const sources = relevantVideos
         .filter(v => v.transcript) // Only videos with transcripts
-        .map(v => ({
-          videoId: v.videoId,
-          videoTitle: v.title,
-          thumbnailUrl: v.thumbnailUrl,
-          publishedAt: v.publishedAt,
-          viewCount: v.viewCount,
-          url: `https://www.youtube.com/watch?v=${v.videoId}`
-        }));
+        .map(v => {
+          const videoId = v.videoId || v.id; // Fallback to id if videoId is missing
+          return {
+            videoId: videoId,
+            videoTitle: v.title,
+            thumbnailUrl: v.thumbnailUrl,
+            publishedAt: v.publishedAt,
+            viewCount: v.viewCount,
+            url: `https://www.youtube.com/watch?v=${videoId}`
+          };
+        });
 
       return {
         answer: answer, // Original markdown with <cite> tags
