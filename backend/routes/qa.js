@@ -167,7 +167,8 @@ router.post('/', async (req, res) => {
           success: true,
           answer: qaResult.answer,
           answerHtml: qaResult.answerHtml,
-          citations: qaResult.sources || [], // Channel Q&A returns 'sources' not 'citations'
+          citations: qaResult.sources || [], // Legacy support
+          channelCitations: qaResult.channelCitations || [], // Structured citations for channel mode
           videosAnalyzed: qaResult.videosAnalyzed,
           projectId: projectId,
           questionsRemaining: remainingInfo.remaining
