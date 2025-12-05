@@ -111,6 +111,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     })
 
+    // Check if user already exists (Supabase doesn't always return error for existing emails)
+    // If data.user exists but no session and no error, it means user already exists
+    // and email confirmation wasn't sent (because email is already registered)
+    if (data?.user && !data?.session && !error) {
+      // User already exists - check if email is confirmed
+      const isEmailConfirmed = data.user.email_confirmed_at !== null
+      
+      if (isEmailConfirmed) {
+        // User exists and email is confirmed - they should sign in instead
+        return {
+          error: {
+            message: 'This email is already registered. Please sign in instead.',
+            code: 'email_already_exists'
+          } as any,
+          data: undefined
+        }
+      } else {
+        // User exists but email not confirmed - suggest resending confirmation
+        return {
+          error: {
+            message: 'This email is already registered but not confirmed. Please check your email for the confirmation link, or we can resend it.',
+            code: 'email_not_confirmed'
+          } as any,
+          data: undefined
+        }
+      }
+    }
+
     // If signup successful and user is immediately authenticated (no email confirmation)
     if (data?.session?.user && !error) {
       setUserId(data.session.user.id)

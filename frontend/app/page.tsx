@@ -7,6 +7,7 @@ import ChannelImport from '@/components/ChannelImport'
 import WanderMindViewer from '@/components/WanderMindViewer'
 import ModernHeader from '@/components/ModernHeader'
 import ConversationHistory from '@/components/ConversationHistory'
+import Footer from '@/components/Footer'
 import { Zap } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
@@ -336,6 +337,9 @@ export default function Home() {
               </div>
             </div>
           </main>
+
+          {/* Footer */}
+          <Footer />
         </div>
       </div>
     )
