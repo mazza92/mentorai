@@ -53,7 +53,7 @@ export default function PrivacyPolicy() {
             </p>
             <div className="bg-slate-50 p-4 rounded-lg mt-4">
               <p className="text-slate-700"><strong>Company:</strong> Lurnia</p>
-              <p className="text-slate-700"><strong>Email:</strong> privacy@lurnia.app</p>
+              <p className="text-slate-700"><strong>Email:</strong> team@lurnia.app</p>
             </div>
           </section>
 
@@ -170,7 +170,7 @@ export default function PrivacyPolicy() {
               <li><strong>Right to Withdraw Consent:</strong> Opt out of marketing communications</li>
             </ul>
             <p className="text-slate-700 leading-relaxed mt-4">
-              To exercise your rights, contact us at <a href="mailto:privacy@lurnia.app" className="text-blue-600 hover:underline">privacy@lurnia.app</a>.
+              To exercise your rights, contact us at <a href="mailto:team@lurnia.app" className="text-blue-600 hover:underline">team@lurnia.app</a>.
               We will respond within 30 days.
             </p>
           </section>
@@ -223,8 +223,8 @@ export default function PrivacyPolicy() {
               If you have questions about this Privacy Policy or how we handle your data, please contact us:
             </p>
             <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-slate-700"><strong>Email:</strong> <a href="mailto:privacy@lurnia.app" className="text-blue-600 hover:underline">privacy@lurnia.app</a></p>
-              <p className="text-slate-700"><strong>Support:</strong> <a href="mailto:support@lurnia.app" className="text-blue-600 hover:underline">support@lurnia.app</a></p>
+              <p className="text-slate-700"><strong>Email:</strong> <a href="mailto:team@lurnia.app" className="text-blue-600 hover:underline">team@lurnia.app</a></p>
+              <p className="text-slate-700"><strong>Website:</strong> <a href="https://lurnia.app" className="text-blue-600 hover:underline">lurnia.app</a></p>
             </div>
             <p className="text-slate-700 leading-relaxed mt-4">
               You also have the right to lodge a complaint with your local data protection authority if you believe
