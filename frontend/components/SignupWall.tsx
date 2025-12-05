@@ -54,7 +54,7 @@ export default function SignupWall({ isOpen, onClose, reason, currentUsage, mess
 
   const handleSignUp = () => {
     onClose()
-    router.push('/auth')
+    router.push('/auth?mode=signup')
   }
 
   return (

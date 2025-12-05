@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Mail, Lock, LogIn, UserPlus, Chrome, Zap, Sparkles, Video, MessageSquare, CheckCircle2, ArrowRight } from 'lucide-react'
@@ -10,12 +10,20 @@ export default function Auth() {
   const { t } = useTranslation('common')
   const { user, signIn, signUp, signInWithGoogle, loading: authLoading } = useAuth()
   const router = useRouter()
-  const [isSignUp, setIsSignUp] = useState(false)
+  const searchParams = useSearchParams()
+
+  // Check if mode=signup is in the URL, default to sign in
+  const [isSignUp, setIsSignUp] = useState(searchParams.get('mode') === 'signup')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Update isSignUp when URL changes
+  useEffect(() => {
+    setIsSignUp(searchParams.get('mode') === 'signup')
+  }, [searchParams])
 
   // Redirect to home if user is already logged in
   useEffect(() => {
