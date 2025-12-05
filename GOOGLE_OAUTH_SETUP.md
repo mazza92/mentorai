@@ -30,26 +30,52 @@ This means Google OAuth is not enabled in your Supabase project. Follow the step
 2. Select your project (or create a new one)
 3. Navigate to **APIs & Services** → **Credentials**
 
-### 2.2 Create OAuth 2.0 Client ID
+> **💡 Branding Tip**: Before creating credentials, configure the OAuth consent screen to show "Lurnia" instead of the Supabase domain. See `GOOGLE_OAUTH_BRANDING.md` for detailed instructions.
+
+### 2.2 Configure OAuth Consent Screen (Branding)
+
+**This is what users see when signing in with Google - customize it with Lurnia branding!**
+
+1. Go to **APIs & Services** → **OAuth consent screen**
+2. If not configured, click **+ CREATE** or **EDIT APP**
+
+**Configure the consent screen:**
+
+- **User Type**: External (unless you have a Google Workspace)
+- **App name**: `Lurnia` or `Lurnia.app`
+- **User support email**: Your email address
+- **App logo** (Optional but recommended): Upload Lurnia logo (120x120px, PNG/JPG)
+  - This appears on the Google sign-in page
+  - Use your Lurnia logo with the ⚡ icon
+- **App domain** (Optional): 
+  - Homepage: `https://lurnia.app` (or your production domain)
+  - Privacy policy: `https://lurnia.app/privacy` (if you have one)
+  - Terms of service: `https://lurnia.app/terms` (if you have one)
+- **Authorized domains**: Add your production domain (e.g., `lurnia.app`)
+- **Developer contact information**: Your email address
+- Click **Save and Continue**
+
+**Scopes:**
+- Click **Add or Remove Scopes** → Select:
+  - `.../auth/userinfo.email`
+  - `.../auth/userinfo.profile`
+  - `openid`
+- Click **Save and Continue**
+
+**Test users** (if in testing mode):
+- Add your email and any test user emails
+- Click **Save and Continue** → **Back to Dashboard**
+
+**Important:** After configuring, the Google sign-in page will show "Sign in to Lurnia" instead of the Supabase domain!
+
+### 2.3 Create OAuth 2.0 Client ID
 
 1. Click **+ CREATE CREDENTIALS** → **OAuth client ID**
-2. If prompted, configure the OAuth consent screen first:
-   - **User Type**: External (unless you have a Google Workspace)
-   - **App name**: WanderMind (or your app name)
-   - **User support email**: Your email
-   - **Developer contact information**: Your email
-   - Click **Save and Continue**
-   - **Scopes**: Click **Add or Remove Scopes** → Select:
-     - `.../auth/userinfo.email`
-     - `.../auth/userinfo.profile`
-     - `openid`
-   - Click **Save and Continue**
-   - **Test users** (if in testing mode): Add your email
-   - Click **Save and Continue** → **Back to Dashboard**
+2. If you haven't configured the consent screen yet, you'll be prompted to do so (follow Step 2.2 above)
 
 3. Now create the OAuth Client ID:
    - **Application type**: Web application
-   - **Name**: WanderMind Web Client (or any name)
+   - **Name**: Lurnia Web Client (or any name)
    - **Authorized JavaScript origins**:
      ```
      http://localhost:3000
