@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { Send, Clock, BookOpen, Loader2, Zap, Youtube, ThumbsUp, List, ChevronDown, ChevronUp, CheckCircle, AlertCircle, Menu, X, Video, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { trackEvent } from '@/components/GoogleAnalytics'
 import ConversationHistory from './ConversationHistory'
 import ProcessingProgress from './ProcessingProgress'
 import SignupWall from './SignupWall'
@@ -760,6 +761,15 @@ const QnAPanel = ({
 
       if (response.data.success) {
         const { answer, answerHtml, citations, channelCitations, questionsRemaining } = response.data
+
+        // Track question asked event
+        trackEvent('question_asked', {
+          project_id: projectId,
+          has_answer: !!answer,
+          citations_count: (citations?.length || 0) + (channelCitations?.length || 0),
+          user_tier: userId === 'anonymous' || userId.startsWith('anon_') ? 'anonymous' : 'registered',
+          questions_remaining: questionsRemaining
+        })
 
         // Update questions remaining counter
         if (questionsRemaining !== null && questionsRemaining !== undefined) {
