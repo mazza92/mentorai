@@ -825,10 +825,8 @@ const QnAPanel = ({
           text: `⏳ **Service Temporarily Busy**\n\n${errorData.message || 'Our AI service is experiencing high demand. Please try again in a moment.'}\n\n*This usually resolves within a few seconds.*`,
           timestamp: new Date()
         }
-        setHistory(prev => [...prev, errorEntry])
-
-        // Remove the user message since it failed
-        setHistory(prev => prev.slice(0, -1))
+        // Remove the user message and add error message in one operation
+        setHistory(prev => [...prev.slice(0, -1), errorEntry])
       }
       // Generic errors
       else {
@@ -838,10 +836,8 @@ const QnAPanel = ({
           text: `❌ **Error**\n\n${errorData?.message || errorData?.error || error.message || 'Failed to get answer. Please try again.'}`,
           timestamp: new Date()
         }
-        setHistory(prev => [...prev, errorEntry])
-
-        // Remove the user message since it failed
-        setHistory(prev => prev.slice(0, -1))
+        // Remove the user message and add error message in one operation
+        setHistory(prev => [...prev.slice(0, -1), errorEntry])
       }
     } finally {
       setIsLoading(false)
