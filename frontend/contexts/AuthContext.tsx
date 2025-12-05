@@ -111,42 +111,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     })
 
-    // Check if user already exists (Supabase doesn't always return error for existing emails)
-    // If data.user exists but no session and no error, it means user already exists
-    // and email confirmation wasn't sent (because email is already registered)
-    if (data?.user && !data?.session && !error) {
-      // User already exists - check if email is confirmed
-      const isEmailConfirmed = data.user.email_confirmed_at !== null
-      
-      if (isEmailConfirmed) {
-        // User exists and email is confirmed - they should sign in instead
-        return {
-          error: {
-            message: 'This email is already registered. Please sign in instead.',
-            code: 'email_already_exists'
-          } as any,
-          data: undefined
-        }
-      } else {
-        // User exists but email not confirmed - suggest resending confirmation
-        return {
-          error: {
-            message: 'This email is already registered but not confirmed. Please check your email for the confirmation link, or we can resend it.',
-            code: 'email_not_confirmed'
-          } as any,
-          data: undefined
-        }
-      }
-    }
-
-    // If signup successful and user is immediately authenticated (no email confirmation)
+    // If signup successful and user is immediately authenticated (no email confirmation required)
     if (data?.session?.user && !error) {
       setUserId(data.session.user.id)
       setSession(data.session)
       setUser(data.session.user)
     }
 
-    // Return both error and data so we can check if confirmation email was sent
+    // For email confirmation flow:
+    // - Supabase creates user and sends confirmation email → data.user exists, data.session is null, error is null
+    // - This is NORMAL and SUCCESS - do not treat as error
+
+    // If actual error (email already exists with confirmed account), Supabase will return error object
+    // Trust Supabase's error response
     return { error, data }
   }
 
