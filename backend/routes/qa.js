@@ -174,8 +174,22 @@ router.post('/', async (req, res) => {
         });
       } catch (channelQAError) {
         console.error('Channel Q&A error:', channelQAError);
+
+        // Check if it's a Google API overload/rate limit error
+        const errorMessage = channelQAError.message || '';
+        if (errorMessage.includes('503') || errorMessage.includes('overloaded') ||
+            errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+          return res.status(503).json({
+            error: 'AI service temporarily overloaded',
+            message: 'Our AI service is experiencing high demand. Please try again in a moment.',
+            retryable: true
+          });
+        }
+
+        // Generic error for other failures
         return res.status(500).json({
           error: 'Failed to answer channel question',
+          message: 'An error occurred while processing your question. Please try again.',
           details: process.env.NODE_ENV === 'development' ? channelQAError.message : undefined
         });
       }
@@ -308,8 +322,22 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('Q&A error:', error);
+
+    // Check if it's a Google API overload/rate limit error
+    const errorMessage = error.message || '';
+    if (errorMessage.includes('503') || errorMessage.includes('overloaded') ||
+        errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+      return res.status(503).json({
+        error: 'AI service temporarily overloaded',
+        message: 'Our AI service is experiencing high demand. Please try again in a moment.',
+        retryable: true
+      });
+    }
+
+    // Generic error
     res.status(500).json({
       error: 'Failed to answer question',
+      message: 'An error occurred while processing your question. Please try again.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
