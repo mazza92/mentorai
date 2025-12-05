@@ -5,6 +5,8 @@ import axios from 'axios'
 import { Youtube, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getApiUrl } from '@/lib/apiUrl'
+import SignupWall from './SignupWall'
+import UpgradeModal from './UpgradeModal'
 
 interface ChannelImportProps {
   userId: string
@@ -28,6 +30,16 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const retryCountRef = useRef<number>(0)
+
+  // Modal states for better UX
+  const [showSignupWall, setShowSignupWall] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [quotaUsage, setQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
+
+  // Helper to check if user is anonymous
+  const isAnonymousUser = (userId: string) => {
+    return !userId || userId === 'anonymous' || userId.startsWith('anon_') || userId.startsWith('session_')
+  }
 
   const isValidYouTubeChannelUrl = (url: string) => {
     // Match various YouTube channel URL formats
@@ -183,15 +195,37 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     } catch (err: any) {
       console.error('Channel import error:', err)
 
-      // Handle quota exceeded error
+      // Handle quota exceeded error with user-friendly modals
       if (err.response?.status === 403) {
-        setError(err.response.data.error || 'Channel import limit reached. Please upgrade to Pro.')
+        const errorData = err.response.data
+        const quota = errorData.quota
+
+        // Set quota usage for modal
+        if (quota) {
+          setQuotaUsage({
+            used: quota.used || quota.channelsThisMonth || 1,
+            limit: quota.limit || 1
+          })
+        }
+
+        // Show appropriate modal based on user type
+        if (isAnonymousUser(userId)) {
+          // Anonymous user - show signup wall
+          setShowSignupWall(true)
+        } else {
+          // Authenticated user - show upgrade modal
+          setShowUpgradeModal(true)
+        }
+
+        // Clear the error message (modal will handle UX)
+        setError(null)
       } else if (err.response?.data?.error) {
+        // Other API errors - show user-friendly message
         setError(err.response.data.error)
       } else if (err.code === 'ECONNABORTED') {
-        setError('Request timeout. The channel might be too large. Please try again.')
+        setError(t('channel.error_timeout') || 'Request timeout. The channel might be too large. Please try again.')
       } else {
-        setError('Failed to import channel. Please check the URL and try again.')
+        setError(t('channel.error_failed') || 'Failed to import channel. Please check the URL and try again.')
       }
       setIsImporting(false)
       setCurrentProjectId(null)
@@ -358,6 +392,22 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
           <p>• https://www.youtube.com/@fireship</p>
         </div>
       </div>
+
+      {/* Signup Wall (for anonymous users who hit quota) */}
+      <SignupWall
+        isOpen={showSignupWall}
+        onClose={() => setShowSignupWall(false)}
+        reason="video"
+        currentUsage={quotaUsage}
+      />
+
+      {/* Upgrade Modal (for authenticated users who hit quota) */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        reason="video"
+        currentUsage={quotaUsage}
+      />
     </div>
   )
 }

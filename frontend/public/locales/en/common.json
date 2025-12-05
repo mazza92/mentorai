@@ -190,6 +190,8 @@
     "redirecting": "Redirecting to your channel...",
     "error_enter_url": "Please enter a valid YouTube channel URL",
     "error_invalid_url": "Please enter a valid YouTube channel URL (e.g., youtube.com/@channelname)",
+    "error_timeout": "Request timeout. The channel might be too large. Please try again.",
+    "error_failed": "Failed to import channel. Please check the URL and try again.",
     "how_it_works": "How it works:",
     "step_1": "We analyze the entire channel (3-5 seconds)",
     "step_2": "You can start asking questions immediately",
