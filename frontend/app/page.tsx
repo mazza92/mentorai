@@ -336,11 +336,11 @@ export default function Home() {
                 <ChannelImport userId={userId} onImportComplete={handleProjectCreated} />
               </div>
             </div>
-          </main>
 
-          {/* Footer */}
+          {/* Footer - Only shown on landing page */}
           <Footer />
-        </div>
+        </main>
+      </div>
       </div>
     )
   }
