@@ -43,18 +43,34 @@ export default function Auth() {
         const result = await signUp(email, password)
 
         if (result.error) {
-          // Check if it's a "user already exists" error
-          if (result.error.message?.includes('already registered') ||
+          // Check for specific error codes
+          if (result.error.code === 'email_already_exists' || 
+              result.error.message?.includes('already registered') ||
               result.error.message?.includes('already exists')) {
-            setError(t('auth.error_email_exists'))
+            setError(result.error.message || t('auth.error_email_exists'))
+            // Suggest signing in instead
+            setTimeout(() => {
+              setIsSignUp(false)
+            }, 3000)
+          } else if (result.error.code === 'email_not_confirmed') {
+            setError(result.error.message || 'This email is already registered but not confirmed. Please check your email for the confirmation link.')
           } else {
             setError(result.error.message)
           }
         } else {
-          // Signup successful - show success message
-          setSuccess(t('auth.success_check_email'))
-          setEmail('')
-          setPassword('')
+          // Check if email was actually sent (user exists but no session means email wasn't sent)
+          if (result.data?.user && !result.data?.session) {
+            // User exists but no email sent - this shouldn't happen with our new logic, but handle it
+            setError('This email is already registered. Please sign in instead.')
+            setTimeout(() => {
+              setIsSignUp(false)
+            }, 3000)
+          } else {
+            // Signup successful - show success message
+            setSuccess(t('auth.success_check_email'))
+            setEmail('')
+            setPassword('')
+          }
         }
       } else {
         const result = await signIn(email, password)
