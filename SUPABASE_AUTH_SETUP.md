@@ -52,25 +52,39 @@ This guide will help you configure Supabase authentication properly for WanderCu
    - Development: `http://localhost:3000`
    - Production: `https://your-production-domain.com`
 
-### Step 2: Configure Email Templates (Optional but Recommended)
+### Step 2: Configure Email Templates (Branded Design)
 
-1. Go to **Authentication** → **Email Templates**
-2. Edit the **Confirm Signup** template:
+1. Go to **Authentication** → **Email Templates** in your Supabase Dashboard
+2. Edit the **Confirm Signup** template
+3. Copy the branded HTML template and paste it into the template editor:
+   
+   **Recommended:** Use `email-templates/confirm-signup-supabase.html` (best email client compatibility)
+   
+   **Alternative:** Use `email-templates/confirm-signup.html` (with SVG logo, may have compatibility issues)
 
-   **Recommended Template:**
-   ```html
-   <h2>Confirm your signup</h2>
+   **Key Features of the Branded Template:**
+   - ✅ Matches Lurnia's blue-purple gradient design (`#3b82f6` to `#8b5cf6`)
+   - ✅ Includes logo and branding
+   - ✅ **Fully mobile-responsive** with optimized layouts for phones and tablets
+   - ✅ Responsive design that works in all email clients (Gmail, Outlook, Apple Mail, etc.)
+   - ✅ Clear call-to-action button with gradient styling
+   - ✅ Alternative text link for accessibility
+   - ✅ Onboarding preview showing what users can do next (**YouTube channel import**, ask questions, get insights)
+   - ✅ Professional footer with security information
+   - ✅ **French version available** (`confirm-signup-supabase-fr.html`) for French-speaking users
 
-   <p>Follow this link to confirm your email address and complete your WanderMind account setup:</p>
+   **Important:** 
+   - The template uses `{{ .ConfirmationURL }}` for the confirmation link (required)
+   - The template uses `{{ .SiteURL }}` for footer links (optional)
+   - These variables are automatically replaced by Supabase
 
-   <p><a href="{{ .ConfirmationURL }}">Confirm your email</a></p>
+4. **Test the Template:**
+   - After saving, sign up with a test email address
+   - Check your inbox (and spam folder) for the confirmation email
+   - Verify the design renders correctly
+   - Test the confirmation link to ensure it works
 
-   <p>If you didn't request this, you can safely ignore this email.</p>
-
-   <p>This link expires in 24 hours.</p>
-   ```
-
-3. Make sure the confirmation URL uses `{{ .ConfirmationURL }}` - this will automatically include the correct redirect URL
+   See `email-templates/README.md` for more details and customization options.
 
 ### Step 3: Enable Email Confirmations
 
