@@ -90,7 +90,9 @@ export function trackEvent(eventName: string, eventParams?: Record<string, any>)
  */
 export function trackConversion(conversionName: string, value?: number) {
   if (typeof window !== 'undefined' && (window as any).gtag) {
-    const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+    const GA_MEASUREMENT_ID: string | undefined = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+
+    if (!GA_MEASUREMENT_ID) return
 
     (window as any).gtag('event', 'conversion', {
       'send_to': `${GA_MEASUREMENT_ID}/${conversionName}`,
