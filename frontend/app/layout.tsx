@@ -4,6 +4,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import CookieConsent from '@/components/CookieConsent'
 import GoogleAnalytics from '@/components/GoogleAnalytics'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   title: 'Lurnia - Your AI Learning Companion',
@@ -34,6 +35,7 @@ export default function RootLayout({
             <CookieConsent />
           </AuthProvider>
         </LanguageProvider>
+        <Analytics />
       </body>
     </html>
   )
