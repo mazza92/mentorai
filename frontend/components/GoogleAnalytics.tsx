@@ -4,6 +4,9 @@ import Script from 'next/script'
 import { useEffect, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
+// Google Ads ID - constant for use across all functions
+const GOOGLE_ADS_ID = 'AW-17789946840'
+
 function GoogleAnalyticsTracking() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -31,8 +34,6 @@ function GoogleAnalyticsTracking() {
 export default function GoogleAnalytics() {
   // Get GA4 measurement ID from environment variables
   const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
-  // Google Ads ID (hardcoded as it's campaign-specific)
-  const GOOGLE_ADS_ID = 'AW-17789946840'
 
   // Don't render if GA_MEASUREMENT_ID is not set
   if (!GA_MEASUREMENT_ID) {
@@ -107,8 +108,6 @@ export function trackEvent(eventName: string, eventParams?: Record<string, any>)
  */
 export function trackConversion(conversionLabel: string, value?: number) {
   if (typeof window !== 'undefined' && (window as any).gtag) {
-    const GOOGLE_ADS_ID: string = 'AW-17789946840'
-
     (window as any).gtag('event', 'conversion', {
       'send_to': `${GOOGLE_ADS_ID}/${conversionLabel}`,
       'value': value || 0,
@@ -124,7 +123,7 @@ export function trackConversion(conversionLabel: string, value?: number) {
 export function trackSignupConversion() {
   if (typeof window !== 'undefined' && (window as any).gtag) {
     (window as any).gtag('event', 'conversion', {
-      'send_to': 'AW-17789946840/SIGNUP_LABEL' // Replace SIGNUP_LABEL with actual label from Google Ads
+      'send_to': `${GOOGLE_ADS_ID}/SIGNUP_LABEL` // Replace SIGNUP_LABEL with actual label from Google Ads
     })
   }
 }
@@ -136,7 +135,7 @@ export function trackSignupConversion() {
 export function trackPurchaseConversion(value: number = 24.99) {
   if (typeof window !== 'undefined' && (window as any).gtag) {
     (window as any).gtag('event', 'conversion', {
-      'send_to': 'AW-17789946840/PURCHASE_LABEL', // Replace PURCHASE_LABEL with actual label from Google Ads
+      'send_to': `${GOOGLE_ADS_ID}/PURCHASE_LABEL`, // Replace PURCHASE_LABEL with actual label from Google Ads
       'value': value,
       'currency': 'EUR',
       'transaction_id': Date.now().toString()
