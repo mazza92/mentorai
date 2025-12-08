@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
-import { trackEvent } from '@/components/GoogleAnalytics'
+import { trackEvent, trackSignupConversion } from '@/components/GoogleAnalytics'
 import { Loader2, Mail, Lock, LogIn, UserPlus, Chrome, Zap, Sparkles, Video, MessageSquare, CheckCircle2, ArrowRight } from 'lucide-react'
 
 export default function Auth() {
@@ -66,10 +66,13 @@ export default function Auth() {
           setEmail('')
           setPassword('')
 
-          // Track signup event
+          // Track signup event for analytics
           trackEvent('sign_up', {
             method: 'email'
           })
+
+          // Track conversion for Google Ads
+          trackSignupConversion()
         }
       } else {
         const result = await signIn(email, password)
