@@ -107,7 +107,7 @@ export function trackEvent(eventName: string, eventParams?: Record<string, any>)
  */
 export function trackConversion(conversionLabel: string, value?: number) {
   if (typeof window !== 'undefined' && (window as any).gtag) {
-    const GOOGLE_ADS_ID = 'AW-17789946840'
+    const GOOGLE_ADS_ID: string = 'AW-17789946840'
 
     (window as any).gtag('event', 'conversion', {
       'send_to': `${GOOGLE_ADS_ID}/${conversionLabel}`,
