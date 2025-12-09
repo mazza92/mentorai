@@ -119,23 +119,27 @@ export function trackConversion(conversionLabel: string, value?: number) {
 /**
  * Track signup conversion for Google Ads
  * Call this after successful signup
+ * Using the same purchase conversion label as we only have one conversion set up
  */
 export function trackSignupConversion() {
   if (typeof window !== 'undefined' && (window as any).gtag) {
     (window as any).gtag('event', 'conversion', {
-      'send_to': `${GOOGLE_ADS_ID}/SIGNUP_LABEL` // Replace SIGNUP_LABEL with actual label from Google Ads
+      'send_to': `${GOOGLE_ADS_ID}/IWHqCKPzns4bENiX9KJC`,
+      'value': 0,
+      'currency': 'EUR'
     })
   }
 }
 
 /**
- * Track purchase/upgrade conversion for Google Ads
+ * Track purchase/upgrade conversion for Google Ads (Achat)
  * Call this after successful Pro upgrade
+ * Conversion label from Google Ads: IWHqCKPzns4bENiX9KJC
  */
 export function trackPurchaseConversion(value: number = 24.99) {
   if (typeof window !== 'undefined' && (window as any).gtag) {
     (window as any).gtag('event', 'conversion', {
-      'send_to': `${GOOGLE_ADS_ID}/PURCHASE_LABEL`, // Replace PURCHASE_LABEL with actual label from Google Ads
+      'send_to': `${GOOGLE_ADS_ID}/IWHqCKPzns4bENiX9KJC`,
       'value': value,
       'currency': 'EUR',
       'transaction_id': Date.now().toString()

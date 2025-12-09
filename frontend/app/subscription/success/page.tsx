@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Loader2 } from 'lucide-react'
 import axios from 'axios'
+import { trackPurchaseConversion } from '@/components/GoogleAnalytics'
 
 function SubscriptionSuccessContent() {
   const router = useRouter()
@@ -13,12 +14,15 @@ function SubscriptionSuccessContent() {
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id')
-    
+
     if (!sessionId) {
       setError('No session ID found')
       setLoading(false)
       return
     }
+
+    // Track Google Ads conversion for Pro upgrade
+    trackPurchaseConversion(24.99)
 
     // Verify the session and update user subscription
     // The webhook should have already updated the user, but we can verify here
