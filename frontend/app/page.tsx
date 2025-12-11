@@ -8,9 +8,8 @@ import WanderMindViewer from '@/components/WanderMindViewer'
 import ModernHeader from '@/components/ModernHeader'
 import ConversationHistory from '@/components/ConversationHistory'
 import Footer from '@/components/Footer'
-import { Zap } from 'lucide-react'
+import { Zap, Loader2, CheckCircle, Youtube, MessageSquare, BookOpen, Sparkles, Clock } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Loader2 } from 'lucide-react'
 import axios from 'axios'
 import { Conversation } from '@/lib/conversationStorage'
 import { getSessionId, setUserId as setSessionUserId } from '@/lib/sessionManager'
@@ -318,28 +317,203 @@ export default function Home() {
           </div>
           
           <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-            <div className="container mx-auto px-6 py-16 max-w-3xl">
-              <div className="text-center mb-12">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-500 mb-8 shadow-lg shadow-blue-500/20">
-                  <Zap className="w-10 h-10 text-white" />
-                </div>
-                <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent mb-5">
-                  {t('app_name')}
-                </h1>
-                <p className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-                  {t('homepage_subtitle')}
-                </p>
-              </div>
+            {/* Hero Section */}
+            <div className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-7xl">
+              <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+                {/* Left: Value Proposition */}
+                <div className="text-center lg:text-left">
+                  <div className="inline-flex items-center px-4 py-2 bg-blue-50 rounded-full mb-6">
+                    <Zap className="w-4 h-4 text-blue-600 mr-2" />
+                    <span className="text-sm font-semibold text-blue-600">{t('landing.badge')}</span>
+                  </div>
 
-              {/* Channel Import Only (MVP) */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 md:p-10 border border-slate-200/60 shadow-xl shadow-slate-200/50">
-                <ChannelImport userId={userId} onImportComplete={handleProjectCreated} />
+                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
+                    {t('landing.hero_title')}
+                  </h1>
+
+                  <p className="text-lg sm:text-xl text-slate-600 mb-8 leading-relaxed">
+                    {t('landing.hero_subtitle')}
+                  </p>
+
+                  {/* CTA */}
+                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-slate-200/60 shadow-xl shadow-slate-200/50 mb-6">
+                    <ChannelImport userId={userId} onImportComplete={handleProjectCreated} />
+                  </div>
+
+                  {/* Trust Indicators */}
+                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span>{t('landing.trust_1')}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span>{t('landing.trust_2')}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span>{t('landing.trust_3')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Visual Demo */}
+                <div className="relative lg:block">
+                  <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl p-1 shadow-2xl">
+                    <div className="bg-white rounded-[22px] p-6 sm:p-8">
+                      {/* Mock Chat Interface */}
+                      <div className="space-y-4">
+                        {/* User Message */}
+                        <div className="flex justify-end">
+                          <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%]">
+                            <p className="text-sm">{t('landing.demo_question')}</p>
+                          </div>
+                        </div>
+
+                        {/* AI Response */}
+                        <div className="flex justify-start">
+                          <div className="bg-slate-100 text-slate-900 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
+                            <p className="text-sm mb-3">{t('landing.demo_answer')}</p>
+                            <div className="flex items-center gap-2 text-xs text-blue-600">
+                              <Youtube className="w-4 h-4" />
+                              <span className="font-medium">{t('landing.demo_citation')}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Typing Indicator */}
+                        <div className="flex justify-start">
+                          <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3">
+                            <div className="flex gap-1">
+                              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating Badge */}
+                  <div className="absolute -top-4 -right-4 bg-white rounded-2xl px-4 py-3 shadow-lg border border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-semibold text-slate-900">{t('landing.live_badge')}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-          {/* Footer - Only shown on landing page */}
-          <Footer />
-        </main>
+            {/* How It Works Section */}
+            <div className="bg-slate-50 py-16 sm:py-24">
+              <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+                <div className="text-center mb-16">
+                  <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">{t('landing.how_title')}</h2>
+                  <p className="text-lg text-slate-600 max-w-2xl mx-auto">{t('landing.how_subtitle')}</p>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-8">
+                  {/* Step 1 */}
+                  <div className="bg-white rounded-2xl p-8 text-center shadow-lg hover:shadow-xl transition-shadow">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-2xl mb-6">
+                      <Youtube className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <div className="inline-flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-full font-bold text-sm mb-4">1</div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-3">{t('landing.step1_title')}</h3>
+                    <p className="text-slate-600">{t('landing.step1_desc')}</p>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="bg-white rounded-2xl p-8 text-center shadow-lg hover:shadow-xl transition-shadow">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-2xl mb-6">
+                      <MessageSquare className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <div className="inline-flex items-center justify-center w-8 h-8 bg-purple-600 text-white rounded-full font-bold text-sm mb-4">2</div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-3">{t('landing.step2_title')}</h3>
+                    <p className="text-slate-600">{t('landing.step2_desc')}</p>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="bg-white rounded-2xl p-8 text-center shadow-lg hover:shadow-xl transition-shadow">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-2xl mb-6">
+                      <Zap className="w-8 h-8 text-green-600" />
+                    </div>
+                    <div className="inline-flex items-center justify-center w-8 h-8 bg-green-600 text-white rounded-full font-bold text-sm mb-4">3</div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-3">{t('landing.step3_title')}</h3>
+                    <p className="text-slate-600">{t('landing.step3_desc')}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Benefits Section */}
+            <div className="py-16 sm:py-24">
+              <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+                <div className="text-center mb-16">
+                  <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">{t('landing.benefits_title')}</h2>
+                  <p className="text-lg text-slate-600 max-w-2xl mx-auto">{t('landing.benefits_subtitle')}</p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{t('landing.benefit1_title')}</h3>
+                      <p className="text-slate-600">{t('landing.benefit1_desc')}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <BookOpen className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{t('landing.benefit2_title')}</h3>
+                      <p className="text-slate-600">{t('landing.benefit2_desc')}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{t('landing.benefit3_title')}</h3>
+                      <p className="text-slate-600">{t('landing.benefit3_desc')}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                      <CheckCircle className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{t('landing.benefit4_title')}</h3>
+                      <p className="text-slate-600">{t('landing.benefit4_desc')}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Final CTA */}
+            <div className="bg-gradient-to-br from-blue-600 to-purple-600 py-16 sm:py-24">
+              <div className="container mx-auto px-4 sm:px-6 max-w-4xl text-center">
+                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">{t('landing.cta_title')}</h2>
+                <p className="text-lg sm:text-xl text-blue-100 mb-8 max-w-2xl mx-auto">{t('landing.cta_subtitle')}</p>
+                <a href="#top" className="inline-block px-8 py-4 bg-white text-blue-600 rounded-xl font-bold text-lg hover:bg-blue-50 transition-colors shadow-xl">
+                  {t('landing.cta_button')}
+                </a>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <Footer />
+          </main>
       </div>
       </div>
     )
