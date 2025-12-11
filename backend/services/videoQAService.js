@@ -48,6 +48,59 @@ class VideoQAService {
   }
 
   /**
+   * Retry mechanism with exponential backoff for API calls
+   * Handles 503 Service Unavailable and 429 Rate Limit errors
+   * @param {Function} apiCall - Async function to call
+   * @param {number} maxRetries - Maximum number of retry attempts (default: 5)
+   * @param {number} initialDelay - Initial delay in ms (default: 1000)
+   * @returns {Promise<any>} Result from successful API call
+   */
+  async retryWithBackoff(apiCall, maxRetries = 5, initialDelay = 1000) {
+    let lastError;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Attempt the API call
+        const result = await apiCall();
+
+        // If successful, log and return
+        if (attempt > 0) {
+          console.log(`[VideoQAService] API call succeeded on attempt ${attempt + 1}`);
+        }
+        return result;
+
+      } catch (error) {
+        lastError = error;
+
+        // Check if error is retryable (503 Service Unavailable or 429 Rate Limit)
+        const isRetryable = error.message?.includes('503') ||
+                           error.message?.includes('overloaded') ||
+                           error.message?.includes('429') ||
+                           error.message?.includes('rate limit');
+
+        // If not retryable or last attempt, throw immediately
+        if (!isRetryable || attempt === maxRetries) {
+          console.error(`[VideoQAService] API call failed after ${attempt + 1} attempts:`, error.message);
+          throw error;
+        }
+
+        // Calculate delay with exponential backoff + jitter
+        const baseDelay = initialDelay * Math.pow(2, attempt);
+        const jitter = Math.random() * 1000; // Random jitter 0-1000ms
+        const delay = baseDelay + jitter;
+
+        console.log(`[VideoQAService] API overloaded (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${Math.round(delay)}ms...`);
+
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    // This should never be reached due to throw above, but just in case
+    throw lastError;
+  }
+
+  /**
    * Build context from video analysis for RAG-style retrieval
    * PRIORITIZES TRANSCRIPT for knowledge questions, uses visual analysis as supplementary
    */
@@ -976,50 +1029,20 @@ References: [timestamps]
         const prompt = `${systemInstruction}\n\nQUESTION: ${userQuestion}\n\n${promptInstruction}`;
 
         console.log('Sending Q&A query to Gemini...');
-        
-        // Retry logic for 503 errors (service overloaded)
-        let result;
-        let response;
-        let answer;
-        const maxRetries = 5; // Increased from 3 to 5 for better reliability
-        let retryCount = 0;
-        let lastError;
-        
-        while (retryCount < maxRetries) {
-          try {
-            result = await this.model.generateContent(prompt);
-            response = await result.response;
-            answer = response.text();
-            if (answer && answer.trim()) {
-              console.log('Q&A response received successfully');
-              break; // Success, exit retry loop
-            } else {
-              throw new Error('Empty response from Gemini');
-            }
-          } catch (error) {
-            lastError = error;
-            // Check if it's a 503 error (service overloaded) or rate limit
-            const isRetryable = (error.message && (
-              error.message.includes('503') || 
-              error.message.includes('429') ||
-              error.message.includes('overloaded') ||
-              error.message.includes('rate limit')
-            ));
-            
-            if (isRetryable && retryCount < maxRetries - 1) {
-              retryCount++;
-              // More conservative exponential backoff with jitter: 3-4s, 6-7s, 12-13s
-              const baseDelay = Math.pow(2, retryCount) * 1500;
-              const jitter = Math.random() * 1000; // 0-1s random jitter to avoid thundering herd
-              const waitTime = baseDelay + jitter;
-              console.log(`Gemini API overloaded (${error.message.includes('503') ? '503' : 'rate limit'}). Retrying in ${Math.floor(waitTime/1000)}s... (attempt ${retryCount}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, waitTime));
-              continue;
-            }
-            // If not retryable or max retries reached, throw the error
-            throw error;
+
+        // Use retry mechanism with exponential backoff to handle 503 overload errors
+        const { result, response, answer } = await this.retryWithBackoff(async () => {
+          const result = await this.model.generateContent(prompt);
+          const response = await result.response;
+          const answer = response.text();
+
+          if (!answer || !answer.trim()) {
+            throw new Error('Empty response from Gemini');
           }
-        }
+
+          console.log('Q&A response received successfully');
+          return { result, response, answer };
+        });
 
         // Extract citations (timestamps) from the answer BEFORE enhancing readability
         const citationRegex = /\[(\d+):(\d+)\]/g;
@@ -1201,35 +1224,13 @@ Generate 3-4 SHORT suggested questions (max 10-12 words each) as a JSON array. O
 
         console.log('Generating suggested prompts with Gemini...');
 
-        // Retry logic for 503 errors (service overloaded)
-        let result;
-        let response;
-        let promptsText;
-        const maxRetries = 3;
-        let retryCount = 0;
-
-        while (retryCount < maxRetries) {
-          try {
-            result = await this.model.generateContent(prompt);
-            response = await result.response;
-            promptsText = response.text();
-            break; // Success, exit retry loop
-          } catch (error) {
-            // Check if it's a 503 error (service overloaded)
-            if (error.message && error.message.includes('503') && retryCount < maxRetries - 1) {
-              retryCount++;
-              // More conservative exponential backoff with jitter: 3-4s, 6-7s, 12-13s
-              const baseDelay = Math.pow(2, retryCount) * 1500;
-              const jitter = Math.random() * 1000; // 0-1s random jitter to avoid thundering herd
-              const waitTime = baseDelay + jitter;
-              console.log(`Gemini API overloaded (503) for prompts. Retrying in ${Math.floor(waitTime/1000)}s... (attempt ${retryCount}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, waitTime));
-              continue;
-            }
-            // If not 503 or max retries reached, throw the error
-            throw error;
-          }
-        }
+        // Use retry mechanism with exponential backoff to handle 503 overload errors
+        const { result, response, promptsText } = await this.retryWithBackoff(async () => {
+          const result = await this.model.generateContent(prompt);
+          const response = await result.response;
+          const promptsText = response.text();
+          return { result, response, promptsText };
+        }, 3); // Use 3 retries for prompts (less critical than Q&A)
 
         // Extract JSON from response
         const jsonMatch = promptsText.match(/\[[\s\S]*?\]/);
@@ -1507,9 +1508,13 @@ Répondez TOUJOURS en français avec des réponses détaillées et complètes.
         }
       });
 
-      const result = await modelWithSystem.generateContent(prompt);
-      const response = await result.response;
-      const answer = response.text();
+      // Wrap API call with retry mechanism to handle 503 overload errors
+      const { result, response, answer } = await this.retryWithBackoff(async () => {
+        const result = await modelWithSystem.generateContent(prompt);
+        const response = await result.response;
+        const answer = response.text();
+        return { result, response, answer };
+      });
 
       // Parse citations from the answer BEFORE cleaning
       // Support both new format: <cite video="X" time="MM:SS"></cite>
