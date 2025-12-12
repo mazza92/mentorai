@@ -182,8 +182,8 @@ Avant de lancer, configurer ces conversions dans Google Ads:
 | 6 | `YouTube Devient Ton Prof` | 24 |
 | 7 | `Apprendre 10x Plus Vite` | 23 |
 | 8 | `IA Qui Répond Tes Questions` | 28 |
-| 9 | `Fini les Vidéos de 3 Heures` | 28 |
-| 10 | `Lurnia - Assistant IA` | 21 |
+| 9 | `` | 28 |
+| 10 | `Lurnia - Assistant IA` | 21 |Fini les Vidéos de 3 Heures
 | 11 | `Transforme YouTube en Cours` | 27 |
 | 12 | `Essai Gratuit Sans CB` | 21 |
 | 13 | `Chat avec N'importe Quelle Vidéo` | 30 |
@@ -373,19 +373,150 @@ Assistant IA, Questions-Réponses, Citations sourcées, Timestamps, Multi-vidéo
 
 ### Audiences Personnalisées (à créer)
 
-**Audience 1: "Apprenants YouTube"**
-- Personnes qui ont recherché:
-  - "apprendre sur youtube"
-  - "cours youtube"
-  - "tutoriel youtube"
-  - "formation youtube"
+#### 📍 Où créer les Audiences Personnalisées
 
-**Audience 2: "Utilisateurs d'IA"**
-- Personnes qui ont recherché:
-  - "chatgpt"
-  - "intelligence artificielle"
-  - "outil ia gratuit"
-  - "assistant ia"
+```
+Google Ads → Outils et paramètres (🔧 icône clé) → Bibliothèque partagée → Gestion des audiences
+```
+
+Ou directement: https://ads.google.com/aw/audiences/management
+
+---
+
+#### 🛠️ Comment créer une Audience Personnalisée - Étape par Étape
+
+**Étape 1:** Cliquer sur le bouton bleu **"+"** puis **"Segment personnalisé"**
+
+**Étape 2:** Choisir le type de segment:
+- ✅ Sélectionner: **"Personnes ayant recherché l'un de ces termes sur Google"**
+
+**Étape 3:** Remplir les informations
+
+---
+
+#### Audience 1: "Apprenants YouTube" 
+
+| Champ | Valeur à entrer |
+|-------|-----------------|
+| **Nom du segment** | `Apprenants YouTube - Lurnia` |
+| **Type** | Personnes ayant recherché ces termes |
+
+**Termes de recherche à ajouter** (un par ligne):
+```
+apprendre sur youtube
+cours youtube
+tutoriel youtube
+formation youtube
+formation vidéo youtube
+apprendre avec vidéo
+cours en ligne youtube
+tuto youtube
+vidéo éducative
+youtube éducatif
+```
+
+**Cliquer sur "Enregistrer le segment"**
+
+---
+
+#### Audience 2: "Utilisateurs d'IA"
+
+| Champ | Valeur à entrer |
+|-------|-----------------|
+| **Nom du segment** | `Utilisateurs IA - Lurnia` |
+| **Type** | Personnes ayant recherché ces termes |
+
+**Termes de recherche à ajouter** (un par ligne):
+```
+chatgpt
+intelligence artificielle
+outil ia gratuit
+assistant ia
+ia gratuit
+chatbot ia
+gpt gratuit
+claude ai
+outil intelligence artificielle
+ai assistant
+```
+
+**Cliquer sur "Enregistrer le segment"**
+
+---
+
+#### Audience 3: "Étudiants" (Bonus)
+
+| Champ | Valeur à entrer |
+|-------|-----------------|
+| **Nom du segment** | `Étudiants Révisions - Lurnia` |
+| **Type** | Personnes ayant recherché ces termes |
+
+**Termes de recherche à ajouter** (un par ligne):
+```
+réviser cours
+fiches de révision
+résumé de cours
+aide devoirs
+comprendre cours
+révisions examens
+méthode de travail étudiant
+productivité étudiant
+prendre des notes
+techniques de révision
+```
+
+**Cliquer sur "Enregistrer le segment"**
+
+---
+
+#### 🔗 Comment associer les Audiences à la Campagne
+
+**Après avoir créé les audiences:**
+
+1. **Aller dans votre campagne** → Lurnia_FR_Learning_Assistant_2024
+
+2. **Cliquer sur "Audiences"** dans le menu de gauche
+
+3. **Cliquer sur "Modifier les segments d'audience"** (icône crayon)
+
+4. **Cliquer sur "Parcourir"** → **"Vos segments personnalisés"**
+
+5. **Cocher les 3 audiences créées:**
+   - ✅ Apprenants YouTube - Lurnia
+   - ✅ Utilisateurs IA - Lurnia
+   - ✅ Étudiants Révisions - Lurnia
+
+6. **IMPORTANT - Choisir le paramètre de ciblage:**
+   - ✅ **"Observation"** (recommandé pour commencer)
+   - ❌ Ne PAS choisir "Ciblage" au début
+   
+   > **Pourquoi "Observation"?** Cela permet de collecter des données sur ces audiences sans restreindre la diffusion. Après 2-3 semaines, si une audience performe mieux, vous pourrez augmenter les enchères pour elle.
+
+7. **Cliquer sur "Enregistrer"**
+
+---
+
+#### 📊 Ajuster les Enchères par Audience (Après 2 Semaines)
+
+Une fois que vous avez des données, vous pouvez ajuster les enchères:
+
+1. **Campagne** → **Audiences** → **Vue d'ensemble**
+
+2. Pour chaque audience, regarder:
+   - Taux de conversion
+   - Coût par conversion
+   - CTR
+
+3. **Ajuster les enchères:**
+   - Audience qui convertit bien → **+20% à +50%**
+   - Audience qui convertit mal → **-20% à -50%**
+
+**Exemple:**
+| Audience | Performance | Ajustement |
+|----------|-------------|------------|
+| Utilisateurs IA | Bon CTR, bonnes conversions | +30% |
+| Apprenants YouTube | CTR moyen, conversions OK | +10% |
+| Étudiants | CTR bas, peu de conversions | -20% |
 
 ---
 
