@@ -5,6 +5,7 @@ import axios from 'axios'
 import { Send, Clock, BookOpen, Loader2, Zap, Youtube, ThumbsUp, List, ChevronDown, ChevronUp, CheckCircle, AlertCircle, Menu, X, Video, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { trackEvent } from '@/components/GoogleAnalytics'
+import { trackQuestionAsked, trackAnswerReceived, trackFirstQuestion, trackSignupWallShown } from '@/lib/analytics'
 import ConversationHistory from './ConversationHistory'
 import ProcessingProgress from './ProcessingProgress'
 import SignupWall from './SignupWall'
@@ -706,6 +707,8 @@ const QnAPanel = ({
 
   const handleQuery = async (userQuery: string) => {
     if (!userQuery.trim() || isLoading) return
+    
+    const questionStartTime = Date.now() // Track response time
 
     // Ensure we have a conversation
     if (!currentConversationId) {
@@ -762,13 +765,42 @@ const QnAPanel = ({
       if (response.data.success) {
         const { answer, answerHtml, citations, channelCitations, questionsRemaining } = response.data
 
-        // Track question asked event
+        // Track question asked event (original GA event)
         trackEvent('question_asked', {
           project_id: projectId,
           has_answer: !!answer,
           citations_count: (citations?.length || 0) + (channelCitations?.length || 0),
           user_tier: userId === 'anonymous' || userId.startsWith('anon_') ? 'anonymous' : 'registered',
           questions_remaining: questionsRemaining
+        })
+        
+        // Enhanced question tracking
+        const questionNumber = history.filter(h => h.type === 'user').length + 1
+        const citationCount = (citations?.length || 0) + (channelCitations?.length || 0)
+        
+        // Track first question as key activation event
+        if (questionNumber === 1) {
+          trackFirstQuestion({
+            projectId,
+            questionLength: userQuery.length
+          })
+        }
+        
+        // Track all questions with detailed metrics
+        trackQuestionAsked({
+          projectId,
+          questionNumber,
+          questionLength: userQuery.length,
+          hasAnswer: !!answer,
+          answerSourceCount: citationCount
+        })
+        
+        // Track answer quality
+        trackAnswerReceived({
+          projectId,
+          answerLength: answer?.length || 0,
+          citationCount,
+          responseTime_ms: Date.now() - (questionStartTime || Date.now())
         })
 
         // Update questions remaining counter
@@ -806,6 +838,7 @@ const QnAPanel = ({
           })
           setSignupMessage(errorData.message)
           setShowSignupWall(true)
+          trackSignupWallShown('question_limit')
           
           // Remove the user message since it failed
           setHistory(prev => prev.slice(0, -1))

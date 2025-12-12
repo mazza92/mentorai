@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import axios from 'axios'
 import { Conversation } from '@/lib/conversationStorage'
 import { getSessionId, setUserId as setSessionUserId } from '@/lib/sessionManager'
+import { trackLandingPageView, initScrollTracking, resetScrollTracking, getUTMParams } from '@/lib/analytics'
 
 export default function Home() {
   const { t } = useTranslation()
@@ -46,6 +47,20 @@ export default function Home() {
     }
     return false // No URL param
   }
+
+  // Track landing page view and initialize scroll tracking
+  useEffect(() => {
+    if (!currentProject) {
+      trackLandingPageView()
+      initScrollTracking()
+      
+      // Store UTM params for attribution
+      getUTMParams()
+    }
+    return () => {
+      resetScrollTracking()
+    }
+  }, [currentProject])
 
   useEffect(() => {
     // Check if Supabase is configured

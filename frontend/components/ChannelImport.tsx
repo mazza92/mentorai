@@ -6,6 +6,16 @@ import { Youtube, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getApiUrl } from '@/lib/apiUrl'
 import { trackEvent } from '@/components/GoogleAnalytics'
+import { 
+  trackInputFocus, 
+  trackInputTyping, 
+  trackUrlSubmit, 
+  trackProcessingStart, 
+  trackProcessingComplete,
+  trackSignupWallShown,
+  trackUpgradeModalShown,
+  trackError
+} from '@/lib/analytics'
 import SignupWall from './SignupWall'
 import UpgradeModal from './UpgradeModal'
 
@@ -31,6 +41,8 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const retryCountRef = useRef<number>(0)
+  const processingStartTime = useRef<number>(0)
+  const hasTrackedTyping = useRef<boolean>(false)
 
   // Modal states for better UX
   const [showSignupWall, setShowSignupWall] = useState(false)
@@ -151,6 +163,10 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     setImportStatus(null)
     setProgress(null)
     setCurrentProjectId(null)
+    processingStartTime.current = Date.now()
+
+    // Track URL submission
+    trackUrlSubmit('channel')
 
     try {
       const apiUrl = getApiUrl()
@@ -171,6 +187,14 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
           channel_name: data.channelName,
           video_count: data.videoCount,
           user_tier: userId === 'anonymous' || userId.startsWith('anon_') ? 'anonymous' : 'registered'
+        })
+
+        // Track processing start with enhanced analytics
+        trackProcessingStart({
+          projectId: data.projectId,
+          type: 'channel',
+          channelName: data.channelName,
+          videoCount: data.videoCount
         })
 
         // Set project ID to start polling
@@ -221,9 +245,11 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
         if (isAnonymousUser(userId)) {
           // Anonymous user - show signup wall
           setShowSignupWall(true)
+          trackSignupWallShown('video_limit')
         } else {
           // Authenticated user - show upgrade modal
           setShowUpgradeModal(true)
+          trackUpgradeModalShown('video_limit', quota)
         }
 
         // Clear the error message (modal will handle UX)
@@ -231,10 +257,13 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
       } else if (err.response?.data?.error) {
         // Other API errors - show user-friendly message
         setError(err.response.data.error)
+        trackError('api_error', err.response.data.error, 'channel_import')
       } else if (err.code === 'ECONNABORTED') {
         setError(t('channel.error_timeout') || 'Request timeout. The channel might be too large. Please try again.')
+        trackError('timeout', 'Channel import timeout', 'channel_import')
       } else {
         setError(t('channel.error_failed') || 'Failed to import channel. Please check the URL and try again.')
+        trackError('unknown', err.message || 'Unknown error', 'channel_import')
       }
       setIsImporting(false)
       setCurrentProjectId(null)
@@ -261,7 +290,15 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
         <input
           type="text"
           value={channelUrl}
-          onChange={(e) => setChannelUrl(e.target.value)}
+          onChange={(e) => {
+            setChannelUrl(e.target.value)
+            // Track first typing event only
+            if (!hasTrackedTyping.current && e.target.value.length > 0) {
+              hasTrackedTyping.current = true
+              trackInputTyping()
+            }
+          }}
+          onFocus={() => trackInputFocus()}
           placeholder="https://www.youtube.com/@channelname"
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
           disabled={isImporting}
