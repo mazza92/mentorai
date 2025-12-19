@@ -256,9 +256,9 @@ Pour un consultant posant 30 questions ciblées par mois sur des chaînes de ré
 ## Ressources Complémentaires
 
 ### Pour Aller Plus Loin
-- Guide complet : 7 méthodes pour résumer une vidéo YouTube avec l'IA
-- Transformer une chaîne YouTube en base de connaissances personnalisée
-- 7 façons de gagner du temps sur YouTube avec l'IA
+- **[Guide Complet : 7 Méthodes pour Résumer une Vidéo YouTube avec l'IA](/ressources/resumer-video-youtube-ia-guide-complet)** - Comparatif des meilleures solutions
+- **[Transformer une Chaîne YouTube en Base de Connaissances Personnalisée](/ressources/transformer-chaine-youtube-base-connaissances-ia)** - Créez votre mentor IA
+- **[Top 7 Outils Gratuits pour Transcrire YouTube avec l'IA](/ressources/outil-gratuit-transcription-youtube-ia)** - Comparatif transcription
 
 ### Commencez Gratuitement
 
