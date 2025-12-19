@@ -548,10 +548,11 @@ Au-delà du calcul économique, c'est la qualité de l'apprentissage qui s'amél
 
 ## Ressources Complémentaires
 
-### Pour Aller Plus Loin
-- Guide : Transformer une chaîne YouTube en base de connaissances
-- 7 façons de gagner du temps sur YouTube avec l'IA
-- Comment créer des notes structurées à partir de vidéos YouTube
+### Articles Connexes
+
+- **[Comment Résumer une Vidéo de 1 Heure en 2 Minutes avec l'IA](/ressources/resumer-video-1-heure-ia)** - Guide pratique détaillé
+- **[Comment Poser des Questions à une Vidéo YouTube avec l'IA](/ressources/poser-questions-video-youtube-ia)** - Méthode interactive
+- **[Top 7 Outils Gratuits pour Transcrire YouTube avec l'IA](/ressources/outil-gratuit-transcription-youtube-ia)** - Comparatif complet
 
 ### Commencez Gratuitement
 

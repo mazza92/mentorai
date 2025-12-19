@@ -434,9 +434,9 @@ Pour un consultant résumant 4 vidéos d'1 heure par mois, l'utilisation d'un ou
 ## Ressources Complémentaires
 
 ### Pour Aller Plus Loin
-- Guide complet : 7 méthodes pour résumer une vidéo YouTube avec l'IA
-- Comment poser des questions à une vidéo YouTube avec l'IA
-- Outil gratuit de transcription YouTube avec IA
+- **[Guide Complet : 7 Méthodes pour Résumer une Vidéo YouTube avec l'IA](/ressources/resumer-video-youtube-ia-guide-complet)** - Comparatif détaillé
+- **[Comment Poser des Questions à une Vidéo YouTube avec l'IA](/ressources/poser-questions-video-youtube-ia)** - Guide interactif Q&A
+- **[Top 7 Outils Gratuits pour Transcrire YouTube avec l'IA](/ressources/outil-gratuit-transcription-youtube-ia)** - Solutions de transcription
 
 ### Commencez Gratuitement
 

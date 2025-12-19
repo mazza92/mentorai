@@ -385,9 +385,9 @@ Pour un consultant analysant 20 vidéos par mois, l'utilisation d'un outil de tr
 ## Ressources Complémentaires
 
 ### Pour Aller Plus Loin
-- Comment poser des questions à une vidéo YouTube avec l'IA
-- Guide complet : 7 méthodes pour résumer une vidéo YouTube
-- Transformer une chaîne YouTube en base de connaissances
+- **[Comment Poser des Questions à une Vidéo YouTube avec l'IA](/ressources/poser-questions-video-youtube-ia)** - Q&A interactif
+- **[Guide Complet : 7 Méthodes pour Résumer une Vidéo YouTube avec l'IA](/ressources/resumer-video-youtube-ia-guide-complet)** - Comparatif détaillé
+- **[Transformer une Chaîne YouTube en Base de Connaissances Personnalisée](/ressources/transformer-chaine-youtube-base-connaissances-ia)** - Créez votre mentor IA
 
 ### Commencez Gratuitement
 
