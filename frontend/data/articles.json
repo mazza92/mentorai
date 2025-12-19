@@ -98,17 +98,17 @@
   {
     "id": 7,
     "slug": "gagner-temps-youtube-ia",
-    "title": "7 Façons de Gagner du Temps sur YouTube avec l'Intelligence Artificielle",
-    "metaTitle": "Gagner du Temps sur YouTube avec l'IA: 7 Astuces Incroyables (2025)",
-    "metaDescription": "Économisez 10+ heures par semaine sur YouTube grâce à l'IA. Découvrez 7 astuces testées et approuvées pour apprendre plus vite, résumer des vidéos, extraire l'essentiel.",
-    "excerpt": "L'IA peut vous faire gagner 10+ heures par semaine sur YouTube. Découvrez 7 techniques concrètes pour apprendre plus vite, résumer instantanément et extraire l'essentiel.",
+    "title": "7 Façons de Gagner du Temps sur YouTube avec l'IA",
+    "metaTitle": "7 Façons de Gagner du Temps sur YouTube avec l'IA | Guide Complet 2025",
+    "metaDescription": "Découvrez comment gagner 1 710 heures par an sur YouTube avec l'IA. 7 méthodes concrètes pour transformer votre créateur préféré en mentor IA. ROI calculé avec exemples réels.",
+    "excerpt": "Transformez YouTube d'un puits sans fond en ressource structurée. 7 méthodes éprouvées pour économiser 1 710 heures annuellement et multiplier votre productivité par 20.",
     "category": "Guides Pratiques",
-    "keywords": ["gagner temps youtube", "youtube productivité ia", "astuces youtube ia", "optimiser temps youtube"],
-    "readTime": "9 min",
-    "publishDate": "2025-01-18",
+    "keywords": ["gagner temps youtube ia", "mentor ia youtube", "productivité youtube", "base connaissances youtube"],
+    "readTime": "11 min",
+    "publishDate": "2025-12-18",
     "author": "Équipe Lurnia",
     "featured": true,
-    "priority": 4,
+    "priority": 5,
     "targetVolume": 1600
   },
   {
@@ -158,5 +158,21 @@
     "featured": false,
     "priority": 4,
     "targetVolume": 320
+  },
+  {
+    "id": 11,
+    "slug": "transformer-chaine-youtube-base-connaissances-ia",
+    "title": "Comment Transformer une Chaîne YouTube en Base de Connaissances Personnalisée avec l'IA",
+    "metaTitle": "Transformer Chaîne YouTube en Base de Connaissances IA | Guide 2025",
+    "metaDescription": "Découvrez comment transformer n'importe quelle chaîne YouTube en base de connaissances interrogeable avec l'IA. Créez votre mentor IA personnel. Guide complet 2025.",
+    "excerpt": "Transformez vos YouTubeurs préférés en mentors IA disponibles 24/7. Interrogez des centaines de vidéos instantanément et obtenez des réponses avec timestamps précis.",
+    "category": "Guides Pratiques",
+    "keywords": ["transformer chaîne youtube base connaissances", "mentor ia youtube", "base connaissances youtube", "analyser chaîne youtube ia"],
+    "readTime": "9 min",
+    "publishDate": "2025-12-19",
+    "author": "Équipe Lurnia",
+    "featured": true,
+    "priority": 5,
+    "targetVolume": 420
   }
 ]
