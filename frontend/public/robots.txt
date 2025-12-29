@@ -2,24 +2,27 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /auth/
 Disallow: /settings
 Disallow: /subscription/
+Disallow: /debug-ga
 
 # Sitemap
 Sitemap: https://lurnia.app/sitemap.xml
 
-# Crawl-delay for respectful crawling
-Crawl-delay: 1
-
-# Allow all major search engines
+# Allow all major search engines - no crawl delay for better indexing
 User-agent: Googlebot
 Allow: /
+Allow: /ressources/
 
 User-agent: Bingbot
 Allow: /
+Allow: /ressources/
 
 User-agent: DuckDuckBot
 Allow: /
+Allow: /ressources/
 
 User-agent: Slurp
 Allow: /
+Allow: /ressources/
