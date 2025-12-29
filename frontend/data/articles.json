@@ -174,5 +174,37 @@
     "featured": true,
     "priority": 5,
     "targetVolume": 420
+  },
+  {
+    "id": 12,
+    "slug": "idees-business-youtube-ia-2025",
+    "title": "15 Idées de Business Validées Trouvées sur YouTube avec l'IA (2025)",
+    "metaTitle": "15 Idées Business Validées YouTube + IA | Revenus Prouvés 2025",
+    "metaDescription": "Découvrez 15 idées de business validées avec chiffres réels extraites de 127 chaînes YouTube d'entrepreneurs grâce à l'IA. De 0€ à 15k€ d'investissement. Guide complet 2025.",
+    "excerpt": "J'ai analysé 500 vidéos d'entrepreneurs avec l'IA pour trouver 15 idées de business validées avec preuves de revenus. De la newsletter à 0€ au SaaS à 10k€. Toutes les sources vérifiables.",
+    "category": "Guides Pratiques",
+    "keywords": ["idées business youtube", "business youtube ia", "idées business 2025", "trouver idée business youtube"],
+    "readTime": "13 min",
+    "publishDate": "2025-12-30",
+    "author": "Équipe Lurnia",
+    "featured": true,
+    "priority": 5,
+    "targetVolume": 450
+  },
+  {
+    "id": 13,
+    "slug": "se-former-gratuitement-competence-rentable-30-jours",
+    "title": "Comment Se Former Gratuitement à une Compétence Rentable en 30 Jours (YouTube + IA)",
+    "metaTitle": "Se Former Gratuitement Compétence Rentable 30 Jours | YouTube + IA 2025",
+    "metaDescription": "Méthode complète pour apprendre une compétence freelance rentable (50-150€/h) en 30 jours avec YouTube + IA. Copywriting, dev web, ads... De débutant à 3k€/mois. Guide gratuit 2025.",
+    "excerpt": "De zéro à freelance payé en 30 jours avec YouTube gratuit + IA. 7 compétences rentables (copywriting, montage, ads...), roadmap jour par jour, cas réels 2-4k€ premier mois.",
+    "category": "Guides Pratiques",
+    "keywords": ["se former gratuitement", "apprendre compétence rentable", "formation gratuite freelance", "devenir freelance 30 jours"],
+    "readTime": "14 min",
+    "publishDate": "2025-12-30",
+    "author": "Équipe Lurnia",
+    "featured": true,
+    "priority": 5,
+    "targetVolume": 650
   }
 ]
