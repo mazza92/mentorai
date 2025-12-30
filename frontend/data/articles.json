@@ -206,5 +206,37 @@
     "featured": true,
     "priority": 5,
     "targetVolume": 650
+  },
+  {
+    "id": 14,
+    "slug": "veille-concurrentielle-youtube-ia",
+    "title": "YouTube Comme Outil de Veille Concurrentielle: Guide Complet IA (2025)",
+    "metaTitle": "Veille Concurrentielle YouTube + IA | Espionner Concurrents Légalement 2025",
+    "metaDescription": "Guide complet: utiliser YouTube + IA pour analyser vos concurrents. 7 types d'intelligence extractibles, méthode en 6 étapes, cas ROI réels. Surveillez stratégies, prix, process.",
+    "excerpt": "Vos concurrents dévoilent tout sur YouTube. Découvrez comment extraire leurs stratégies, prix, process et roadmaps avec l'IA. Méthode systématique en 6 étapes + cas d'usage B2B.",
+    "category": "Guides Pratiques",
+    "keywords": ["veille concurrentielle youtube", "analyse concurrents youtube", "espionner concurrents youtube", "intelligence économique youtube"],
+    "readTime": "12 min",
+    "publishDate": "2025-12-30",
+    "author": "Équipe Lurnia",
+    "featured": true,
+    "priority": 4,
+    "targetVolume": 380
+  },
+  {
+    "id": 15,
+    "slug": "creer-cours-en-ligne-youtube-gratuit",
+    "title": "Comment Créer un Cours en Ligne à Partir de YouTube (0€ d'Investissement)",
+    "metaTitle": "Créer Cours en Ligne YouTube Gratuit | 3-10k€ Premier Lancement 2025",
+    "metaDescription": "Méthode complète pour créer et vendre un cours en ligne à partir de YouTube sans investissement. Roadmap 14 jours, pré-vente validée, 3-10k€ première cohorte. Cas réels Sarah 31k€.",
+    "excerpt": "Transformez YouTube gratuit en cours payant 497-997€. Méthode complète de pré-vente: 14 jours de structuration, validation avant création, témoignages réels 6-31k€ en 6 mois.",
+    "category": "Guides Pratiques",
+    "keywords": ["créer cours en ligne gratuit", "transformer youtube en cours", "vendre formation en ligne", "course creation youtube"],
+    "readTime": "11 min",
+    "publishDate": "2025-12-30",
+    "author": "Équipe Lurnia",
+    "featured": true,
+    "priority": 4,
+    "targetVolume": 520
   }
 ]
