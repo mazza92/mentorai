@@ -39,7 +39,7 @@ export default function UpgradeModal({ isOpen, onClose, reason, currentUsage }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between rounded-t-2xl">
           <div>
@@ -57,13 +57,13 @@ export default function UpgradeModal({ isOpen, onClose, reason, currentUsage }: 
 
         {/* Plans Grid */}
         <div className="p-6">
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <div className="flex justify-center mb-6">
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`relative bg-white rounded-xl border-2 p-6 transition-all ${
+                className={`relative bg-white rounded-xl border-2 p-6 transition-all w-full max-w-sm ${
                   plan.highlighted
-                    ? 'border-blue-500 ring-2 ring-blue-200 scale-105'
+                    ? 'border-blue-500 ring-2 ring-blue-200'
                     : 'border-slate-200 hover:border-blue-300'
                 }`}
               >
@@ -110,44 +110,24 @@ export default function UpgradeModal({ isOpen, onClose, reason, currentUsage }: 
           </div>
 
           {/* Benefits Section */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
-            <h3 className="font-semibold text-slate-900 mb-3">Why Upgrade?</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="flex items-start">
-                <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                  <Zap className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-slate-900 text-sm">Import More Channels</h4>
-                  <p className="text-xs text-slate-600">Learn from entire YouTube channels</p>
-                </div>
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
+            <h3 className="font-semibold text-slate-900 mb-3 text-sm">Why Upgrade?</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center">
+                <Zap className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" />
+                <span className="text-xs text-slate-700">More channels</span>
               </div>
-              <div className="flex items-start">
-                <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                  <Crown className="w-4 h-4 text-purple-600" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-slate-900 text-sm">Ask More Questions</h4>
-                  <p className="text-xs text-slate-600">Get deeper insights with more queries</p>
-                </div>
+              <div className="flex items-center">
+                <Crown className="w-4 h-4 text-purple-600 mr-2 flex-shrink-0" />
+                <span className="text-xs text-slate-700">More questions</span>
               </div>
-              <div className="flex items-start">
-                <div className="p-2 bg-green-100 rounded-lg mr-3">
-                  <Check className="w-4 h-4 text-green-600" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-slate-900 text-sm">Priority Support</h4>
-                  <p className="text-xs text-slate-600">Get help when you need it</p>
-                </div>
+              <div className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" />
+                <span className="text-xs text-slate-700">Priority support</span>
               </div>
-              <div className="flex items-start">
-                <div className="p-2 bg-orange-100 rounded-lg mr-3">
-                  <Rocket className="w-4 h-4 text-orange-600" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-slate-900 text-sm">Advanced Features</h4>
-                  <p className="text-xs text-slate-600">Export transcripts, API access & more</p>
-                </div>
+              <div className="flex items-center">
+                <Rocket className="w-4 h-4 text-orange-600 mr-2 flex-shrink-0" />
+                <span className="text-xs text-slate-700">Export & more</span>
               </div>
             </div>
           </div>
