@@ -14,6 +14,8 @@ frontend/out/
 .env.test.local
 .env.production.local
 backend/.env
+backend.env
+*.env
 
 # Logs
 *.log
