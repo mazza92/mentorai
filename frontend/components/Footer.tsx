@@ -42,6 +42,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/ressources" className="text-slate-400 hover:text-white transition-colors text-sm">
+                  Resources & Blog
+                </Link>
+              </li>
+              <li>
                 <a href="mailto:team@lurnia.app" className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2">
                   <Mail className="w-4 h-4" />
                   Support

@@ -173,3 +173,99 @@ body {
   @apply mb-0;
 }
 
+/* Enhanced Article Content Styles */
+.article-content h1 {
+  @apply text-4xl font-bold mt-12 mb-6 text-slate-900 leading-tight;
+  @apply first:mt-0;
+}
+
+.article-content h2 {
+  @apply text-3xl font-bold mt-16 mb-6 text-slate-900 leading-tight border-b-2 border-blue-100 pb-4;
+  @apply first:mt-0;
+  scroll-margin-top: 6rem;
+}
+
+.article-content h3 {
+  @apply text-2xl font-bold mt-12 mb-4 text-blue-700 leading-snug;
+  scroll-margin-top: 6rem;
+}
+
+.article-content h4 {
+  @apply text-xl font-semibold mt-8 mb-3 text-slate-800;
+  scroll-margin-top: 6rem;
+}
+
+.article-content p {
+  @apply mb-6 text-slate-700 leading-[1.8];
+}
+
+.article-content strong {
+  @apply font-bold text-slate-900;
+}
+
+.article-content em {
+  @apply italic text-slate-700;
+}
+
+.article-content a {
+  @apply text-blue-600 font-semibold no-underline border-b-2 border-transparent hover:border-blue-600 transition-all;
+}
+
+.article-content ul {
+  @apply my-8 space-y-3 ml-6;
+  list-style-type: none;
+}
+
+.article-content ul li {
+  @apply text-slate-700 leading-[1.7] pl-0 relative;
+}
+
+.article-content ul li::before {
+  content: "→";
+  @apply text-blue-600 font-bold absolute -left-6;
+}
+
+.article-content ol {
+  @apply my-8 space-y-3 ml-6 list-decimal;
+}
+
+.article-content ol li {
+  @apply text-slate-700 leading-[1.7] pl-2;
+}
+
+.article-content code {
+  @apply bg-blue-50 text-blue-800 px-2 py-1 rounded-md text-sm font-mono border border-blue-200;
+}
+
+.article-content pre {
+  @apply bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto shadow-2xl my-8;
+}
+
+.article-content pre code {
+  @apply bg-transparent text-slate-100 border-0 p-0;
+}
+
+.article-content blockquote {
+  @apply border-l-4 border-blue-600 pl-6 pr-4 py-4 my-8 italic text-slate-600 bg-gradient-to-r from-blue-50 to-transparent rounded-r-xl shadow-sm;
+}
+
+.article-content img {
+  @apply rounded-2xl shadow-xl my-10 w-full;
+}
+
+.article-content hr {
+  @apply my-16 border-slate-300;
+}
+
+.article-content table {
+  @apply w-full my-8 border-collapse border border-slate-300 rounded-lg overflow-hidden;
+}
+
+.article-content th {
+  @apply bg-slate-100 p-3 font-bold text-left border border-slate-300;
+}
+
+.article-content td {
+  @apply p-3 border border-slate-200;
+}
+
