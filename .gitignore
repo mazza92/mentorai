@@ -44,7 +44,39 @@ temp/
 .firebase/
 firebase-debug.log
 
-TECHNICAL_OVERVIEW.md
-
 # YouTube cookies (sensitive)
 backend/cookies.txt
+
+# Internal documentation (keep only README, ARCHITECTURE, SETUP, QUICKSTART, DEPLOYMENT)
+TECHNICAL_OVERVIEW.md
+ENV_SETUP.md
+STRIPE_PAYMENT_TESTING.md
+PAYMENT_SETUP.md
+*_FIX.md
+*_FIXES*.md
+*_GUIDE.md
+*_SETUP.md
+!SETUP.md
+*_OPTIMIZATION*.md
+*_IMPLEMENTATION.md
+*_IMPROVEMENTS.md
+*_TROUBLESHOOTING.md
+*_CHECKLIST.md
+*_SUMMARY.md
+!PROJECT_SUMMARY.md
+QUICK_FIX*.md
+PRODUCTION_READY*.md
+backend/*.md
+!backend/README.md
+frontend/*.md
+!frontend/README.md
+email-templates/*.md
+!email-templates/README.md
+
+# Test files
+test-*.js
+backend/test-*.js
+nul
+
+# Development scripts
+install-*.ps1
