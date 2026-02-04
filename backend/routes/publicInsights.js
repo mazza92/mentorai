@@ -10,6 +10,97 @@ const seoContentService = require('../services/seoContentService');
 const { FieldValue } = require('@google-cloud/firestore');
 
 /**
+ * Generate one public insight for a video (shared by single and batch).
+ * @param {Firestore} firestore
+ * @param {string} videoId
+ * @param {string} channelId
+ * @returns {Promise<{ insightId, slug, videoTitle, channelName, thumbnail, status }>}
+ * @throws if video missing or no transcript
+ */
+async function generateOneInsight(firestore, videoId, channelId) {
+  const videoRef = firestore.collection('channels').doc(channelId).collection('videos').doc(videoId);
+  const videoDoc = await videoRef.get();
+
+  if (!videoDoc.exists) {
+    const err = new Error('Video not found');
+    err.code = 'VIDEO_NOT_FOUND';
+    throw err;
+  }
+
+  const video = videoDoc.data();
+
+  const channelRef = firestore.collection('channels').doc(channelId);
+  const channelDoc = await channelRef.get();
+  const channelName = channelDoc.exists ? channelDoc.data().channelName : 'Unknown Creator';
+
+  if (!video.transcript) {
+    const err = new Error('Video has no transcript. Import the video first.');
+    err.code = 'NO_TRANSCRIPT';
+    throw err;
+  }
+
+  const seoContent = await seoContentService.generateSEOContent(
+    { ...video, videoId },
+    video.transcript,
+    channelName
+  );
+
+  const validation = seoContentService.validateContent(seoContent);
+  if (!validation.valid) {
+    console.warn('[PublicInsights] Validation warnings:', validation.errors);
+  }
+
+  const existingQuery = await firestore.collection('public_insights')
+    .where('videoId', '==', videoId)
+    .limit(1)
+    .get();
+
+  const insightData = {
+    videoId,
+    channelId,
+    slug: seoContent.slug,
+    videoTitle: video.title,
+    channelName,
+    thumbnail: video.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+    duration: video.duration || 0,
+    viewCount: video.viewCount || 0,
+    publishedAt: video.publishedAt || null,
+    seoTitle: seoContent.seoTitle,
+    metaTitle: seoContent.metaTitle,
+    metaDescription: seoContent.metaDescription,
+    quickInsights: seoContent.quickInsights,
+    deepLinks: seoContent.deepLinks,
+    semanticAnalysis: seoContent.semanticAnalysis,
+    conversionQuestions: seoContent.conversionQuestions,
+    faqs: seoContent.faqs,
+    keywords: seoContent.keywords || [],
+    status: 'draft',
+    generatedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  };
+
+  let insightId;
+  if (!existingQuery.empty) {
+    insightId = existingQuery.docs[0].id;
+    await firestore.collection('public_insights').doc(insightId).update(insightData);
+    console.log(`[PublicInsights] Updated existing insight ${insightId}`);
+  } else {
+    const newDoc = await firestore.collection('public_insights').add(insightData);
+    insightId = newDoc.id;
+    console.log(`[PublicInsights] Created new insight ${insightId}`);
+  }
+
+  return {
+    insightId,
+    slug: seoContent.slug,
+    videoTitle: video.title,
+    channelName,
+    thumbnail: insightData.thumbnail,
+    status: 'draft'
+  };
+}
+
+/**
  * POST /api/public-insights/generate
  * Generate SEO content for a video
  * Body: { videoId, channelId }
@@ -28,111 +119,121 @@ router.post('/generate', async (req, res) => {
     console.log(`[PublicInsights] Generating SEO content for video ${videoId} in channel ${channelId}`);
 
     const { firestore } = getFirestore();
+    const result = await generateOneInsight(firestore, videoId, channelId);
 
-    // Fetch video data from Firestore
-    const videoRef = firestore.collection('channels').doc(channelId).collection('videos').doc(videoId);
-    const videoDoc = await videoRef.get();
-
-    if (!videoDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: 'Video not found'
-      });
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        previewUrl: `/resume/${result.slug}`
+      }
+    });
+  } catch (error) {
+    if (error.code === 'VIDEO_NOT_FOUND') {
+      return res.status(404).json({ success: false, error: error.message });
     }
+    if (error.code === 'NO_TRANSCRIPT') {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    console.error('[PublicInsights] Generate error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
-    const video = videoDoc.data();
+/**
+ * POST /api/public-insights/generate-batch
+ * Generate at least N insights for a channel (videos with transcripts, then optionally publish).
+ * Body: { channelId, count?: 10, publish?: false }
+ * Use for SEO: create 10+ pages, set publish: true to make them indexable.
+ */
+router.post('/generate-batch', async (req, res) => {
+  try {
+    const { channelId, count = 10, publish = false } = req.body;
 
-    // Fetch channel data for creator name
-    const channelRef = firestore.collection('channels').doc(channelId);
-    const channelDoc = await channelRef.get();
-    const channelName = channelDoc.exists ? channelDoc.data().channelName : 'Unknown Creator';
-
-    // Check if transcript exists
-    if (!video.transcript) {
+    if (!channelId) {
       return res.status(400).json({
         success: false,
-        error: 'Video has no transcript. Import the video first.'
+        error: 'channelId is required'
       });
     }
 
-    // Generate SEO content
-    const seoContent = await seoContentService.generateSEOContent(
-      { ...video, videoId },
-      video.transcript,
-      channelName
-    );
+    const targetCount = Math.min(Math.max(Number(count) || 10, 1), 50);
 
-    // Validate content
-    const validation = seoContentService.validateContent(seoContent);
-    if (!validation.valid) {
-      console.warn('[PublicInsights] Validation warnings:', validation.errors);
+    console.log(`[PublicInsights] Batch generate: channel ${channelId}, target ${targetCount}, publish=${publish}`);
+
+    const { firestore } = getFirestore();
+
+    const channelRef = firestore.collection('channels').doc(channelId);
+    const channelDoc = await channelRef.get();
+    if (!channelDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Channel not found'
+      });
     }
 
-    // Check if insight already exists for this video
-    const existingQuery = await firestore.collection('public_insights')
-      .where('videoId', '==', videoId)
-      .limit(1)
-      .get();
+    const videosSnap = await channelRef.collection('videos').get();
+    const withTranscript = videosSnap.docs
+      .filter(d => d.data().transcript)
+      .sort((a, b) => (b.data().publishedAt?.toMillis?.() || 0) - (a.data().publishedAt?.toMillis?.() || 0))
+      .slice(0, targetCount);
 
-    let insightId;
-    const insightData = {
-      videoId,
-      channelId,
-      slug: seoContent.slug,
+    if (withTranscript.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No videos with transcripts found for this channel. Import the channel and ensure transcripts are loaded.'
+      });
+    }
 
-      // Video metadata (denormalized)
-      videoTitle: video.title,
-      channelName,
-      thumbnail: video.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      duration: video.duration || 0,
-      viewCount: video.viewCount || 0,
-      publishedAt: video.publishedAt || null,
+    const generated = [];
+    const skipped = [];
+    const errors = [];
 
-      // SEO content
-      seoTitle: seoContent.seoTitle,
-      metaTitle: seoContent.metaTitle,
-      metaDescription: seoContent.metaDescription,
-      quickInsights: seoContent.quickInsights,
-      deepLinks: seoContent.deepLinks,
-      semanticAnalysis: seoContent.semanticAnalysis,
-      conversionQuestions: seoContent.conversionQuestions,
-      faqs: seoContent.faqs,
-      keywords: seoContent.keywords || [],
-
-      // Management
-      status: 'draft',
-      generatedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
-    };
-
-    if (!existingQuery.empty) {
-      // Update existing
-      insightId = existingQuery.docs[0].id;
-      await firestore.collection('public_insights').doc(insightId).update(insightData);
-      console.log(`[PublicInsights] Updated existing insight ${insightId}`);
-    } else {
-      // Create new
-      const newDoc = await firestore.collection('public_insights').add(insightData);
-      insightId = newDoc.id;
-      console.log(`[PublicInsights] Created new insight ${insightId}`);
+    for (const doc of withTranscript) {
+      const videoId = doc.id;
+      try {
+        const result = await generateOneInsight(firestore, videoId, channelId);
+        let status = result.status;
+        if (publish) {
+          await firestore.collection('public_insights').doc(result.insightId).update({
+            status: 'published',
+            publishedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp()
+          });
+          status = 'published';
+        }
+        generated.push({
+          videoId,
+          insightId: result.insightId,
+          slug: result.slug,
+          videoTitle: result.videoTitle,
+          status
+        });
+      } catch (e) {
+        if (e.code === 'NO_TRANSCRIPT') {
+          skipped.push({ videoId, reason: e.message });
+        } else {
+          errors.push({ videoId, error: e.message });
+        }
+      }
     }
 
     res.json({
       success: true,
       data: {
-        id: insightId,
-        slug: seoContent.slug,
-        ...seoContent,
-        videoTitle: video.title,
-        channelName,
-        thumbnail: insightData.thumbnail,
-        status: 'draft',
-        previewUrl: `/resume/${seoContent.slug}`
+        channelId,
+        generated: generated.length,
+        generatedList: generated,
+        skipped: skipped.length,
+        errors: errors.length,
+        errorsList: errors
       }
     });
-
   } catch (error) {
-    console.error('[PublicInsights] Generate error:', error);
+    console.error('[PublicInsights] Generate-batch error:', error);
     res.status(500).json({
       success: false,
       error: error.message
