@@ -78,6 +78,7 @@
 
   "header": {
     "pricing": "Tarifs",
+    "guides": "Guides",
     "settings": "Paramètres",
     "conversations": "Conversations",
     "new_conversation": "Nouvelle conversation",
@@ -231,7 +232,8 @@
     "benefit4_desc": "Votre mentor personnel toujours à disposition. Posez vos questions quand vous voulez, où vous voulez.",
     "cta_title": "Prêt à transformer votre apprentissage ?",
     "cta_subtitle": "Commencez gratuitement dès maintenant. Aucune carte bancaire requise.",
-    "cta_button": "Commencer gratuitement"
+    "cta_button": "Commencer gratuitement",
+    "guides_link": "Découvrir nos guides vidéo"
   },
 
   "common": {

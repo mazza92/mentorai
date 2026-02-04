@@ -8,6 +8,7 @@ import WanderMindViewer from '@/components/WanderMindViewer'
 import ModernHeader from '@/components/ModernHeader'
 import ConversationHistory from '@/components/ConversationHistory'
 import Footer from '@/components/Footer'
+import Link from 'next/link'
 import { Zap, Loader2, CheckCircle, Youtube, MessageSquare, BookOpen, Sparkles, Clock } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import axios from 'axios'
@@ -391,6 +392,14 @@ export default function Home() {
                       <span>{t('landing.trust_3')}</span>
                     </div>
                   </div>
+
+                  {/* Guides link */}
+                  <p className="mt-6 text-center lg:text-left">
+                    <Link href="/resume" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+                      <BookOpen className="w-4 h-4" />
+                      {t('landing.guides_link')}
+                    </Link>
+                  </p>
                 </div>
 
                 {/* Right: Visual Demo */}

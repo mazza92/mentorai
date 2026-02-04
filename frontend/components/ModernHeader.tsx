@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus, Crown, Globe } from 'lucide-react'
+import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus, Crown, Globe, BookOpen } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import ConversationHistory from '@/components/ConversationHistory'
@@ -143,6 +143,15 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
             >
               <Globe className="w-4 h-4" />
               <span className="text-xs uppercase font-semibold">{language}</span>
+            </button>
+
+            {/* Desktop Guides Link (always visible) */}
+            <button
+              onClick={() => router.push('/resume')}
+              className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>{t('header.guides')}</span>
             </button>
 
             {/* Desktop Pricing Link (always visible) */}
@@ -331,6 +340,17 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
                 <Globe className="w-5 h-5 text-blue-500" />
                 <span>{language === 'en' ? 'English' : 'Français'}</span>
                 <span className="ml-auto text-xs uppercase font-semibold text-slate-500">{language}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  router.push('/resume')
+                  setMobileMenuOpen(false)
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                <BookOpen className="w-5 h-5 text-blue-500" />
+                <span>{t('header.guides')}</span>
               </button>
 
               <button
