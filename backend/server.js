@@ -147,6 +147,7 @@ app.use('/api/triple-index', require('./routes/tripleIndexRoutes')); // Triple-l
 app.use('/api/export', require('./routes/export'));
 app.use('/api/subscriptions', subscriptionsRouter); // Stripe subscriptions (webhook is registered above with raw body)
 app.use('/api/channel', channelLimiter, require('./routes/channel')); // YouTube channel import
+app.use('/api/public-insights', require('./routes/publicInsights')); // Public SEO pages (pSEO)
 
 // Test helpers (DEVELOPMENT ONLY - disable in production)
 if (process.env.NODE_ENV !== 'production') {
