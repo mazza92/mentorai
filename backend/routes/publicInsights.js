@@ -202,23 +202,20 @@ router.get('/list', async (req, res) => {
 
     const { firestore } = getFirestore();
 
+    // Simple query without orderBy to avoid needing composite index
+    // Sorting done in memory - fine for small collections
     let query = firestore.collection('public_insights')
-      .where('status', '==', 'published')
-      .orderBy('publishedAt', 'desc')
-      .limit(limit);
+      .where('status', '==', 'published');
 
     if (channelId) {
-      query = firestore.collection('public_insights')
-        .where('status', '==', 'published')
-        .where('channelId', '==', channelId)
-        .orderBy('publishedAt', 'desc')
-        .limit(limit);
+      query = query.where('channelId', '==', channelId);
     }
 
     const snapshot = await query.get();
 
-    const insights = snapshot.docs.map(doc => {
+    let insights = snapshot.docs.map(doc => {
       const data = doc.data();
+      const publishedAt = data.publishedAt?.toDate?.() || new Date(0);
       return {
         id: doc.id,
         slug: data.slug,
@@ -229,10 +226,20 @@ router.get('/list', async (req, res) => {
         thumbnail: data.thumbnail,
         metaTitle: data.metaTitle,
         metaDescription: data.metaDescription,
-        publishedAt: data.publishedAt?.toDate?.()?.toISOString() || null,
+        publishedAt: publishedAt.toISOString(),
+        publishedAtTimestamp: publishedAt.getTime(),
         pageViews: data.pageViews || 0
       };
     });
+
+    // Sort by publishedAt descending (newest first)
+    insights.sort((a, b) => b.publishedAtTimestamp - a.publishedAtTimestamp);
+
+    // Apply limit after sorting
+    insights = insights.slice(0, limit);
+
+    // Remove the timestamp helper field
+    insights = insights.map(({ publishedAtTimestamp, ...rest }) => rest);
 
     res.json({
       success: true,
