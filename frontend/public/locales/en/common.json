@@ -78,6 +78,7 @@
 
   "header": {
     "pricing": "Pricing",
+    "guides": "Guides",
     "settings": "Settings",
     "conversations": "Conversations",
     "new_conversation": "New conversation",
@@ -230,7 +231,8 @@
     "benefit4_desc": "Your personal mentor always ready. Ask your questions whenever and wherever you want.",
     "cta_title": "Ready to transform your learning?",
     "cta_subtitle": "Start free right now. No credit card required.",
-    "cta_button": "Start Free"
+    "cta_button": "Start Free",
+    "guides_link": "Explore our video guides"
   },
 
   "common": {

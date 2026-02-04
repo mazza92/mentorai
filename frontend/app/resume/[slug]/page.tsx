@@ -137,7 +137,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!insight) {
     return {
       title: 'Page non trouvee | Lurnia',
-      description: 'Le resume demande n\'existe pas.'
+      description: 'Le guide demandé n\'existe pas.'
     }
   }
 
@@ -344,7 +344,7 @@ export default async function ResumePage({ params }: { params: { slug: string } 
                 </li>
                 <li>/</li>
                 <li>
-                  <Link href="/resume" className="hover:text-blue-600 transition-colors">Resumes IA</Link>
+                  <Link href="/resume" className="hover:text-blue-600 transition-colors">Guides</Link>
                 </li>
                 <li>/</li>
                 <li className="text-slate-700 truncate max-w-[200px]">{insight.channelName}</li>
@@ -528,7 +528,7 @@ export default async function ResumePage({ params }: { params: { slug: string } 
                 Decouvrez Lurnia
               </h2>
               <p className="text-slate-600 mb-6 max-w-xl mx-auto">
-                Transformez n'importe quelle video YouTube en assistant personnel. Posez des questions, obtenez des resumes instantanes.
+                Transformez n'importe quelle vidéo YouTube en assistant personnel. Posez des questions, obtenez des guides instantanés.
               </p>
               <Link
                 href="/"

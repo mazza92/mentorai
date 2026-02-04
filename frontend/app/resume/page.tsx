@@ -4,11 +4,11 @@ import { ArrowRight, Play, Clock, Eye } from 'lucide-react'
 import Footer from '@/components/Footer'
 
 export const metadata: Metadata = {
-  title: 'Resumes IA de Videos YouTube | Lurnia',
-  description: 'Decouvrez nos resumes IA de videos YouTube populaires. Points cles, timestamps importants et analyses approfondies generes par intelligence artificielle.',
+  title: 'Guides IA de vidéos YouTube | Lurnia',
+  description: 'Découvrez nos guides vidéo YouTube : points clés, timestamps et analyses générés par intelligence artificielle.',
   openGraph: {
-    title: 'Resumes IA de Videos YouTube | Lurnia',
-    description: 'Decouvrez nos resumes IA de videos YouTube populaires.',
+    title: 'Guides IA de vidéos YouTube | Lurnia',
+    description: 'Découvrez nos guides vidéo YouTube.',
     type: 'website'
   },
   alternates: {
@@ -73,10 +73,10 @@ export default async function ResumeDirectoryPage() {
           {/* Hero Section */}
           <div className="text-center mb-16">
             <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-6">
-              Resumes IA de Videos YouTube
+              Guides IA de vidéos YouTube
             </h1>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-              Decouvrez les points cles des meilleures videos YouTube, analyses et resumes par notre intelligence artificielle.
+              Découvrez les points clés des meilleures vidéos YouTube, analysées et synthétisées par notre intelligence artificielle.
             </p>
           </div>
 
@@ -129,13 +129,13 @@ export default async function ResumeDirectoryPage() {
           ) : (
             <div className="text-center py-20">
               <p className="text-slate-500 text-lg mb-6">
-                Aucun resume disponible pour le moment.
+                Aucun guide disponible pour le moment.
               </p>
               <Link
                 href="/"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all"
               >
-                Creer votre premier resume <ArrowRight className="w-5 h-5" />
+                Créer votre premier guide <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
           )}
@@ -143,10 +143,10 @@ export default async function ResumeDirectoryPage() {
           {/* CTA Section */}
           <section className="mt-20 text-center py-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl text-white">
             <h2 className="text-3xl font-bold mb-4">
-              Creez vos propres resumes IA
+              Créez vos propres guides IA
             </h2>
             <p className="text-blue-100 mb-8 max-w-xl mx-auto text-lg">
-              Importez n'importe quelle video YouTube et obtenez un resume intelligent en quelques secondes.
+              Importez n'importe quelle vidéo YouTube et obtenez un guide intelligent en quelques secondes.
             </p>
             <Link
               href="/"
