@@ -135,6 +135,37 @@ FORMAT JSON REQUIS (retourne UNIQUEMENT ce JSON, sans texte avant ou après):
     }
   ],
 
+  "howToSteps": [
+    {
+      "position": 1,
+      "name": "[5-8 mots - titre de l'étape]",
+      "text": "[25-40 mots - instruction actionnable basée sur le contenu de la vidéo]",
+      "timestamp": [secondes correspondant à cette étape],
+      "timestampFormatted": "[MM:SS]"
+    },
+    {
+      "position": 2,
+      "name": "[titre étape 2]",
+      "text": "[instruction étape 2]",
+      "timestamp": [secondes],
+      "timestampFormatted": "[MM:SS]"
+    },
+    {
+      "position": 3,
+      "name": "[titre étape 3]",
+      "text": "[instruction étape 3]",
+      "timestamp": [secondes],
+      "timestampFormatted": "[MM:SS]"
+    },
+    {
+      "position": 4,
+      "name": "[titre étape 4]",
+      "text": "[instruction étape 4]",
+      "timestamp": [secondes],
+      "timestampFormatted": "[MM:SS]"
+    }
+  ],
+
   "semanticAnalysis": "[Paragraphe de 150 mots en markdown. Analyse approfondie du contenu: thèmes principaux, concepts clés, public cible, et valeur ajoutée de la vidéo. Utilise **gras** pour les mots-clés importants. Inclus naturellement les termes SEO pertinents.]",
 
   "conversionQuestions": [
@@ -243,6 +274,10 @@ FORMAT JSON REQUIS (retourne UNIQUEMENT ce JSON, sans texte avant ou après):
 
     if (!content.deepLinks || content.deepLinks.length !== 4) {
       errors.push('deepLinks must have exactly 4 items');
+    }
+
+    if (!content.howToSteps || content.howToSteps.length < 3 || content.howToSteps.length > 5) {
+      errors.push('howToSteps must have 3-5 items');
     }
 
     if (!content.conversionQuestions || content.conversionQuestions.length !== 3) {

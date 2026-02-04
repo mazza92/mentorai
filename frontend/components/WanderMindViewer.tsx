@@ -25,6 +25,8 @@ interface WanderMindViewerProps {
   projectId: string
   userId: string
   onNewConversation?: () => void
+  initialTimestamp?: number | null
+  initialQuestion?: string | null
 }
 
 interface TranscriptLine {
@@ -509,7 +511,8 @@ const QnAPanel = ({
   onSelectConversation,
   metadata,
   mobileContextOpen,
-  setMobileContextOpen
+  setMobileContextOpen,
+  initialQuestion
 }: {
   projectId: string
   userId: string
@@ -522,6 +525,7 @@ const QnAPanel = ({
   metadata?: VideoMetadata
   mobileContextOpen?: boolean
   setMobileContextOpen?: (open: boolean) => void
+  initialQuestion?: string | null
 }) => {
   const { t } = useTranslation('common')
   const [query, setQuery] = useState('')
@@ -595,6 +599,14 @@ const QnAPanel = ({
     }
     loadConversation()
   }, [projectId, userId]) // Only reload when projectId or userId changes
+
+  // Handle pre-filled question from pSEO deep links
+  useEffect(() => {
+    if (initialQuestion && !history.length) {
+      console.log('[QnAPanel] Pre-filling question from deep link:', initialQuestion)
+      setQuery(initialQuestion)
+    }
+  }, [initialQuestion, history.length])
 
   // Load source guide from project or fetch if not available
   useEffect(() => {
@@ -1873,7 +1885,7 @@ const QnAPanel = ({
 }
 
 // Main WanderMind Viewer Component
-export default function WanderMindViewer({ projectId, userId, onNewConversation }: WanderMindViewerProps) {
+export default function WanderMindViewer({ projectId, userId, onNewConversation, initialTimestamp, initialQuestion }: WanderMindViewerProps) {
   const { t } = useTranslation('common')
   const [project, setProject] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -1943,6 +1955,14 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
   useEffect(() => {
     projectNotFoundRef.current = projectNotFound
   }, [projectNotFound])
+
+  // Handle deep link timestamp from pSEO pages
+  useEffect(() => {
+    if (initialTimestamp && initialTimestamp > 0 && !loading) {
+      console.log('[WanderMindViewer] Setting initial timestamp:', initialTimestamp)
+      setHighlightedTime(initialTimestamp)
+    }
+  }, [initialTimestamp, loading])
 
   useEffect(() => {
     // Reset topics fetched flag when project changes
@@ -2571,6 +2591,7 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
             metadata={metadata}
             mobileContextOpen={mobileContextOpen}
             setMobileContextOpen={setMobileContextOpen}
+            initialQuestion={initialQuestion}
           />
         </div>
       </div>
@@ -2606,6 +2627,7 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation 
           metadata={metadata}
           mobileContextOpen={mobileContextOpen}
           setMobileContextOpen={setMobileContextOpen}
+          initialQuestion={initialQuestion}
         />
       </div>
 
