@@ -23,12 +23,33 @@ export default function Home() {
   const [userId, setUserId] = useState<string>('anonymous')
   const [isInitialized, setIsInitialized] = useState(false)
 
+  // Deep link parameters for pSEO pages
+  const [initialTimestamp, setInitialTimestamp] = useState<number | null>(null)
+  const [initialQuestion, setInitialQuestion] = useState<string | null>(null)
+
   // Function to check URL and update project
   const checkUrlAndSetProject = (effectiveUserId?: string) => {
     if (typeof window === 'undefined') return
 
     const urlParams = new URLSearchParams(window.location.search)
     const projectParam = urlParams.get('project')
+
+    // Parse deep link parameters for pSEO pages
+    const timestampParam = urlParams.get('t')
+    const questionParam = urlParams.get('question')
+
+    // Set timestamp if valid
+    if (timestampParam) {
+      const timestamp = parseInt(timestampParam, 10)
+      if (!isNaN(timestamp) && timestamp > 0) {
+        setInitialTimestamp(timestamp)
+      }
+    }
+
+    // Set question if present
+    if (questionParam) {
+      setInitialQuestion(decodeURIComponent(questionParam))
+    }
 
     if (projectParam) {
       // URL param always wins - update even if currentProject is already set
@@ -545,10 +566,12 @@ export default function Home() {
       />
       
       <div className="flex-1 overflow-hidden">
-        <WanderMindViewer 
-          projectId={currentProject} 
+        <WanderMindViewer
+          projectId={currentProject}
           userId={userId}
           onNewConversation={handleNewProject}
+          initialTimestamp={initialTimestamp}
+          initialQuestion={initialQuestion}
         />
       </div>
     </div>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Play, ExternalLink, ArrowRight, Clock, Eye, MessageCircle, ChevronDown } from 'lucide-react'
 import Footer from '@/components/Footer'
+import FloatingAskWidget from '@/components/FloatingAskWidget'
 
 // Types
 interface QuickInsight {
@@ -29,6 +30,14 @@ interface FAQ {
   answer: string
 }
 
+interface HowToStep {
+  position: number
+  name: string
+  text: string
+  timestamp: number
+  timestampFormatted: string
+}
+
 interface PublicInsight {
   id: string
   slug: string
@@ -44,11 +53,21 @@ interface PublicInsight {
   metaDescription: string
   quickInsights: QuickInsight[]
   deepLinks: DeepLink[]
+  howToSteps?: HowToStep[]
   semanticAnalysis: string
   conversionQuestions: ConversionQuestion[]
   faqs: FAQ[]
   keywords: string[]
   publishedAt: string | null
+}
+
+// Related insight summary for internal linking
+interface RelatedInsight {
+  id: string
+  slug: string
+  videoTitle: string
+  thumbnail: string
+  channelName: string
 }
 
 // Fetch data
@@ -66,6 +85,28 @@ async function getInsight(slug: string): Promise<PublicInsight | null> {
   } catch (error) {
     console.error('Failed to fetch insight:', error)
     return null
+  }
+}
+
+// Fetch related insights from same channel
+async function getRelatedInsights(channelId: string, currentSlug: string): Promise<RelatedInsight[]> {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+  try {
+    const res = await fetch(`${API_URL}/api/public-insights/list?channelId=${channelId}&limit=7`, {
+      next: { revalidate: 3600 }
+    })
+
+    if (!res.ok) return []
+    const data = await res.json()
+
+    // Filter out current video and limit to 6
+    return (data.data || [])
+      .filter((i: RelatedInsight) => i.slug !== currentSlug)
+      .slice(0, 6)
+  } catch (error) {
+    console.error('Failed to fetch related insights:', error)
+    return []
   }
 }
 
@@ -179,6 +220,9 @@ export default async function ResumePage({ params }: { params: { slug: string } 
     notFound()
   }
 
+  // Fetch related insights from same channel
+  const relatedInsights = await getRelatedInsights(insight.channelId, insight.slug)
+
   // Schema.org structured data
   const articleSchema = {
     "@context": "https://schema.org",
@@ -227,6 +271,23 @@ export default async function ResumePage({ params }: { params: { slug: string } 
     }))
   }
 
+  // HowTo schema for featured snippets (Position 0)
+  const howToSchema = insight.howToSteps && insight.howToSteps.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": `Comment comprendre "${insight.videoTitle}" en quelques minutes`,
+    "description": insight.metaDescription,
+    "image": insight.thumbnail,
+    "totalTime": `PT${Math.floor(insight.duration / 60)}M`,
+    "step": insight.howToSteps.map(step => ({
+      "@type": "HowToStep",
+      "position": step.position,
+      "name": step.name,
+      "text": step.text,
+      "url": `https://lurnia.app/resume/${insight.slug}#step-${step.position}`
+    }))
+  } : null
+
   return (
     <>
       <Script
@@ -244,6 +305,13 @@ export default async function ResumePage({ params }: { params: { slug: string } 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
+      {howToSchema && (
+        <Script
+          id="howto-schema"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+        />
+      )}
 
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
         {/* Header */}
@@ -418,6 +486,42 @@ export default async function ResumePage({ params }: { params: { slug: string } 
               <FAQAccordion faqs={insight.faqs} />
             </section>
 
+            {/* More from Creator - Internal Linking */}
+            {relatedInsights.length > 0 && (
+              <section className="mb-12">
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                  <span className="text-2xl">&#127909;</span> Plus de {insight.channelName}
+                </h2>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {relatedInsights.map((related) => (
+                    <Link
+                      key={related.id}
+                      href={`/resume/${related.slug}`}
+                      className="group bg-white rounded-xl overflow-hidden border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all"
+                    >
+                      <div className="relative aspect-video">
+                        <img
+                          src={related.thumbnail}
+                          alt={related.videoTitle}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
+                            <Play className="w-5 h-5 text-blue-600 ml-0.5" fill="currentColor" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-semibold text-slate-900 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors">
+                          {related.videoTitle}
+                        </h3>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Final CTA */}
             <section className="text-center py-12 border-t border-slate-200">
               <h2 className="text-2xl font-bold text-slate-900 mb-4">
@@ -439,6 +543,14 @@ export default async function ResumePage({ params }: { params: { slug: string } 
 
         <Footer />
       </div>
+
+      {/* Floating Ask Widget */}
+      <FloatingAskWidget
+        videoId={insight.videoId}
+        videoTitle={insight.videoTitle}
+        channelName={insight.channelName}
+        conversionQuestions={insight.conversionQuestions}
+      />
     </>
   )
 }
