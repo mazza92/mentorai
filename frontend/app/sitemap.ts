@@ -1,7 +1,22 @@
 import { MetadataRoute } from 'next'
 import articlesData from '@/data/articles.json'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+async function getPublishedGuides(): Promise<{ slug: string; publishedAt: string }[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/public-insights/list?limit=100`, {
+      next: { revalidate: 3600 }
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.data || []
+  } catch {
+    return []
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://lurnia.app'
 
   // Static pages
@@ -30,12 +45,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 0.8,
     },
-    {
-      url: `${baseUrl}/settings`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
   ]
 
   // Dynamic article pages
@@ -46,5 +55,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: article.featured ? 0.9 : 0.7,
   }))
 
-  return [...staticPages, ...articlePages]
+  // Dynamic guide pages (pSEO - fetched from API)
+  const guides = await getPublishedGuides()
+  const guidePages: MetadataRoute.Sitemap = guides.map(guide => ({
+    url: `${baseUrl}/guides/${guide.slug}`,
+    lastModified: guide.publishedAt ? new Date(guide.publishedAt) : new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.8,
+  }))
+
+  return [...staticPages, ...articlePages, ...guidePages]
 }
