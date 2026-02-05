@@ -10,19 +10,23 @@ Disallow: /debug-ga
 # Sitemap
 Sitemap: https://lurnia.app/sitemap.xml
 
-# Allow all major search engines - no crawl delay for better indexing
+# Allow all major search engines - explicit allow for SEO content
 User-agent: Googlebot
 Allow: /
+Allow: /guides/
 Allow: /ressources/
 
 User-agent: Bingbot
 Allow: /
+Allow: /guides/
 Allow: /ressources/
 
 User-agent: DuckDuckBot
 Allow: /
+Allow: /guides/
 Allow: /ressources/
 
 User-agent: Slurp
 Allow: /
+Allow: /guides/
 Allow: /ressources/

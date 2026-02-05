@@ -271,6 +271,37 @@ export default async function GuidePage({ params }: { params: { slug: string } }
     }))
   }
 
+  // BreadcrumbList schema for Google breadcrumb display
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Accueil",
+        "item": "https://lurnia.app"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Guides",
+        "item": "https://lurnia.app/guides"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": insight.channelName,
+        "item": `https://lurnia.app/guides?channelId=${insight.channelId}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 4,
+        "name": insight.seoTitle
+      }
+    ]
+  }
+
   // HowTo schema for featured snippets (Position 0)
   const howToSchema = insight.howToSteps && insight.howToSteps.length > 0 ? {
     "@context": "https://schema.org",
@@ -304,6 +335,11 @@ export default async function GuidePage({ params }: { params: { slug: string } }
         id="faq-schema"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <Script
+        id="breadcrumb-schema"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
       {howToSchema && (
         <Script
