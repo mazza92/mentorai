@@ -395,7 +395,7 @@ export default function Home() {
 
                   {/* Guides link */}
                   <p className="mt-6 text-center lg:text-left">
-                    <Link href="/resume" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+                    <Link href="/guides" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
                       <BookOpen className="w-4 h-4" />
                       {t('landing.guides_link')}
                     </Link>

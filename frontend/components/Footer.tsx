@@ -32,7 +32,7 @@ export default function Footer() {
             <h3 className="text-white font-semibold mb-4">Product</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/resume" className="text-slate-400 hover:text-white transition-colors text-sm">
+                <Link href="/guides" className="text-slate-400 hover:text-white transition-colors text-sm">
                   {t('header.guides')}
                 </Link>
               </li>

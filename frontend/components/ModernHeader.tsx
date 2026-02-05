@@ -147,7 +147,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
 
             {/* Desktop Guides Link (always visible) */}
             <button
-              onClick={() => router.push('/resume')}
+              onClick={() => router.push('/guides')}
               className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700"
             >
               <BookOpen className="w-4 h-4" />
@@ -344,7 +344,7 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
 
               <button
                 onClick={() => {
-                  router.push('/resume')
+                  router.push('/guides')
                   setMobileMenuOpen(false)
                 }}
                 className="w-full flex items-center space-x-3 px-4 py-3 text-left text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
