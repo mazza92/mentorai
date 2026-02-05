@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     type: 'website'
   },
   alternates: {
-    canonical: 'https://lurnia.app/resume'
+    canonical: 'https://lurnia.app/guides'
   }
 }
 
@@ -43,7 +43,7 @@ async function getInsights(): Promise<InsightSummary[]> {
   }
 }
 
-export default async function ResumeDirectoryPage() {
+export default async function GuidesDirectoryPage() {
   const insights = await getInsights()
 
   return (
@@ -86,7 +86,7 @@ export default async function ResumeDirectoryPage() {
               {insights.map((insight) => (
                 <Link
                   key={insight.id}
-                  href={`/resume/${insight.slug}`}
+                  href={`/guides/${insight.slug}`}
                   className="group bg-white rounded-2xl overflow-hidden border border-slate-200 hover:border-blue-300 hover:shadow-xl transition-all"
                 >
                   {/* Thumbnail */}

@@ -70,6 +70,7 @@ async function generateOneInsight(firestore, videoId, channelId) {
     metaDescription: seoContent.metaDescription,
     quickInsights: seoContent.quickInsights,
     deepLinks: seoContent.deepLinks,
+    howToSteps: seoContent.howToSteps || [],
     semanticAnalysis: seoContent.semanticAnalysis,
     conversionQuestions: seoContent.conversionQuestions,
     faqs: seoContent.faqs,
@@ -125,7 +126,7 @@ router.post('/generate', async (req, res) => {
       success: true,
       data: {
         ...result,
-        previewUrl: `/resume/${result.slug}`
+        previewUrl: `/guides/${result.slug}`
       }
     });
   } catch (error) {
@@ -436,7 +437,7 @@ router.post('/publish/:id', async (req, res) => {
         id,
         slug: data.slug,
         status: 'published',
-        publicUrl: `https://lurnia.app/resume/${data.slug}`
+        publicUrl: `https://lurnia.app/guides/${data.slug}`
       }
     });
 
@@ -496,7 +497,7 @@ router.get('/sitemap', async (req, res) => {
     const urls = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        loc: `https://lurnia.app/resume/${data.slug}`,
+        loc: `https://lurnia.app/guides/${data.slug}`,
         lastmod: data.updatedAt?.toDate?.()?.toISOString()?.split('T')[0] ||
                  data.publishedAt?.toDate?.()?.toISOString()?.split('T')[0] ||
                  new Date().toISOString().split('T')[0],

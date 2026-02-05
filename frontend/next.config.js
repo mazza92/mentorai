@@ -6,6 +6,9 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Legacy /resume -> /guides
+      { source: '/resume', destination: '/guides', permanent: true },
+      { source: '/resume/:path*', destination: '/guides/:path*', permanent: true },
       // Redirect www to non-www
       {
         source: '/:path*',

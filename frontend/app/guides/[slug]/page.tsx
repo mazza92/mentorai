@@ -159,7 +159,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       images: [insight.thumbnail]
     },
     alternates: {
-      canonical: `https://lurnia.app/resume/${insight.slug}`
+      canonical: `https://lurnia.app/guides/${insight.slug}`
     },
     robots: {
       index: true,
@@ -213,7 +213,7 @@ function FAQAccordion({ faqs }: { faqs: FAQ[] }) {
 }
 
 // Page component
-export default async function ResumePage({ params }: { params: { slug: string } }) {
+export default async function GuidePage({ params }: { params: { slug: string } }) {
   const insight = await getInsight(params.slug)
 
   if (!insight) {
@@ -243,7 +243,7 @@ export default async function ResumePage({ params }: { params: { slug: string } 
       }
     },
     "datePublished": insight.publishedAt,
-    "mainEntityOfPage": `https://lurnia.app/resume/${insight.slug}`
+    "mainEntityOfPage": `https://lurnia.app/guides/${insight.slug}`
   }
 
   const videoSchema = {
@@ -284,7 +284,7 @@ export default async function ResumePage({ params }: { params: { slug: string } 
       "position": step.position,
       "name": step.name,
       "text": step.text,
-      "url": `https://lurnia.app/resume/${insight.slug}#step-${step.position}`
+      "url": `https://lurnia.app/guides/${insight.slug}#step-${step.position}`
     }))
   } : null
 
@@ -344,7 +344,7 @@ export default async function ResumePage({ params }: { params: { slug: string } 
                 </li>
                 <li>/</li>
                 <li>
-                  <Link href="/resume" className="hover:text-blue-600 transition-colors">Guides</Link>
+                  <Link href="/guides" className="hover:text-blue-600 transition-colors">Guides</Link>
                 </li>
                 <li>/</li>
                 <li className="text-slate-700 truncate max-w-[200px]">{insight.channelName}</li>
@@ -496,7 +496,7 @@ export default async function ResumePage({ params }: { params: { slug: string } 
                   {relatedInsights.map((related) => (
                     <Link
                       key={related.id}
-                      href={`/resume/${related.slug}`}
+                      href={`/guides/${related.slug}`}
                       className="group bg-white rounded-xl overflow-hidden border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all"
                     >
                       <div className="relative aspect-video">
