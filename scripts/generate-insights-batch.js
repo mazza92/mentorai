@@ -4,11 +4,19 @@
  * Generate public insights in batch for a channel (for SEO indexing).
  *
  * Usage:
- *   node scripts/generate-insights-batch.js <channelId> [--count=10] [--publish]
+ *   node scripts/generate-insights-batch.js <channelId> [options]
+ *
+ * Options:
+ *   --count=N        Max insights to generate (default: 10, max: 200)
+ *   --all            Process all available videos (sets count=200)
+ *   --publish        Auto-publish generated insights
+ *   --skip-existing  Skip videos that already have insights (recommended)
+ *   --stats          Show channel stats only (no generation)
  *
  * Examples:
- *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg
- *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --count=10 --publish
+ *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --stats
+ *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --all --skip-existing --publish
+ *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --count=50 --skip-existing --publish
  *
  * Env:
  *   BACKEND_URL  Base URL of the API (default: production)
@@ -16,24 +24,61 @@
 
 const channelId = process.argv[2];
 const countArg = process.argv.find((a) => a.startsWith('--count='));
-const count = countArg ? parseInt(countArg.split('=')[1], 10) || 10 : 10;
+const useAll = process.argv.includes('--all');
+const count = useAll ? 200 : (countArg ? parseInt(countArg.split('=')[1], 10) || 10 : 10);
 const publish = process.argv.includes('--publish');
+const skipExisting = process.argv.includes('--skip-existing');
+const statsOnly = process.argv.includes('--stats');
 
 const defaultUrl = 'https://mentorai-production.up.railway.app';
 const baseUrl = (process.env.BACKEND_URL || defaultUrl).replace(/\/$/, '');
 
+// ANSI colors for terminal output
+const colors = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  red: '\x1b[31m',
+  magenta: '\x1b[35m'
+};
+
+function c(color, text) {
+  return `${colors[color]}${text}${colors.reset}`;
+}
+
 if (!channelId || channelId.startsWith('--')) {
-  console.error('Usage: node scripts/generate-insights-batch.js <channelId> [--count=10] [--publish]');
-  console.error('Example: node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --count=10 --publish');
+  console.error('Usage: node scripts/generate-insights-batch.js <channelId> [options]\n');
+  console.error('Options:');
+  console.error('  --count=N        Max insights to generate (default: 10, max: 200)');
+  console.error('  --all            Process all available videos (sets count=200)');
+  console.error('  --publish        Auto-publish generated insights');
+  console.error('  --skip-existing  Skip videos that already have insights (recommended)');
+  console.error('  --stats          Show channel stats only (no generation)\n');
+  console.error('Examples:');
+  console.error('  node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --stats');
+  console.error('  node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --all --skip-existing --publish');
   process.exit(1);
 }
 
-async function main() {
-  const url = `${baseUrl}/api/public-insights/generate-batch`;
-  const body = JSON.stringify({ channelId, count, publish });
+async function getChannelStats() {
+  const url = `${baseUrl}/api/public-insights/channel-stats/${channelId}`;
+  const res = await fetch(url);
+  const data = await res.json().catch(() => ({}));
 
-  console.log(`Calling ${url}`);
-  console.log(`Channel: ${channelId}, count: ${count}, publish: ${publish}\n`);
+  if (!res.ok) {
+    throw new Error(data.error || res.statusText);
+  }
+
+  return data.data;
+}
+
+async function generateBatch() {
+  const url = `${baseUrl}/api/public-insights/generate-batch`;
+  const body = JSON.stringify({ channelId, count, publish, skipExisting });
 
   const res = await fetch(url, {
     method: 'POST',
@@ -44,22 +89,126 @@ async function main() {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    console.error('Error:', data.error || res.statusText);
-    process.exit(1);
+    throw new Error(data.error || res.statusText);
   }
 
-  console.log('Success:', data.data.generated, 'insights generated');
-  if (data.data.generatedList?.length) {
-    data.data.generatedList.forEach((r) => {
-      console.log('  -', r.videoTitle?.slice(0, 50) + (r.videoTitle?.length > 50 ? '…' : ''), `[${r.status}]`);
-    });
+  return data.data;
+}
+
+function printStats(stats) {
+  console.log('\n' + c('bold', '=== Channel Stats ==='));
+  console.log(`Channel: ${c('cyan', stats.channelName)} (${stats.channelId})`);
+  console.log('');
+  console.log(`  Total videos:            ${c('bold', stats.totalVideos)}`);
+  console.log(`  With transcript:         ${c('green', stats.videosWithTranscript)}`);
+  console.log(`  Without transcript:      ${c('dim', stats.videosWithoutTranscript)}`);
+  console.log('');
+  console.log(`  Existing insights:       ${c('blue', stats.existingInsights)}`);
+  console.log(`    - Published:           ${c('green', stats.publishedInsights)}`);
+  console.log(`    - Draft:               ${c('yellow', stats.draftInsights)}`);
+  console.log('');
+  console.log(`  ${c('magenta', 'Available for generation:')} ${c('bold', stats.availableForGeneration)}`);
+  console.log('');
+}
+
+function printResults(result) {
+  console.log('\n' + c('bold', '=== Generation Results ==='));
+  console.log(`Channel: ${c('cyan', result.channelName)}`);
+  console.log('');
+
+  // Stats table
+  console.log('  Videos with transcript:  ' + c('bold', result.totalVideosWithTranscript));
+  console.log('  Already have insights:   ' + c('dim', result.alreadyHaveInsights));
+  console.log('  Processed this run:      ' + c('bold', result.candidatesProcessed));
+  console.log('  Remaining available:     ' + c('magenta', result.remainingAvailable));
+  console.log('');
+
+  // Results
+  console.log(c('green', `  NEW insights created:    ${result.newlyCreated}`));
+  if (result.updated > 0) {
+    console.log(c('yellow', `  Existing updated:        ${result.updated}`));
   }
-  if (data.data.errorsList?.length) {
-    console.log('Errors:', data.data.errorsList);
+  if (result.errors > 0) {
+    console.log(c('red', `  Errors:                  ${result.errors}`));
+  }
+  console.log('');
+
+  // List newly created
+  if (result.newlyCreatedList?.length > 0) {
+    console.log(c('green', 'New insights:'));
+    result.newlyCreatedList.forEach((r, i) => {
+      const title = r.videoTitle?.slice(0, 55) + (r.videoTitle?.length > 55 ? '...' : '');
+      console.log(`  ${i + 1}. ${title}`);
+      console.log(`     ${c('dim', '/guides/' + r.slug)} [${r.status}]`);
+    });
+    console.log('');
+  }
+
+  // List updated (if any and not too many)
+  if (result.updatedList?.length > 0 && result.updatedList.length <= 5) {
+    console.log(c('yellow', 'Updated insights:'));
+    result.updatedList.forEach((r) => {
+      const title = r.videoTitle?.slice(0, 55) + (r.videoTitle?.length > 55 ? '...' : '');
+      console.log(`  - ${title} [${r.status}]`);
+    });
+    console.log('');
+  }
+
+  // List errors
+  if (result.errorsList?.length > 0) {
+    console.log(c('red', 'Errors:'));
+    result.errorsList.forEach((e) => {
+      console.log(`  - ${e.videoId}: ${e.error}`);
+    });
+    console.log('');
+  }
+
+  // Summary
+  const total = result.newlyCreated + result.updated;
+  if (total > 0) {
+    console.log(c('bold', `Total: ${total} insights generated/updated`));
+    if (result.remainingAvailable > 0) {
+      console.log(c('dim', `Tip: Run again with --skip-existing to process ${result.remainingAvailable} more videos`));
+    }
+  } else if (result.remainingAvailable === 0 && result.alreadyHaveInsights > 0) {
+    console.log(c('green', 'All available videos already have insights!'));
   }
 }
 
+async function main() {
+  console.log(c('bold', '\nLurnia Batch Insight Generator'));
+  console.log(c('dim', `API: ${baseUrl}`));
+  console.log('');
+
+  // Always show stats first
+  console.log('Fetching channel stats...');
+  const stats = await getChannelStats();
+  printStats(stats);
+
+  if (statsOnly) {
+    return;
+  }
+
+  // Check if there are videos available
+  if (stats.availableForGeneration === 0 && skipExisting) {
+    console.log(c('green', 'No new videos available for generation.'));
+    console.log(c('dim', 'All videos with transcripts already have insights.'));
+    return;
+  }
+
+  // Show what we're about to do
+  console.log(c('bold', '=== Starting Generation ==='));
+  console.log(`  Target count: ${c('bold', count)}${useAll ? ' (--all)' : ''}`);
+  console.log(`  Publish: ${publish ? c('green', 'yes') : c('dim', 'no')}`);
+  console.log(`  Skip existing: ${skipExisting ? c('green', 'yes') : c('yellow', 'no (will re-generate)')}`);
+  console.log('');
+  console.log('Generating insights... (this may take a while)');
+
+  const result = await generateBatch();
+  printResults(result);
+}
+
 main().catch((e) => {
-  console.error(e.message || e);
+  console.error(c('red', '\nError: ') + (e.message || e));
   process.exit(1);
 });

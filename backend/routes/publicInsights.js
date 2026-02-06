@@ -146,13 +146,17 @@ router.post('/generate', async (req, res) => {
 
 /**
  * POST /api/public-insights/generate-batch
- * Generate at least N insights for a channel (videos with transcripts, then optionally publish).
- * Body: { channelId, count?: 10, publish?: false }
- * Use for SEO: create 10+ pages, set publish: true to make them indexable.
+ * Generate insights for a channel (videos with transcripts).
+ * Body: { channelId, count?: 10, publish?: false, skipExisting?: false }
+ *
+ * Options:
+ *   - count: max number to process (default 10, max 200)
+ *   - publish: auto-publish generated insights
+ *   - skipExisting: skip videos that already have insights (recommended for efficiency)
  */
 router.post('/generate-batch', async (req, res) => {
   try {
-    const { channelId, count = 10, publish = false } = req.body;
+    const { channelId, count = 10, publish = false, skipExisting = false } = req.body;
 
     if (!channelId) {
       return res.status(400).json({
@@ -161,9 +165,10 @@ router.post('/generate-batch', async (req, res) => {
       });
     }
 
-    const targetCount = Math.min(Math.max(Number(count) || 10, 1), 50);
+    // Increase max from 50 to 200 for larger batch operations
+    const targetCount = Math.min(Math.max(Number(count) || 10, 1), 200);
 
-    console.log(`[PublicInsights] Batch generate: channel ${channelId}, target ${targetCount}, publish=${publish}`);
+    console.log(`[PublicInsights] Batch generate: channel ${channelId}, target ${targetCount}, publish=${publish}, skipExisting=${skipExisting}`);
 
     const { firestore } = getFirestore();
 
@@ -176,28 +181,59 @@ router.post('/generate-batch', async (req, res) => {
       });
     }
 
-    const videosSnap = await channelRef.collection('videos').get();
-    const withTranscript = videosSnap.docs
-      .filter(d => d.data().transcript)
-      .sort((a, b) => (b.data().publishedAt?.toMillis?.() || 0) - (a.data().publishedAt?.toMillis?.() || 0))
-      .slice(0, targetCount);
+    const channelName = channelDoc.data().channelName || 'Unknown';
 
-    if (withTranscript.length === 0) {
+    // Get all videos with transcripts
+    const videosSnap = await channelRef.collection('videos').get();
+    const allWithTranscript = videosSnap.docs
+      .filter(d => d.data().transcript)
+      .sort((a, b) => (b.data().publishedAt?.toMillis?.() || 0) - (a.data().publishedAt?.toMillis?.() || 0));
+
+    const totalWithTranscript = allWithTranscript.length;
+
+    if (totalWithTranscript === 0) {
       return res.status(400).json({
         success: false,
         error: 'No videos with transcripts found for this channel. Import the channel and ensure transcripts are loaded.'
       });
     }
 
-    const generated = [];
-    const skipped = [];
+    // If skipExisting, filter out videos that already have insights
+    let existingVideoIds = new Set();
+    if (skipExisting) {
+      const existingInsights = await firestore.collection('public_insights')
+        .where('channelId', '==', channelId)
+        .select('videoId')
+        .get();
+      existingVideoIds = new Set(existingInsights.docs.map(d => d.data().videoId));
+    }
+
+    const videosToProcess = skipExisting
+      ? allWithTranscript.filter(d => !existingVideoIds.has(d.id))
+      : allWithTranscript;
+
+    const candidateCount = videosToProcess.length;
+    const withTranscript = videosToProcess.slice(0, targetCount);
+
+    const newlyCreated = [];
+    const updated = [];
+    const existingSkipped = [];
     const errors = [];
 
     for (const doc of withTranscript) {
       const videoId = doc.id;
       try {
+        // Check if insight already exists for this video
+        const existingQuery = await firestore.collection('public_insights')
+          .where('videoId', '==', videoId)
+          .limit(1)
+          .get();
+
+        const alreadyExists = !existingQuery.empty;
+
         const result = await generateOneInsight(firestore, videoId, channelId);
         let status = result.status;
+
         if (publish) {
           await firestore.collection('public_insights').doc(result.insightId).update({
             status: 'published',
@@ -206,16 +242,23 @@ router.post('/generate-batch', async (req, res) => {
           });
           status = 'published';
         }
-        generated.push({
+
+        const entry = {
           videoId,
           insightId: result.insightId,
           slug: result.slug,
           videoTitle: result.videoTitle,
           status
-        });
+        };
+
+        if (alreadyExists) {
+          updated.push(entry);
+        } else {
+          newlyCreated.push(entry);
+        }
       } catch (e) {
         if (e.code === 'NO_TRANSCRIPT') {
-          skipped.push({ videoId, reason: e.message });
+          existingSkipped.push({ videoId, reason: e.message });
         } else {
           errors.push({ videoId, error: e.message });
         }
@@ -226,15 +269,85 @@ router.post('/generate-batch', async (req, res) => {
       success: true,
       data: {
         channelId,
-        generated: generated.length,
-        generatedList: generated,
-        skipped: skipped.length,
+        channelName,
+        // Summary stats
+        totalVideosWithTranscript: totalWithTranscript,
+        alreadyHaveInsights: existingVideoIds.size,
+        candidatesProcessed: withTranscript.length,
+        remainingAvailable: candidateCount - withTranscript.length,
+        // Results
+        newlyCreated: newlyCreated.length,
+        updated: updated.length,
         errors: errors.length,
-        errorsList: errors
+        // Details
+        newlyCreatedList: newlyCreated,
+        updatedList: updated,
+        errorsList: errors,
+        // Legacy compatibility
+        generated: newlyCreated.length + updated.length,
+        generatedList: [...newlyCreated, ...updated]
       }
     });
   } catch (error) {
     console.error('[PublicInsights] Generate-batch error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/public-insights/channel-stats/:channelId
+ * Get stats about a channel's videos and existing insights
+ */
+router.get('/channel-stats/:channelId', async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const { firestore } = getFirestore();
+
+    const channelRef = firestore.collection('channels').doc(channelId);
+    const channelDoc = await channelRef.get();
+
+    if (!channelDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Channel not found'
+      });
+    }
+
+    const channelData = channelDoc.data();
+
+    // Count videos
+    const videosSnap = await channelRef.collection('videos').get();
+    const totalVideos = videosSnap.size;
+    const videosWithTranscript = videosSnap.docs.filter(d => d.data().transcript).length;
+
+    // Count existing insights
+    const insightsSnap = await firestore.collection('public_insights')
+      .where('channelId', '==', channelId)
+      .get();
+
+    const existingInsights = insightsSnap.size;
+    const publishedInsights = insightsSnap.docs.filter(d => d.data().status === 'published').length;
+    const draftInsights = insightsSnap.docs.filter(d => d.data().status === 'draft').length;
+
+    res.json({
+      success: true,
+      data: {
+        channelId,
+        channelName: channelData.channelName || 'Unknown',
+        totalVideos,
+        videosWithTranscript,
+        videosWithoutTranscript: totalVideos - videosWithTranscript,
+        existingInsights,
+        publishedInsights,
+        draftInsights,
+        availableForGeneration: videosWithTranscript - existingInsights
+      }
+    });
+  } catch (error) {
+    console.error('[PublicInsights] Channel stats error:', error);
     res.status(500).json({
       success: false,
       error: error.message
