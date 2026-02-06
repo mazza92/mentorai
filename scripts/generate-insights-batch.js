@@ -12,6 +12,7 @@
  *   --publish        Auto-publish generated insights
  *   --skip-existing  Skip videos that already have insights (recommended)
  *   --stats          Show channel stats only (no generation)
+ *   --no-revalidate  Skip cache revalidation after generation
  *
  * Examples:
  *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --stats
@@ -19,7 +20,8 @@
  *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --count=50 --skip-existing --publish
  *
  * Env:
- *   BACKEND_URL  Base URL of the API (default: production)
+ *   BACKEND_URL   Base URL of the backend API (default: production Railway)
+ *   FRONTEND_URL  Base URL of the frontend (default: production Vercel)
  */
 
 const channelId = process.argv[2];
@@ -29,9 +31,12 @@ const count = useAll ? 200 : (countArg ? parseInt(countArg.split('=')[1], 10) ||
 const publish = process.argv.includes('--publish');
 const skipExisting = process.argv.includes('--skip-existing');
 const statsOnly = process.argv.includes('--stats');
+const noRevalidate = process.argv.includes('--no-revalidate');
 
-const defaultUrl = 'https://mentorai-production.up.railway.app';
-const baseUrl = (process.env.BACKEND_URL || defaultUrl).replace(/\/$/, '');
+const defaultBackendUrl = 'https://mentorai-production.up.railway.app';
+const defaultFrontendUrl = 'https://lurnia.app';
+const backendUrl = (process.env.BACKEND_URL || defaultBackendUrl).replace(/\/$/, '');
+const frontendUrl = (process.env.FRONTEND_URL || defaultFrontendUrl).replace(/\/$/, '');
 
 // ANSI colors for terminal output
 const colors = {
@@ -57,7 +62,8 @@ if (!channelId || channelId.startsWith('--')) {
   console.error('  --all            Process all available videos (sets count=200)');
   console.error('  --publish        Auto-publish generated insights');
   console.error('  --skip-existing  Skip videos that already have insights (recommended)');
-  console.error('  --stats          Show channel stats only (no generation)\n');
+  console.error('  --stats          Show channel stats only (no generation)');
+  console.error('  --no-revalidate  Skip cache revalidation after generation\n');
   console.error('Examples:');
   console.error('  node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --stats');
   console.error('  node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --all --skip-existing --publish');
@@ -65,7 +71,7 @@ if (!channelId || channelId.startsWith('--')) {
 }
 
 async function getChannelStats() {
-  const url = `${baseUrl}/api/public-insights/channel-stats/${channelId}`;
+  const url = `${backendUrl}/api/public-insights/channel-stats/${channelId}`;
   const res = await fetch(url);
   const data = await res.json().catch(() => ({}));
 
@@ -77,7 +83,7 @@ async function getChannelStats() {
 }
 
 async function generateBatch() {
-  const url = `${baseUrl}/api/public-insights/generate-batch`;
+  const url = `${backendUrl}/api/public-insights/generate-batch`;
   const body = JSON.stringify({ channelId, count, publish, skipExisting });
 
   const res = await fetch(url, {
@@ -93,6 +99,38 @@ async function generateBatch() {
   }
 
   return data.data;
+}
+
+async function revalidateCache(slugs = []) {
+  const url = `${frontendUrl}/api/revalidate`;
+
+  // Always revalidate the directory page
+  const paths = ['/guides'];
+
+  // Also revalidate individual new pages (limit to first 10 to avoid huge requests)
+  slugs.slice(0, 10).forEach(slug => {
+    paths.push(`/guides/${slug}`);
+  });
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths })
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.log(c('yellow', `  Cache revalidation warning: ${data.error || res.statusText}`));
+      return false;
+    }
+
+    return data.revalidated || [];
+  } catch (error) {
+    console.log(c('yellow', `  Cache revalidation skipped: ${error.message}`));
+    return false;
+  }
 }
 
 function printStats(stats) {
@@ -139,7 +177,7 @@ function printResults(result) {
     result.newlyCreatedList.forEach((r, i) => {
       const title = r.videoTitle?.slice(0, 55) + (r.videoTitle?.length > 55 ? '...' : '');
       console.log(`  ${i + 1}. ${title}`);
-      console.log(`     ${c('dim', '/guides/' + r.slug)} [${r.status}]`);
+      console.log(`     ${c('dim', frontendUrl + '/guides/' + r.slug)} [${r.status}]`);
     });
     console.log('');
   }
@@ -173,11 +211,14 @@ function printResults(result) {
   } else if (result.remainingAvailable === 0 && result.alreadyHaveInsights > 0) {
     console.log(c('green', 'All available videos already have insights!'));
   }
+
+  return result;
 }
 
 async function main() {
   console.log(c('bold', '\nLurnia Batch Insight Generator'));
-  console.log(c('dim', `API: ${baseUrl}`));
+  console.log(c('dim', `Backend: ${backendUrl}`));
+  console.log(c('dim', `Frontend: ${frontendUrl}`));
   console.log('');
 
   // Always show stats first
@@ -206,6 +247,22 @@ async function main() {
 
   const result = await generateBatch();
   printResults(result);
+
+  // Revalidate cache if we generated/updated anything
+  const total = result.newlyCreated + result.updated;
+  if (total > 0 && !noRevalidate) {
+    console.log('');
+    console.log('Revalidating frontend cache...');
+
+    // Get slugs of newly created insights
+    const newSlugs = result.newlyCreatedList?.map(r => r.slug) || [];
+    const revalidated = await revalidateCache(newSlugs);
+
+    if (revalidated && revalidated.length > 0) {
+      console.log(c('green', `  Cache cleared for ${revalidated.length} path(s)`));
+      console.log(c('dim', `  New insights should appear on ${frontendUrl}/guides immediately`));
+    }
+  }
 }
 
 main().catch((e) => {
