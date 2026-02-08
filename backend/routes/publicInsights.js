@@ -198,16 +198,14 @@ router.post('/generate-batch', async (req, res) => {
       });
     }
 
-    // If skipExisting, filter out videos that already have insights
-    let existingVideoIds = new Set();
-    if (skipExisting) {
-      const existingInsights = await firestore.collection('public_insights')
-        .where('channelId', '==', channelId)
-        .select('videoId')
-        .get();
-      existingVideoIds = new Set(existingInsights.docs.map(d => d.data().videoId));
-    }
+    // Always query existing insights for accurate stats
+    const existingInsights = await firestore.collection('public_insights')
+      .where('channelId', '==', channelId)
+      .select('videoId')
+      .get();
+    const existingVideoIds = new Set(existingInsights.docs.map(d => d.data().videoId));
 
+    // Filter out existing if skipExisting is true
     const videosToProcess = skipExisting
       ? allWithTranscript.filter(d => !existingVideoIds.has(d.id))
       : allWithTranscript;
@@ -265,6 +263,9 @@ router.post('/generate-batch', async (req, res) => {
       }
     }
 
+    // Calculate videos still needing insights (for --skip-existing hint)
+    const videosStillNeedingInsights = allWithTranscript.filter(d => !existingVideoIds.has(d.id)).length;
+
     res.json({
       success: true,
       data: {
@@ -275,6 +276,9 @@ router.post('/generate-batch', async (req, res) => {
         alreadyHaveInsights: existingVideoIds.size,
         candidatesProcessed: withTranscript.length,
         remainingAvailable: candidateCount - withTranscript.length,
+        // How many videos still don't have insights (useful when skipExisting=false)
+        videosStillNeedingInsights,
+        skipExistingUsed: skipExisting,
         // Results
         newlyCreated: newlyCreated.length,
         updated: updated.length,
