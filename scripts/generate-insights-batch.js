@@ -205,8 +205,16 @@ function printResults(result) {
   const total = result.newlyCreated + result.updated;
   if (total > 0) {
     console.log(c('bold', `Total: ${total} insights generated/updated`));
-    if (result.remainingAvailable > 0) {
-      console.log(c('dim', `Tip: Run again with --skip-existing to process ${result.remainingAvailable} more videos`));
+
+    // Show helpful tips based on the situation
+    const stillNeedInsights = result.videosStillNeedingInsights || 0;
+    if (stillNeedInsights > 0 && !result.skipExistingUsed) {
+      // User ran without --skip-existing and there are videos still without insights
+      console.log(c('yellow', `\nNote: ${stillNeedInsights} video(s) still don't have insights.`));
+      console.log(c('dim', `Run with --skip-existing to generate insights for them:`));
+      console.log(c('cyan', `  node scripts/generate-insights-batch.js ${result.channelId} --count=${stillNeedInsights} --skip-existing --publish`));
+    } else if (result.remainingAvailable > 0) {
+      console.log(c('dim', `Tip: Run again to process ${result.remainingAvailable} more videos`));
     }
   } else if (result.remainingAvailable === 0 && result.alreadyHaveInsights > 0) {
     console.log(c('green', 'All available videos already have insights!'));
