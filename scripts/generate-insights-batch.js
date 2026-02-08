@@ -133,6 +133,35 @@ async function revalidateCache(slugs = []) {
   }
 }
 
+async function notifyIndexNow(slugs = []) {
+  if (slugs.length === 0) return false;
+
+  const url = `${frontendUrl}/api/indexnow`;
+
+  // Build URLs for new pages
+  const urls = ['/guides', ...slugs.map(slug => `/guides/${slug}`)];
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls })
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.log(c('yellow', `  IndexNow warning: ${data.error || res.statusText}`));
+      return false;
+    }
+
+    return data.submitted || 0;
+  } catch (error) {
+    console.log(c('yellow', `  IndexNow skipped: ${error.message}`));
+    return false;
+  }
+}
+
 function printStats(stats) {
   console.log('\n' + c('bold', '=== Channel Stats ==='));
   console.log(`Channel: ${c('cyan', stats.channelName)} (${stats.channelId})`);
@@ -268,8 +297,18 @@ async function main() {
 
     if (revalidated && revalidated.length > 0) {
       console.log(c('green', `  Cache cleared for ${revalidated.length} path(s)`));
-      console.log(c('dim', `  New insights should appear on ${frontendUrl}/guides immediately`));
     }
+
+    // Notify search engines via IndexNow (Bing, Yandex, etc.)
+    if (newSlugs.length > 0) {
+      console.log('Notifying search engines (IndexNow)...');
+      const submitted = await notifyIndexNow(newSlugs);
+      if (submitted) {
+        console.log(c('green', `  Submitted ${submitted} URL(s) to Bing/Yandex`));
+      }
+    }
+
+    console.log(c('dim', `New insights live at ${frontendUrl}/guides`));
   }
 }
 
