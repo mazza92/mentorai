@@ -490,16 +490,14 @@ router.post('/video-direct', async (req, res) => {
     }
 
     // Use videoQAService to answer the question
+    // Signature: answerQuestion(userQuestion, videoAnalysis, transcript, chatHistory, personalizedContext, userLanguage)
     const answer = await videoQAService.answerQuestion(
       question,
-      captionResult.text,
       null, // No video analysis for direct mode
+      captionResult.text,
       [], // No chat history
-      'en', // Default language
-      {
-        videoTitle: videoTitle || 'YouTube Video',
-        channelName: channelName || 'Unknown Channel'
-      }
+      '', // No personalized context
+      'en' // Default language
     );
 
     // Increment question count
