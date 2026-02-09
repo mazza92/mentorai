@@ -406,7 +406,11 @@ async function incrementQuestionCount(userId) {
       updatedAt: new Date(),
     });
 
+    // Verification read to confirm the data was written
+    const verifyDoc = await firestore.collection('users').doc(userId).get();
+    const verifyData = verifyDoc.data();
     console.log(`[incrementQuestionCount] Successfully updated for user ${userId}`);
+    console.log(`[incrementQuestionCount] Verified: questionsThisMonth is now ${verifyData?.questionsThisMonth}, channelsThisMonth is ${verifyData?.channelsThisMonth}`);
     return true;
   } catch (error) {
     console.error(`[incrementQuestionCount] ERROR for user ${userId}:`, error.message);

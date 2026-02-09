@@ -82,9 +82,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    console.log('Q&A request for project:', projectId);
-    console.log('Question:', question);
-    console.log('Chat history length:', chatHistory ? chatHistory.length : 0);
+    console.log('[QA] Request for project:', projectId);
+    console.log('[QA] Question:', question.substring(0, 50) + (question.length > 50 ? '...' : ''));
+    console.log('[QA] UserId:', userId);
+    console.log('[QA] Chat history length:', chatHistory ? chatHistory.length : 0);
 
     // Check question quota before processing
     try {
@@ -157,8 +158,13 @@ router.post('/', async (req, res) => {
         );
 
         // Increment question count
-        await userService.incrementQuestionCount(userId);
-        console.log(`Question count incremented for user ${userId}`);
+        console.log(`[QA Channel] About to increment question count for userId: ${userId}`);
+        try {
+          await userService.incrementQuestionCount(userId);
+          console.log(`[QA Channel] Question count incremented successfully for user ${userId}`);
+        } catch (incrementError) {
+          console.error(`[QA Channel] Failed to increment question count:`, incrementError.message);
+        }
 
         // Get remaining questions
         const remainingInfo = await userService.getRemainingQuestions(userId);
@@ -295,11 +301,12 @@ router.post('/', async (req, res) => {
     // Increment question count on successful response
     let questionsRemaining = null;
 
+    console.log(`[QA Video] About to increment question count for userId: ${userId}`);
     try {
       await userService.incrementQuestionCount(userId);
-      console.log(`Question count incremented for user ${userId}`);
+      console.log(`[QA Video] Question count incremented successfully for user ${userId}`);
     } catch (error) {
-      console.error('Error incrementing question count:', error.message);
+      console.error(`[QA Video] Failed to increment question count:`, error.message);
     }
 
     // Get remaining questions for response
@@ -422,6 +429,98 @@ router.get('/suggested-prompts/:projectId', async (req, res) => {
     console.error('Suggested prompts error:', error);
     res.status(500).json({
       error: 'Failed to generate suggested prompts',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * POST /api/qa/video-direct
+ * Direct Q&A for a YouTube video (used by browser extension)
+ * Does not require a saved project - fetches transcript on-demand
+ */
+router.post('/video-direct', async (req, res) => {
+  try {
+    const { videoId, question, userId, videoTitle, channelName } = req.body;
+
+    if (!videoId || !question) {
+      return res.status(400).json({ error: 'Video ID and question are required' });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    console.log('[QA Direct] Request for video:', videoId);
+    console.log('[QA Direct] Question:', question.substring(0, 50) + (question.length > 50 ? '...' : ''));
+    console.log('[QA Direct] UserId:', userId);
+
+    // Check question quota before processing
+    try {
+      const { canAsk, limit, remaining, questionsThisMonth, tier, requiresSignup } = await userService.checkQuestionQuota(userId);
+
+      if (!canAsk) {
+        return res.status(403).json({
+          error: 'Question limit reached',
+          message: requiresSignup
+            ? `You've used your ${limit} free question${limit > 1 ? 's' : ''}. Sign up for more!`
+            : `Monthly limit reached (${questionsThisMonth}/${limit} questions).`,
+          tier,
+          limit,
+          used: questionsThisMonth,
+          requiresSignup
+        });
+      }
+    } catch (quotaError) {
+      console.error('[QA Direct] Quota check error:', quotaError);
+      // Continue anyway for now - don't block users on quota errors
+    }
+
+    // Fetch transcript on-demand using caption service
+    const CaptionService = require('../services/captionService');
+    const captionService = new CaptionService();
+
+    const captionResult = await captionService.fetchYouTubeCaptions(videoId);
+
+    if (!captionResult.available || !captionResult.text) {
+      return res.status(400).json({
+        error: 'No transcript available',
+        message: 'This video does not have captions available. Try a different video.'
+      });
+    }
+
+    // Use videoQAService to answer the question
+    const answer = await videoQAService.answerQuestion(
+      question,
+      captionResult.text,
+      null, // No video analysis for direct mode
+      [], // No chat history
+      'en', // Default language
+      {
+        videoTitle: videoTitle || 'YouTube Video',
+        channelName: channelName || 'Unknown Channel'
+      }
+    );
+
+    // Increment question count
+    try {
+      await userService.incrementQuestionCount(userId);
+      console.log('[QA Direct] Question count incremented for user:', userId);
+    } catch (incrementError) {
+      console.error('[QA Direct] Failed to increment question count:', incrementError.message);
+    }
+
+    res.json({
+      success: true,
+      answer,
+      videoId,
+      source: 'extension'
+    });
+
+  } catch (error) {
+    console.error('[QA Direct] Error:', error);
+    res.status(500).json({
+      error: 'Failed to answer question',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
