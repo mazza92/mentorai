@@ -477,9 +477,7 @@ router.post('/video-direct', async (req, res) => {
     }
 
     // Fetch transcript on-demand using caption service
-    const CaptionService = require('../services/captionService');
-    const captionService = new CaptionService();
-
+    const captionService = require('../services/captionService');
     const captionResult = await captionService.fetchYouTubeCaptions(videoId);
 
     if (!captionResult.available || !captionResult.text) {
