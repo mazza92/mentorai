@@ -477,8 +477,7 @@ router.post('/video-direct', async (req, res) => {
     }
 
     // Fetch transcript on-demand using channel transcript service (has multiple fallbacks)
-    const ChannelTranscriptService = require('../services/channelTranscriptService');
-    const transcriptService = new ChannelTranscriptService();
+    const transcriptService = require('../services/channelTranscriptService');
     const captionResult = await transcriptService.fetchTranscript(videoId);
 
     if (!captionResult.available || !captionResult.text) {
