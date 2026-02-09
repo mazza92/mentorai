@@ -476,9 +476,10 @@ router.post('/video-direct', async (req, res) => {
       // Continue anyway for now - don't block users on quota errors
     }
 
-    // Fetch transcript on-demand using caption service
-    const captionService = require('../services/captionService');
-    const captionResult = await captionService.fetchYouTubeCaptions(videoId);
+    // Fetch transcript on-demand using channel transcript service (has multiple fallbacks)
+    const ChannelTranscriptService = require('../services/channelTranscriptService');
+    const transcriptService = new ChannelTranscriptService();
+    const captionResult = await transcriptService.fetchTranscript(videoId);
 
     if (!captionResult.available || !captionResult.text) {
       return res.status(400).json({
