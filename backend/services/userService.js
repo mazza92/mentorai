@@ -363,13 +363,18 @@ async function incrementChannelCount(userId) {
  * @returns {Promise<boolean>} - Success status
  */
 async function incrementQuestionCount(userId) {
+  console.log(`[incrementQuestionCount] Starting for userId: ${userId}`);
+
   // Handle anonymous users
   if (isAnonymousUser(userId)) {
+    console.log(`[incrementQuestionCount] Anonymous user detected, using session service`);
     return anonymousSessionService.incrementQuestionCount(userId);
   }
+
   try {
     // Use mock mode if Firestore is not available
     if (useMockMode || !firestore) {
+      console.log(`[incrementQuestionCount] Mock mode active, using in-memory store`);
       let user = mockUsers.get(userId) || { userId, tier: 'free', questionsThisMonth: 0, exportsThisMonth: 0 };
       user.questionsThisMonth = (user.questionsThisMonth || 0) + 1;
       mockUsers.set(userId, user);
@@ -377,8 +382,10 @@ async function incrementQuestionCount(userId) {
     }
 
     const userDoc = await firestore.collection('users').doc(userId).get();
+    console.log(`[incrementQuestionCount] User doc exists: ${userDoc.exists}`);
 
     if (!userDoc.exists) {
+      console.log(`[incrementQuestionCount] Creating new user doc with questionsThisMonth: 1`);
       await firestore.collection('users').doc(userId).set({
         userId,
         tier: 'free',
@@ -391,15 +398,20 @@ async function incrementQuestionCount(userId) {
     }
 
     const currentCount = userDoc.data().questionsThisMonth || 0;
+    const newCount = currentCount + 1;
+    console.log(`[incrementQuestionCount] Updating questionsThisMonth: ${currentCount} -> ${newCount}`);
+
     await firestore.collection('users').doc(userId).update({
-      questionsThisMonth: currentCount + 1,
+      questionsThisMonth: newCount,
       updatedAt: new Date(),
     });
 
+    console.log(`[incrementQuestionCount] Successfully updated for user ${userId}`);
     return true;
   } catch (error) {
-    console.error('Error incrementing question count:', error.message);
-    // Fallback to mock mode
+    console.error(`[incrementQuestionCount] ERROR for user ${userId}:`, error.message);
+    console.error(`[incrementQuestionCount] Full error:`, error);
+    // Fallback to mock mode - but this won't persist to Firestore!
     let user = mockUsers.get(userId) || { userId, tier: 'free', questionsThisMonth: 0, exportsThisMonth: 0 };
     user.questionsThisMonth = (user.questionsThisMonth || 0) + 1;
     mockUsers.set(userId, user);
