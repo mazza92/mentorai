@@ -491,10 +491,13 @@ router.post('/video-direct', async (req, res) => {
 
     // Use videoQAService to answer the question
     // Signature: answerQuestion(userQuestion, videoAnalysis, transcript, chatHistory, personalizedContext, userLanguage)
-    const answer = await videoQAService.answerQuestion(
+    const transcript = { text: captionResult.text }; // Wrap in object format expected by service
+    const videoAnalysis = { title: videoTitle || 'YouTube Video', author: channelName || 'Unknown' };
+
+    const qaResult = await videoQAService.answerQuestion(
       question,
-      null, // No video analysis for direct mode
-      captionResult.text,
+      videoAnalysis,
+      transcript,
       [], // No chat history
       '', // No personalized context
       'en' // Default language
@@ -510,7 +513,8 @@ router.post('/video-direct', async (req, res) => {
 
     res.json({
       success: true,
-      answer,
+      answer: qaResult.answer,
+      citations: qaResult.citations || [],
       videoId,
       source: 'extension'
     });
