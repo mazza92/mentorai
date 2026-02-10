@@ -441,7 +441,7 @@ router.get('/suggested-prompts/:projectId', async (req, res) => {
  */
 router.post('/video-direct', async (req, res) => {
   try {
-    const { videoId, question, userId, videoTitle, channelName, transcript: clientTranscript, videoLanguage } = req.body;
+    const { videoId, question, userId, videoTitle, channelName, transcript: clientTranscript, videoLanguage, chatHistory } = req.body;
 
     if (!videoId || !question) {
       return res.status(400).json({ error: 'Video ID and question are required' });
@@ -456,6 +456,7 @@ router.post('/video-direct', async (req, res) => {
     console.log('[QA Direct] UserId:', userId);
     console.log('[QA Direct] Client transcript:', clientTranscript ? `${clientTranscript.length} chars` : 'not provided');
     console.log('[QA Direct] Video language from captions:', videoLanguage || 'not provided');
+    console.log('[QA Direct] Chat history:', chatHistory?.length || 0, 'previous exchanges');
 
     // Check question quota before processing
     try {
@@ -527,7 +528,7 @@ router.post('/video-direct', async (req, res) => {
       question,
       videoAnalysis,
       transcript,
-      [], // No chat history
+      chatHistory || [], // Pass chat history from client
       '', // No personalized context
       responseLanguage // From video captions or question detection
     );

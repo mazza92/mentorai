@@ -513,6 +513,52 @@ class VideoQAService {
       enhanced = enhanced.replace(/\n{3,}/g, '\n\n');
     }
 
+    // --- PHASE 4: FIX BROKEN NUMBERED LISTS ---
+    // Fix numbers on separate lines (e.g., "1.\n**Title**" → "1. **Title**")
+    enhanced = enhanced.replace(/(\d+)\.\s*\n+\s*(\*\*)/g, '$1. $2');
+    enhanced = enhanced.replace(/(\d+)\.\s*\n+\s*([A-ZÀ-ÿ])/g, '$1. $2');
+
+    // Auto-fix missing numbers in lists (when first item has "1." but others don't)
+    // Look for pattern: numbered item followed by bold items without numbers
+    const lines = enhanced.split('\n');
+    let inNumberedList = false;
+    let currentNumber = 0;
+    const fixedLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Check if this line starts a numbered list
+      const numberedMatch = line.match(/^(\d+)\.\s+(.+)/);
+      if (numberedMatch) {
+        inNumberedList = true;
+        currentNumber = parseInt(numberedMatch[1]);
+        fixedLines.push(line);
+        continue;
+      }
+
+      // Check if we're in a numbered list and this line should be numbered
+      // (starts with bold or capital letter, no bullet/number)
+      if (inNumberedList && line && !line.match(/^[-\*\d]/) && !line.match(/^Références?:/i) && !line.match(/^References?:/i)) {
+        const shouldBeNumbered = line.match(/^\*\*[^*]+\*\*\s*:/) ||
+                                  (line.match(/^[A-ZÀ-ÿ]/) && line.includes(':') && line.length > 20);
+        if (shouldBeNumbered) {
+          currentNumber++;
+          fixedLines.push(`${currentNumber}. ${line}`);
+          continue;
+        }
+      }
+
+      // Empty line or different structure ends the list
+      if (!line || line.match(/^Références?:/i) || line.match(/^References?:/i)) {
+        inNumberedList = false;
+      }
+
+      fixedLines.push(lines[i]); // Keep original (with whitespace)
+    }
+
+    enhanced = fixedLines.join('\n');
+
     // Final trim
     enhanced = enhanced.trim();
 
@@ -995,7 +1041,7 @@ ${personalizedContext ? '\n---\n' + personalizedContext + '\n' : ''}
 
 You are an expert teacher sharing knowledge, NOT someone describing a video.
 
-Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nContinuez la conversation naturellement, en développant les explications précédentes.' : '\n\nContinue the conversation naturally, building on previous explanations.') : ''}`;
+Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\n⚠️ CONVERSATION EN COURS - NE PAS SALUER:\n- ❌ NE DITES PAS "Bonjour", "Salut", "Hello" ou autre salutation\n- ❌ NE DITES PAS "Bien sûr!", "Certainement!", "Voici..."\n- ✅ Répondez DIRECTEMENT à la question, comme dans une conversation fluide\n- ✅ Continuez naturellement en développant les explications précédentes' : '\n\n⚠️ ONGOING CONVERSATION - DO NOT GREET:\n- ❌ DO NOT say "Hello", "Hi", "Hey" or any greeting\n- ❌ DO NOT say "Sure!", "Of course!", "Here is..."\n- ✅ Answer DIRECTLY, like in a flowing conversation\n- ✅ Continue naturally, building on previous explanations') : ''}`;
 
         // Build prompt instruction based on question type
         const promptInstruction = isEnumeration

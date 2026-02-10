@@ -507,6 +507,18 @@ async function handleSendQuestion() {
     // Log what we're sending
     console.log('[Popup] Sending to backend - transcript:', transcript ? transcript.length + ' chars' : 'none', ', lang:', videoLanguage || 'none');
 
+    // Convert chatHistory to backend format (pairs of {question, answer})
+    const backendChatHistory = [];
+    for (let i = 0; i < chatHistory.length - 1; i++) {
+      if (chatHistory[i].type === 'user' && chatHistory[i + 1]?.type === 'assistant') {
+        backendChatHistory.push({
+          question: chatHistory[i].content,
+          answer: chatHistory[i + 1].content
+        });
+        i++; // Skip the answer since we paired it
+      }
+    }
+
     // Use background service worker to process (survives popup close)
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({
@@ -518,7 +530,8 @@ async function handleSendQuestion() {
           channelName: currentVideo.channel,
           transcript,
           videoLanguage,
-          userId: currentUser.id
+          userId: currentUser.id,
+          chatHistory: backendChatHistory // Send conversation history
         }
       }, (result) => {
         if (chrome.runtime.lastError) {

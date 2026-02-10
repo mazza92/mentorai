@@ -92,7 +92,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * Process a question in the background
  */
 async function processQuestion(data) {
-  const { videoId, question, videoTitle, channelName, transcript, videoLanguage, userId } = data;
+  const { videoId, question, videoTitle, channelName, transcript, videoLanguage, userId, chatHistory } = data;
 
   // Mark as processing
   await chrome.storage.local.set({
@@ -114,7 +114,8 @@ async function processQuestion(data) {
         channelName,
         userId,
         transcript,
-        videoLanguage
+        videoLanguage,
+        chatHistory: chatHistory || [] // Pass conversation history
       })
     });
 
