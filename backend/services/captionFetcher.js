@@ -24,25 +24,39 @@ class CaptionFetcher {
       const pythonScript = `
 import sys
 import json
-from youtube_transcript_api import YouTubeTranscriptApi
 
 def fetch_transcript(video_id):
     try:
-        # NO COOKIES REQUIRED - Direct API access!
-        # Use the get_transcript method (version 0.6.2 API)
-        transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
+        # Try new API first (youtube-transcript-api >= 1.0)
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            ytt_api = YouTubeTranscriptApi()
+            transcript_data = ytt_api.fetch(video_id)
+            # New API returns FetchedTranscript, get snippets
+            if hasattr(transcript_data, 'snippets'):
+                transcript_list = [{'text': s.text, 'start': s.start, 'duration': s.duration} for s in transcript_data.snippets]
+            else:
+                transcript_list = list(transcript_data)
+        except (TypeError, AttributeError):
+            # Fall back to old API (youtube-transcript-api < 1.0)
+            from youtube_transcript_api import YouTubeTranscriptApi
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
 
         # Format response
         segments = []
         full_text = []
 
-        for segment in transcript_data:
+        for segment in transcript_list:
+            text = segment.get('text', '') if isinstance(segment, dict) else getattr(segment, 'text', '')
+            start = segment.get('start', 0) if isinstance(segment, dict) else getattr(segment, 'start', 0)
+            duration = segment.get('duration', 0) if isinstance(segment, dict) else getattr(segment, 'duration', 0)
+
             segments.append({
-                'text': segment['text'],
-                'offset': int(segment['start'] * 1000),  # Convert to milliseconds
-                'duration': int(segment['duration'] * 1000)
+                'text': text,
+                'offset': int(start * 1000),  # Convert to milliseconds
+                'duration': int(duration * 1000)
             })
-            full_text.append(segment['text'])
+            full_text.append(text)
 
         result = {
             'success': True,
