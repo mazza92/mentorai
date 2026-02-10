@@ -26,6 +26,7 @@ const userName = document.getElementById('userName');
 const userEmail = document.getElementById('userEmail');
 const questionsStat = document.getElementById('questionsStat');
 const planStat = document.getElementById('planStat');
+const exportBtn = document.getElementById('exportBtn');
 
 // State
 let currentUser = null;
@@ -169,6 +170,7 @@ function setupEventListeners() {
   settingsBtn.addEventListener('click', showSettingsView);
   backBtn.addEventListener('click', showMainView);
   logoutBtn.addEventListener('click', handleLogout);
+  exportBtn.addEventListener('click', exportChatAsPDF);
 
   // Input
   questionInput.addEventListener('input', handleInputChange);
@@ -979,6 +981,270 @@ function clearMessages() {
   // Populate with language-appropriate prompts
   const videoLang = currentVideo?.language || 'en';
   updateSuggestedQuestions(videoLang);
+}
+
+/**
+ * Export chat conversation as PDF using browser print dialog
+ */
+function exportChatAsPDF() {
+  if (!chatHistory || chatHistory.length === 0) {
+    alert('No conversation to export yet. Ask a question first!');
+    return;
+  }
+
+  // Build HTML content for print
+  const videoTitle = currentVideo?.title || 'YouTube Video';
+  const videoChannel = currentVideo?.channel || 'Unknown Channel';
+  const videoId = currentVideo?.videoId || '';
+  const videoUrl = videoId ? `https://youtube.com/watch?v=${videoId}` : '';
+  const exportDate = new Date().toLocaleDateString();
+
+  let conversationHtml = '';
+  for (const msg of chatHistory) {
+    const role = msg.type === 'user' ? 'You' : 'Lurnia';
+    const roleClass = msg.type === 'user' ? 'user-msg' : 'assistant-msg';
+    const content = msg.type === 'assistant' ? simpleMarkdownForPdf(msg.content) : escapeHtml(msg.content);
+    conversationHtml += `
+      <div class="message ${roleClass}">
+        <div class="role">${role}</div>
+        <div class="content">${content}</div>
+      </div>
+    `;
+  }
+
+  const printHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Lurnia Chat - ${escapeHtml(videoTitle)}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .header {
+      border-bottom: 2px solid #3b82f6;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .logo-icon {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 6px;
+    }
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      color: #3b82f6;
+    }
+    .video-info {
+      background: #f8fafc;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .video-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+    .video-channel {
+      font-size: 14px;
+      color: #64748b;
+    }
+    .video-link {
+      font-size: 12px;
+      color: #3b82f6;
+      text-decoration: none;
+      word-break: break-all;
+    }
+    .meta {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .conversation {
+      margin-top: 24px;
+    }
+    .message {
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+    }
+    .role {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .user-msg .role { color: #3b82f6; }
+    .assistant-msg .role { color: #8b5cf6; }
+    .content {
+      background: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .user-msg .content {
+      background: #eff6ff;
+      border-left: 3px solid #3b82f6;
+    }
+    .assistant-msg .content {
+      background: #faf5ff;
+      border-left: 3px solid #8b5cf6;
+    }
+    .content p { margin-bottom: 8px; }
+    .content p:last-child { margin-bottom: 0; }
+    .content ul, .content ol {
+      margin: 8px 0;
+      padding-left: 24px;
+    }
+    .content li { margin-bottom: 4px; }
+    .content strong { font-weight: 600; }
+    .content em { font-style: italic; }
+    .content code {
+      background: #e2e8f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+    }
+    @media print {
+      body { padding: 20px; }
+      .message { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon"></div>
+      <span class="logo-text">Lurnia</span>
+    </div>
+    <div class="video-info">
+      <div class="video-title">${escapeHtml(videoTitle)}</div>
+      <div class="video-channel">${escapeHtml(videoChannel)}</div>
+      ${videoUrl ? `<a class="video-link" href="${videoUrl}">${videoUrl}</a>` : ''}
+    </div>
+    <div class="meta">Exported on ${exportDate}</div>
+  </div>
+  <div class="conversation">
+    ${conversationHtml}
+  </div>
+  <div class="footer">
+    Generated with Lurnia - AI-powered YouTube learning assistant<br>
+    <a href="https://lurnia.app">lurnia.app</a>
+  </div>
+</body>
+</html>
+  `;
+
+  // Open print window
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  if (printWindow) {
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
+
+    // Wait for content to load, then trigger print
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  } else {
+    alert('Please allow popups to export the chat as PDF.');
+  }
+}
+
+/**
+ * Simple markdown converter for PDF export (similar to simpleMarkdown but cleaner)
+ */
+function simpleMarkdownForPdf(text) {
+  if (!text) return '';
+
+  // Strip reference lines
+  let cleanText = text
+    .replace(/\n*R[ée]f[ée]rences?\s*:?\s*(\[\d+:\d+\],?\s*)+\.?/gi, '')
+    .replace(/\n*References?\s*:?\s*(\[\d+:\d+\],?\s*)+\.?/gi, '')
+    .trim();
+
+  let html = escapeHtml(cleanText);
+
+  // Headers
+  html = html.replace(/^###\s+(.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^##\s+(.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^#\s+(.+)$/gm, '<h3>$1</h3>');
+
+  // Bold and italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+  html = html.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
+
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  // Process lists
+  const lines = html.split('\n');
+  let result = [];
+  let inBulletList = false;
+  let inNumberedList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+      result.push('<br>');
+      continue;
+    }
+
+    const bulletMatch = trimmed.match(/^[-•]\s+(.+)/);
+    const numberedMatch = trimmed.match(/^(\d+)[.)]\s+(.+)/);
+
+    if (bulletMatch) {
+      if (!inBulletList) {
+        if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+        result.push('<ul>');
+        inBulletList = true;
+      }
+      result.push(`<li>${bulletMatch[1]}</li>`);
+    } else if (numberedMatch) {
+      if (!inNumberedList) {
+        if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+        result.push('<ol>');
+        inNumberedList = true;
+      }
+      result.push(`<li>${numberedMatch[2]}</li>`);
+    } else {
+      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+      result.push(`<p>${trimmed}</p>`);
+    }
+  }
+  if (inBulletList) result.push('</ul>');
+  if (inNumberedList) result.push('</ol>');
+
+  return result.join('\n');
 }
 
 // Initialize on load
