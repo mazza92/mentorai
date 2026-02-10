@@ -27,20 +27,51 @@ import json
 
 def fetch_transcript(video_id):
     try:
-        # Try new API first (youtube-transcript-api >= 1.0)
+        from youtube_transcript_api import YouTubeTranscriptApi
+
+        transcript_list = None
+
+        # Try to get transcript - first try any available language
         try:
-            from youtube_transcript_api import YouTubeTranscriptApi
+            # Try new API first (youtube-transcript-api >= 1.0)
             ytt_api = YouTubeTranscriptApi()
-            transcript_data = ytt_api.fetch(video_id)
-            # New API returns FetchedTranscript, get snippets
-            if hasattr(transcript_data, 'snippets'):
-                transcript_list = [{'text': s.text, 'start': s.start, 'duration': s.duration} for s in transcript_data.snippets]
-            else:
-                transcript_list = list(transcript_data)
+
+            # Try to list available transcripts
+            try:
+                transcript_list_obj = ytt_api.list(video_id)
+                # Get first available transcript (prefer manual, then generated)
+                available = list(transcript_list_obj)
+                if available:
+                    first_transcript = available[0]
+                    transcript_data = first_transcript.fetch()
+                    if hasattr(transcript_data, 'snippets'):
+                        transcript_list = [{'text': s.text, 'start': s.start, 'duration': s.duration} for s in transcript_data.snippets]
+                    else:
+                        transcript_list = list(transcript_data)
+            except:
+                # Direct fetch with language fallback
+                for lang in ['en', 'fr', 'es', 'de', 'pt', 'it', 'auto']:
+                    try:
+                        transcript_data = ytt_api.fetch(video_id, languages=[lang] if lang != 'auto' else None)
+                        if hasattr(transcript_data, 'snippets'):
+                            transcript_list = [{'text': s.text, 'start': s.start, 'duration': s.duration} for s in transcript_data.snippets]
+                        else:
+                            transcript_list = list(transcript_data)
+                        break
+                    except:
+                        continue
+
         except (TypeError, AttributeError):
             # Fall back to old API (youtube-transcript-api < 1.0)
-            from youtube_transcript_api import YouTubeTranscriptApi
-            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+            for lang in ['en', 'fr', 'es', 'de', 'pt', 'it']:
+                try:
+                    transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=[lang])
+                    break
+                except:
+                    continue
+
+        if not transcript_list:
+            raise Exception('No transcript available in any language')
 
         # Format response
         segments = []
