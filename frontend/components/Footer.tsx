@@ -2,7 +2,7 @@
 
 import { useTranslation } from 'react-i18next'
 import Link from 'next/link'
-import { Mail, FileText, Shield, Cookie } from 'lucide-react'
+import { Mail, FileText, Shield, Cookie, Chrome } from 'lucide-react'
 
 export default function Footer() {
   const { t } = useTranslation('common')
@@ -80,6 +80,12 @@ export default function Footer() {
                 <Link href="/cookies" className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2">
                   <Cookie className="w-4 h-4" />
                   Cookie Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy-extension" className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2">
+                  <Chrome className="w-4 h-4" />
+                  Extension Privacy
                 </Link>
               </li>
             </ul>
