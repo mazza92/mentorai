@@ -515,13 +515,13 @@ class VideoQAService {
 
     // --- PHASE 4: FIX BROKEN NUMBERED LISTS ---
     // Handles AI output like:
-    // "1. First: description\nSecond: description\nThird: description"
+    // "1. First: description\n1. Second: description\n1. Third: description"
     // Converts to: "1. First: description\n\n2. Second: description\n\n3. Third: description"
 
     // Check if we have a numbered list that might be broken
     if (/^1\.\s+/m.test(enhanced)) {
       // Split the text to process numbered list sections
-      let currentNumber = 1;
+      let currentNumber = 0;
       let result = '';
       let inList = false;
       let listBuffer = '';
@@ -533,18 +533,37 @@ class VideoQAService {
         const line = lines[i];
         const trimmedLine = line.trim();
 
-        // Check for numbered item (e.g., "1. Title: text")
-        const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)/);
+        // Check for numbered item (e.g., "1. Title: text" or "1.Title: text")
+        const numberedMatch = trimmedLine.match(/^(\d+)\.?\s*(.+)/);
+        const startsWithNumber = numberedMatch && /^\d+\./.test(trimmedLine);
 
-        if (numberedMatch) {
+        if (startsWithNumber && numberedMatch) {
           // Found a numbered item
           if (listBuffer) {
             result += listBuffer + '\n\n';
             listBuffer = '';
           }
-          currentNumber = parseInt(numberedMatch[1]);
-          listBuffer = trimmedLine;
-          inList = true;
+
+          const matchedNumber = parseInt(numberedMatch[1]);
+          const itemContent = numberedMatch[2];
+
+          // Determine the correct number for this item
+          if (!inList) {
+            // Starting a new list - use the number as-is (usually 1)
+            currentNumber = matchedNumber;
+            inList = true;
+          } else if (matchedNumber === 1 && currentNumber >= 1) {
+            // AI repeated "1." - this is a broken list, auto-increment
+            currentNumber++;
+          } else if (matchedNumber === currentNumber + 1) {
+            // AI correctly numbered - use its number
+            currentNumber = matchedNumber;
+          } else {
+            // Some other number - auto-increment for consistency
+            currentNumber++;
+          }
+
+          listBuffer = `${currentNumber}. ${itemContent}`;
           continue;
         }
 
