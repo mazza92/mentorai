@@ -255,22 +255,72 @@ class ChannelTranscriptService {
     // Get the first available caption track (usually auto-generated or English)
     const captionTrack = captionTracks[0];
     const captionUrl = captionTrack.baseUrl;
+    console.log(`[ChannelTranscript] Caption URL: ${captionUrl.substring(0, 100)}...`);
 
-    // Fetch the actual captions
+    // Try JSON3 format first (more reliable parsing)
+    try {
+      const json3Url = captionUrl + '&fmt=json3';
+      console.log(`[ChannelTranscript] Fetching JSON3 captions...`);
+
+      const { data: json3Data } = await axios.get(json3Url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+      });
+
+      if (json3Data && json3Data.events) {
+        const transcript = [];
+        for (const event of json3Data.events) {
+          if (event.segs) {
+            const text = event.segs.map(seg => seg.utf8 || '').join('');
+            if (text.trim()) {
+              transcript.push({
+                text: text.trim(),
+                offset: event.tStartMs || 0,
+                duration: event.dDurationMs || 0
+              });
+            }
+          }
+        }
+
+        if (transcript.length > 0) {
+          console.log(`[ChannelTranscript] ✓ JSON3 parsed ${transcript.length} segments`);
+          return transcript;
+        }
+      }
+    } catch (json3Error) {
+      console.log(`[ChannelTranscript] JSON3 failed: ${json3Error.message}`);
+    }
+
+    // Fallback to XML format
+    console.log(`[ChannelTranscript] Fetching XML captions...`);
     const { data: captionsXml } = await axios.get(captionUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       }
     });
 
-    // Parse XML captions (simplified XML parsing)
-    const captionMatches = [...captionsXml.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g)];
+    console.log(`[ChannelTranscript] Caption response length: ${captionsXml?.length || 0} chars`);
+
+    // Try multiple regex patterns for XML parsing
+    let captionMatches = [...(captionsXml || '').matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]*)<\/text>/g)];
+
+    // If no matches, try alternative pattern (some captions have different format)
+    if (captionMatches.length === 0) {
+      captionMatches = [...(captionsXml || '').matchAll(/<text[^>]*start="([^"]+)"[^>]*dur="([^"]+)"[^>]*>([\s\S]*?)<\/text>/g)];
+    }
+
+    console.log(`[ChannelTranscript] XML regex matched ${captionMatches.length} segments`);
 
     const transcript = captionMatches.map(match => ({
       text: this.decodeHtml(match[3]),
-      offset: parseFloat(match[1]) * 1000, // Convert to milliseconds
+      offset: parseFloat(match[1]) * 1000,
       duration: parseFloat(match[2]) * 1000
-    }));
+    })).filter(seg => seg.text.trim().length > 0);
+
+    if (transcript.length === 0) {
+      throw new Error('Could not parse any caption segments');
+    }
 
     return transcript;
   }
@@ -297,41 +347,52 @@ class ChannelTranscriptService {
    * @returns {Promise<Array>}
    */
   async fetchWithRetry(videoId, maxRetries = 2) {
-    // METHOD 1: Try Puppeteer (REAL BROWSER - most reliable, works everywhere!)
-    try {
-      console.log(`[ChannelTranscript] Using Puppeteer (real browser) for ${videoId}`);
-      const result = await puppeteerCaptionFetcher.fetchCaptions(videoId);
+    console.log(`[ChannelTranscript] Starting caption fetch for ${videoId}, trying all methods...`);
 
-      if (result.success && result.segments && result.segments.length > 0) {
-        console.log(`[ChannelTranscript] ✓ Puppeteer: Successfully fetched ${result.segments.length} caption segments (${result.charCount} chars)`);
-        return result.segments;
-      } else {
-        console.log(`[ChannelTranscript] Puppeteer returned no segments for ${videoId}: ${result.error || 'Unknown error'}`);
+    // METHOD 1: Try Puppeteer (REAL BROWSER - most reliable, works everywhere!)
+    if (puppeteerCaptionFetcher && typeof puppeteerCaptionFetcher.fetchCaptions === 'function') {
+      try {
+        console.log(`[ChannelTranscript] METHOD 1: Trying Puppeteer for ${videoId}`);
+        const result = await puppeteerCaptionFetcher.fetchCaptions(videoId);
+
+        if (result && result.success && result.segments && result.segments.length > 0) {
+          console.log(`[ChannelTranscript] ✓ Puppeteer: Successfully fetched ${result.segments.length} caption segments (${result.charCount} chars)`);
+          return result.segments;
+        } else {
+          console.log(`[ChannelTranscript] Puppeteer returned no segments for ${videoId}: ${result?.error || 'Unknown error'}`);
+        }
+      } catch (puppeteerError) {
+        console.log(`[ChannelTranscript] Puppeteer failed for ${videoId}: ${puppeteerError.message}`);
       }
-    } catch (puppeteerError) {
-      console.log(`[ChannelTranscript] Puppeteer failed for ${videoId}: ${puppeteerError.message}`);
+    } else {
+      console.log(`[ChannelTranscript] Puppeteer not available, skipping`);
     }
 
     // METHOD 2: Try Python youtube-transcript-api (lightweight fallback)
-    try {
-      console.log(`[ChannelTranscript] Using Python transcript-api for ${videoId}`);
-      const result = await captionFetcher.fetchTranscript(videoId);
+    if (captionFetcher && typeof captionFetcher.fetchTranscript === 'function') {
+      try {
+        console.log(`[ChannelTranscript] METHOD 2: Trying Python transcript-api for ${videoId}`);
+        const result = await captionFetcher.fetchTranscript(videoId);
 
-      if (result.success && result.segments && result.segments.length > 0) {
-        console.log(`[ChannelTranscript] ✓ Python API: Successfully fetched ${result.segments.length} caption segments (${result.charCount} chars)`);
-        return result.segments;
-      } else {
-        console.log(`[ChannelTranscript] Python API returned no segments for ${videoId}: ${result.error || 'Unknown error'}`);
+        if (result && result.success && result.segments && result.segments.length > 0) {
+          console.log(`[ChannelTranscript] ✓ Python API: Successfully fetched ${result.segments.length} caption segments (${result.charCount} chars)`);
+          return result.segments;
+        } else {
+          console.log(`[ChannelTranscript] Python API returned no segments for ${videoId}: ${result?.error || 'Unknown error'}`);
+        }
+      } catch (pythonError) {
+        console.log(`[ChannelTranscript] Python API failed for ${videoId}: ${pythonError.message}`);
       }
-    } catch (pythonError) {
-      console.log(`[ChannelTranscript] Python API failed for ${videoId}: ${pythonError.message}`);
+    } else {
+      console.log(`[ChannelTranscript] Python captionFetcher not available, skipping`);
     }
 
-    // METHOD 3: Try yt-dlp with browser cookies (only works locally, not on Railway)
+    // METHOD 3: Try yt-dlp with browser cookies
+    console.log(`[ChannelTranscript] METHOD 3: Trying yt-dlp for ${videoId}`);
     const browsers = ['chrome', 'firefox', 'edge'];
     for (const browser of browsers) {
       try {
-        console.log(`[ChannelTranscript] Using yt-dlp (${browser} cookies) for ${videoId}`);
+        console.log(`[ChannelTranscript] yt-dlp: trying ${browser} cookies...`);
         const transcript = await this.fetchCaptionsWithYtDlp(videoId, browser);
 
         if (transcript && transcript.length > 0) {
@@ -339,12 +400,13 @@ class ChannelTranscriptService {
           return transcript;
         }
       } catch (ytdlpError) {
-        console.log(`[ChannelTranscript] yt-dlp (${browser}) failed for ${videoId}: ${ytdlpError.message}`);
+        console.log(`[ChannelTranscript] yt-dlp (${browser}) failed: ${ytdlpError.message}`);
         // Try next browser
       }
     }
 
-    // METHOD 3: Fallback to axios scraping with retries (last resort)
+    // METHOD 4: Fallback to axios scraping with retries (last resort)
+    console.log(`[ChannelTranscript] METHOD 4: Trying axios scraping for ${videoId}`);
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[ChannelTranscript] Fallback attempt ${attempt}/${maxRetries} for ${videoId}`);
