@@ -321,6 +321,90 @@ async function handleVideoDetected(data) {
 
   // Load saved chat history for this video
   await loadChatHistory(data.videoId);
+
+  // Check for pending answer from previous session
+  await checkPendingAnswer(data.videoId);
+}
+
+/**
+ * Check if there's a pending answer from a previous popup session
+ */
+async function checkPendingAnswer(videoId) {
+  try {
+    const pending = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'GET_PENDING_ANSWER', videoId }, resolve);
+    });
+
+    if (!pending) return;
+
+    console.log('[Popup] Found pending answer status:', pending.status);
+
+    // Check if this question is already in chat history (avoid duplicates)
+    const questionAlreadyInHistory = chatHistory.some(msg =>
+      msg.type === 'user' && msg.content === pending.question
+    );
+
+    if (pending.status === 'processing') {
+      // Still processing - show loading and wait
+      const timeSinceStart = Date.now() - pending.startedAt;
+      if (timeSinceStart < 60000) { // Less than 1 minute old
+        // Only add question if not already shown
+        if (!questionAlreadyInHistory) {
+          restoreMessage(pending.question, 'user');
+          chatHistory.push({ content: pending.question, type: 'user', timestamps: [] });
+        }
+        const loadingId = addLoadingMessage();
+
+        // Poll for completion
+        const checkInterval = setInterval(async () => {
+          const updated = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({ type: 'GET_PENDING_ANSWER', videoId }, resolve);
+          });
+
+          if (updated && updated.status === 'completed') {
+            clearInterval(checkInterval);
+            removeMessage(loadingId);
+            const timestamps = extractTimestamps(updated.answer);
+            addMessage(updated.answer, 'assistant', timestamps);
+            chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+          } else if (updated && updated.status === 'error') {
+            clearInterval(checkInterval);
+            removeMessage(loadingId);
+            addMessage(updated.error || 'Failed to get answer', 'assistant');
+            chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+          }
+        }, 1000);
+      } else {
+        // Too old, clear it
+        chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+      }
+    } else if (pending.status === 'completed') {
+      // Completed while popup was closed - check if not already in chat history
+      const answerAlreadyShown = chatHistory.some(msg =>
+        msg.type === 'assistant' && msg.content === pending.answer
+      );
+
+      if (!answerAlreadyShown) {
+        // Only add question if not already shown
+        if (!questionAlreadyInHistory) {
+          addMessage(pending.question, 'user');
+        }
+        const timestamps = extractTimestamps(pending.answer);
+        addMessage(pending.answer, 'assistant', timestamps);
+      }
+      chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+    } else if (pending.status === 'error') {
+      // Show error if recent and not already shown
+      const timeSinceFail = Date.now() - pending.failedAt;
+      if (timeSinceFail < 30000 && !questionAlreadyInHistory) {
+        addMessage(pending.question, 'user');
+        addMessage(pending.error || 'Failed to get answer. Please try again.', 'assistant');
+      }
+      chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+    }
+  } catch (error) {
+    console.error('[Popup] Error checking pending answer:', error);
+  }
 }
 
 function updateStatus(status, text) {
@@ -381,13 +465,24 @@ async function handleSendQuestion() {
   try {
     // Try to fetch transcript client-side first (bypasses server IP blocking)
     let transcript = null;
+    let videoLanguage = null;
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab) {
+      console.log('[Popup] Fetching transcript from tab:', tab?.id, tab?.url);
+
+      if (tab && tab.id) {
         const transcriptResult = await new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            console.log('[Popup] Transcript fetch timeout (5s)');
+            resolve(null);
+          }, 5000);
+
           chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSCRIPT' }, (response) => {
+            clearTimeout(timeout);
             if (chrome.runtime.lastError) {
               console.log('[Popup] Transcript fetch error:', chrome.runtime.lastError.message);
+              // Try to inject content script manually
+              console.log('[Popup] Content script may not be loaded. Try refreshing the YouTube page.');
               resolve(null);
             } else {
               resolve(response);
@@ -396,29 +491,57 @@ async function handleSendQuestion() {
         });
 
         if (transcriptResult && transcriptResult.success) {
-          console.log('[Popup] Got transcript client-side:', transcriptResult.charCount, 'chars');
+          console.log('[Popup] ✓ Got transcript client-side:', transcriptResult.charCount, 'chars, lang:', transcriptResult.language);
           transcript = transcriptResult.text;
+          videoLanguage = transcriptResult.language; // Caption language from YouTube
         } else {
-          console.log('[Popup] Client-side transcript failed:', transcriptResult?.error || 'unknown');
+          console.log('[Popup] ✗ Client-side transcript failed:', transcriptResult?.error || 'no response from content script');
         }
+      } else {
+        console.log('[Popup] No active tab found');
       }
     } catch (transcriptErr) {
       console.log('[Popup] Transcript error:', transcriptErr.message);
     }
 
-    const response = await api.askQuestion({
-      videoId: currentVideo.videoId,
-      question,
-      videoTitle: currentVideo.title,
-      channelName: currentVideo.channel,
-      transcript // Pass client-fetched transcript if available
-    }, currentUser.id);
+    // Log what we're sending
+    console.log('[Popup] Sending to backend - transcript:', transcript ? transcript.length + ' chars' : 'none', ', lang:', videoLanguage || 'none');
+
+    // Use background service worker to process (survives popup close)
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        type: 'ASK_QUESTION',
+        data: {
+          videoId: currentVideo.videoId,
+          question,
+          videoTitle: currentVideo.title,
+          channelName: currentVideo.channel,
+          transcript,
+          videoLanguage,
+          userId: currentUser.id
+        }
+      }, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (result && result.success) {
+          resolve(result);
+        } else {
+          reject(new Error(result?.error || 'Failed to get answer'));
+        }
+      });
+    });
 
     // Remove loading message
     removeMessage(loadingId);
 
+    // Extract timestamps from response
+    const timestamps = extractTimestamps(response.answer);
+
     // Add assistant response
-    addMessage(response.answer, 'assistant', response.timestamps);
+    addMessage(response.answer, 'assistant', timestamps);
+
+    // Clear pending answer since we displayed it
+    chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId: currentVideo.videoId });
 
     // Update quota
     await loadUserQuota();
@@ -434,6 +557,32 @@ async function handleSendQuestion() {
     isProcessing = false;
     handleInputChange();
   }
+}
+
+/**
+ * Extract timestamps from answer text
+ */
+function extractTimestamps(text) {
+  const timestamps = [];
+  const regex = /\[?(\d{1,2}):(\d{2})(?::(\d{2}))?\]?/g;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    let seconds;
+    if (match[3]) {
+      seconds = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]);
+    } else {
+      seconds = parseInt(match[1]) * 60 + parseInt(match[2]);
+    }
+
+    timestamps.push({
+      label: match[0].replace(/[\[\]]/g, ''),
+      seconds,
+      index: match.index
+    });
+  }
+
+  return timestamps;
 }
 
 function addMessage(content, type, timestamps = []) {
@@ -487,32 +636,96 @@ function escapeHtml(text) {
 function simpleMarkdown(text) {
   if (!text) return '';
 
+  // Strip reference lines (we show timestamps separately)
+  // Matches: "Références: [2:19], [5:17]" or "References: [1:23], [4:56]" etc.
+  let cleanText = text
+    .replace(/\n*R[ée]f[ée]rences?\s*:?\s*(\[\d+:\d+\],?\s*)+\.?/gi, '')
+    .replace(/\n*References?\s*:?\s*(\[\d+:\d+\],?\s*)+\.?/gi, '')
+    .trim();
+
   // First escape HTML to prevent XSS
-  let html = escapeHtml(text);
+  let html = escapeHtml(cleanText);
+
+  // Headers: ## Header -> <h3>Header</h3>
+  html = html.replace(/^###\s+(.+)$/gm, '<h4 class="md-header">$1</h4>');
+  html = html.replace(/^##\s+(.+)$/gm, '<h3 class="md-header">$1</h3>');
+  html = html.replace(/^#\s+(.+)$/gm, '<h3 class="md-header">$1</h3>');
+
+  // Emoji headers (🎯 Strategy, etc.) - make them bold headers
+  html = html.replace(/^([\u{1F300}-\u{1F9FF}])\s+(.+)$/gmu, '<div class="md-section"><strong>$1 $2</strong></div>');
 
   // Bold: **text** or __text__
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
 
   // Italic: *text* or _text_
-  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+  html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+  html = html.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
 
-  // Line breaks
-  html = html.replace(/\n\n/g, '</p><p>');
-  html = html.replace(/\n/g, '<br>');
+  // Inline code: `code`
+  html = html.replace(/`([^`]+)`/g, '<code class="md-code">$1</code>');
 
-  // Bullet points
-  html = html.replace(/^[\s]*[-•]\s+(.+)/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+  // Process lists with proper paragraph breaks
+  const lines = html.split('\n');
+  let result = [];
+  let inBulletList = false;
+  let inNumberedList = false;
 
-  // Numbered lists
-  html = html.replace(/^[\s]*\d+\.\s+(.+)/gm, '<li>$1</li>');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) {
+      // Empty line - close any open lists and add paragraph break
+      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+      result.push('</p><p class="md-para">');
+      continue;
+    }
+
+    const bulletMatch = line.match(/^[-•]\s+(.+)/);
+    const numberedMatch = line.match(/^(\d+)[.)]\s+(.+)/);
+
+    if (bulletMatch) {
+      if (!inBulletList) {
+        if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+        result.push('<ul class="md-list">');
+        inBulletList = true;
+      }
+      result.push(`<li>${bulletMatch[1]}</li>`);
+    } else if (numberedMatch) {
+      if (!inNumberedList) {
+        if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+        result.push('<ol class="md-list">');
+        inNumberedList = true;
+      }
+      result.push(`<li>${numberedMatch[2]}</li>`);
+    } else {
+      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+      result.push(line);
+    }
+  }
+  if (inBulletList) result.push('</ul>');
+  if (inNumberedList) result.push('</ol>');
+
+  html = result.join('\n');
+
+  // Convert remaining single newlines to line breaks (for paragraph flow)
+  html = html.replace(/([^>])\n([^<])/g, '$1<br>$2');
+
+  // Clean up multiple paragraph tags
+  html = html.replace(/(<\/p>\s*<p class="md-para">)+/g, '</p><p class="md-para">');
+  html = html.replace(/<p class="md-para"><\/p>/g, '');
+  html = html.replace(/<br>\s*<br>/g, '</p><p class="md-para">');
 
   // Wrap in paragraph
-  if (!html.startsWith('<')) {
-    html = '<p>' + html + '</p>';
+  if (html && !html.match(/^<(p|ul|ol|h[34]|div)/)) {
+    html = '<p class="md-para">' + html + '</p>';
   }
+
+  // Final cleanup
+  html = html.replace(/<p class="md-para">\s*<\/p>/g, '');
+  html = html.replace(/^\s*<br>|<br>\s*$/g, '');
+  html = html.replace(/<\/p>\s*$/, '</p>');
 
   return html;
 }
@@ -577,15 +790,18 @@ async function loadChatHistory(videoId) {
       console.log('[Popup] Restoring', savedChat.messages.length, 'messages for video', videoId);
       chatHistory = savedChat.messages;
 
-      // Clear existing messages (keep welcome)
-      const welcomeMsg = messages.querySelector('.welcome-message');
+      // Clear existing messages (remove welcome for restored chats)
       messages.innerHTML = '';
-      if (welcomeMsg) messages.appendChild(welcomeMsg);
 
       // Restore messages
       for (const msg of chatHistory) {
         restoreMessage(msg.content, msg.type, msg.timestamps || []);
       }
+
+      // Scroll to bottom to show last message
+      requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
+      });
     } else {
       // Clear chat for new video
       chatHistory = [];

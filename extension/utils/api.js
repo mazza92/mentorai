@@ -58,7 +58,7 @@ export const api = {
    * Ask a question about a video (uses direct endpoint)
    * If transcript is provided, backend uses it directly (faster, bypasses IP blocking)
    */
-  async askQuestion({ videoId, question, videoTitle, channelName, transcript }, userId) {
+  async askQuestion({ videoId, question, videoTitle, channelName, transcript, videoLanguage }, userId) {
     const response = await fetch(`${API_BASE}/qa/video-direct`, {
       method: 'POST',
       headers: {
@@ -70,7 +70,8 @@ export const api = {
         videoTitle,
         channelName,
         userId,
-        transcript // Client-side fetched transcript (optional)
+        transcript,
+        videoLanguage // Caption language from YouTube (e.g., 'fr', 'en')
       })
     });
 
