@@ -514,50 +514,111 @@ class VideoQAService {
     }
 
     // --- PHASE 4: FIX BROKEN NUMBERED LISTS ---
-    // Fix numbers on separate lines (e.g., "1.\n**Title**" → "1. **Title**")
-    enhanced = enhanced.replace(/(\d+)\.\s*\n+\s*(\*\*)/g, '$1. $2');
-    enhanced = enhanced.replace(/(\d+)\.\s*\n+\s*([A-ZÀ-ÿ])/g, '$1. $2');
+    // Handles AI output like:
+    // "1. First: description\nSecond: description\nThird: description"
+    // Converts to: "1. First: description\n\n2. Second: description\n\n3. Third: description"
 
-    // Auto-fix missing numbers in lists (when first item has "1." but others don't)
-    // Look for pattern: numbered item followed by bold items without numbers
-    const lines = enhanced.split('\n');
-    let inNumberedList = false;
-    let currentNumber = 0;
-    const fixedLines = [];
+    // Check if we have a numbered list that might be broken
+    if (/^1\.\s+/m.test(enhanced)) {
+      // Split the text to process numbered list sections
+      let currentNumber = 1;
+      let result = '';
+      let inList = false;
+      let listBuffer = '';
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      // Process line by line
+      const lines = enhanced.split('\n');
 
-      // Check if this line starts a numbered list
-      const numberedMatch = line.match(/^(\d+)\.\s+(.+)/);
-      if (numberedMatch) {
-        inNumberedList = true;
-        currentNumber = parseInt(numberedMatch[1]);
-        fixedLines.push(line);
-        continue;
-      }
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmedLine = line.trim();
 
-      // Check if we're in a numbered list and this line should be numbered
-      // (starts with bold or capital letter, no bullet/number)
-      if (inNumberedList && line && !line.match(/^[-\*\d]/) && !line.match(/^Références?:/i) && !line.match(/^References?:/i)) {
-        const shouldBeNumbered = line.match(/^\*\*[^*]+\*\*\s*:/) ||
-                                  (line.match(/^[A-ZÀ-ÿ]/) && line.includes(':') && line.length > 20);
-        if (shouldBeNumbered) {
-          currentNumber++;
-          fixedLines.push(`${currentNumber}. ${line}`);
+        // Check for numbered item (e.g., "1. Title: text")
+        const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)/);
+
+        if (numberedMatch) {
+          // Found a numbered item
+          if (listBuffer) {
+            result += listBuffer + '\n\n';
+            listBuffer = '';
+          }
+          currentNumber = parseInt(numberedMatch[1]);
+          listBuffer = trimmedLine;
+          inList = true;
           continue;
+        }
+
+        // Check for unnumbered item that should be numbered
+        // Pattern: "Title with Words: description" (2+ words before colon, starts with capital)
+        const unnumberedMatch = trimmedLine.match(/^([A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿéèêëàâäùûüôöîïçÉÈÊËÀÂÄÙÛÜÔÖÎÏÇ'']+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿéèêëàâäùûüôöîïçÉÈÊËÀÂÄÙÛÜÔÖÎÏÇ'']+)+)\s*:\s*(.+)/);
+
+        if (inList && unnumberedMatch && !trimmedLine.match(/^Références?:/i) && !trimmedLine.match(/^References?:/i)) {
+          // This should be a numbered item
+          if (listBuffer) {
+            result += listBuffer + '\n\n';
+            listBuffer = '';
+          }
+          currentNumber++;
+          listBuffer = `${currentNumber}. ${trimmedLine}`;
+          continue;
+        }
+
+        // Check for bold item that should be numbered: "**Title**: description"
+        const boldMatch = trimmedLine.match(/^\*\*([^*]+)\*\*\s*:\s*(.+)/);
+        if (inList && boldMatch && !trimmedLine.match(/^\d+\./)) {
+          if (listBuffer) {
+            result += listBuffer + '\n\n';
+            listBuffer = '';
+          }
+          currentNumber++;
+          listBuffer = `${currentNumber}. ${trimmedLine}`;
+          continue;
+        }
+
+        // Empty line ends the list
+        if (!trimmedLine) {
+          if (listBuffer) {
+            result += listBuffer + '\n';
+            listBuffer = '';
+          }
+          inList = false;
+          result += '\n';
+          continue;
+        }
+
+        // References section ends the list
+        if (trimmedLine.match(/^Références?:/i) || trimmedLine.match(/^References?:/i)) {
+          if (listBuffer) {
+            result += listBuffer + '\n\n';
+            listBuffer = '';
+          }
+          inList = false;
+          result += line + '\n';
+          continue;
+        }
+
+        // Regular line - append to buffer if in list, otherwise add to result
+        if (inList && listBuffer) {
+          // This is continuation of current list item
+          listBuffer += '\n' + line;
+        } else {
+          result += line + '\n';
         }
       }
 
-      // Empty line or different structure ends the list
-      if (!line || line.match(/^Références?:/i) || line.match(/^References?:/i)) {
-        inNumberedList = false;
+      // Don't forget remaining buffer
+      if (listBuffer) {
+        result += listBuffer;
       }
 
-      fixedLines.push(lines[i]); // Keep original (with whitespace)
+      enhanced = result;
     }
 
-    enhanced = fixedLines.join('\n');
+    // Ensure blank line between numbered items for readability
+    enhanced = enhanced.replace(/(\d+\.\s+[^\n]+)\n(\d+\.)/g, '$1\n\n$2');
+
+    // Clean up excessive newlines
+    enhanced = enhanced.replace(/\n{3,}/g, '\n\n');
 
     // Final trim
     enhanced = enhanced.trim();

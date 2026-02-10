@@ -322,6 +322,96 @@ body {
   border-bottom-left-radius: 4px;
 }
 
+/* Markdown Styling */
+.message.assistant .md-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 12px 0 6px 0;
+}
+
+.message.assistant .md-header:first-child {
+  margin-top: 0;
+}
+
+.message.assistant h4.md-header {
+  font-size: 13px;
+}
+
+.message.assistant .md-para {
+  margin: 8px 0;
+}
+
+.message.assistant .md-para:first-child {
+  margin-top: 0;
+}
+
+.message.assistant .md-para:last-child {
+  margin-bottom: 0;
+}
+
+.message.assistant ul.md-list {
+  margin: 8px 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.message.assistant ol.md-list {
+  margin: 8px 0;
+  padding-left: 24px;
+  list-style-type: decimal;
+  counter-reset: none;
+}
+
+.message.assistant .md-list li {
+  margin: 10px 0;
+  padding-left: 4px;
+  padding-bottom: 6px;
+  line-height: 1.65;
+  display: list-item;
+}
+
+/* Ensure good spacing for numbered list items */
+.message.assistant ol.md-list li {
+  margin: 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.message.assistant ol.md-list li:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.message.assistant .md-code {
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--primary-purple);
+}
+
+.message.assistant strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.message.assistant em {
+  font-style: italic;
+}
+
+.message.assistant .md-section {
+  margin: 10px 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.message.assistant .md-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
 .message .timestamp {
   display: inline-block;
   padding: 2px 8px;
