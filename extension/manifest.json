@@ -2,10 +2,11 @@
   "manifest_version": 3,
   "name": "Lurnia - YouTube Learning Companion",
   "version": "1.0.0",
-  "description": "Ask questions about any YouTube video and get AI-powered answers with timestamps",
+  "description": "Lurnia is an AI-powered learning companion that enhances video comprehension through real-time Q&A and timestamp-linked insights. Not affiliated with YouTube.",
   "permissions": [
     "storage",
     "activeTab",
+    "scripting",
     "contextMenus",
     "alarms",
     "identity"
@@ -14,8 +15,7 @@
     "https://www.youtube.com/*",
     "https://youtube.com/*",
     "https://lurnia.app/*",
-    "https://mentorai-production.up.railway.app/*",
-    "http://localhost:3001/*"
+    "https://mentorai-production.up.railway.app/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
