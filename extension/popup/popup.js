@@ -781,12 +781,41 @@ function simpleMarkdown(text) {
   let inBulletList = false;
   let inNumberedList = false;
 
+  // Helper to check if a line is a numbered list item
+  const isNumberedItem = (line) => /^(\d+)[.)]\s+.+/.test(line?.trim() || '');
+  const isBulletItem = (line) => /^[-•]\s+.+/.test(line?.trim() || '');
+
+  // Helper to find next non-empty line
+  const peekNextContent = (fromIndex) => {
+    for (let j = fromIndex + 1; j < lines.length; j++) {
+      if (lines[j].trim()) return lines[j].trim();
+    }
+    return null;
+  };
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) {
-      // Empty line - close any open lists and add paragraph break
-      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
-      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+      // Empty line - check if we should keep the list open
+      if (inNumberedList) {
+        // Peek ahead: if next content is also a numbered item, keep list open
+        const nextContent = peekNextContent(i);
+        if (nextContent && isNumberedItem(nextContent)) {
+          // Stay in list, just add spacing
+          continue;
+        }
+        // Otherwise close the list
+        result.push('</ol>');
+        inNumberedList = false;
+      }
+      if (inBulletList) {
+        const nextContent = peekNextContent(i);
+        if (nextContent && isBulletItem(nextContent)) {
+          continue;
+        }
+        result.push('</ul>');
+        inBulletList = false;
+      }
       result.push('</p><p class="md-para">');
       continue;
     }
@@ -1309,11 +1338,38 @@ function simpleMarkdownForPdf(text) {
   let inBulletList = false;
   let inNumberedList = false;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+  // Helper to check if a line is a numbered list item
+  const isNumberedItem = (line) => /^(\d+)[.)]\s+.+/.test(line?.trim() || '');
+  const isBulletItem = (line) => /^[-•]\s+.+/.test(line?.trim() || '');
+
+  // Helper to find next non-empty line
+  const peekNextContent = (fromIndex) => {
+    for (let j = fromIndex + 1; j < lines.length; j++) {
+      if (lines[j].trim()) return lines[j].trim();
+    }
+    return null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
     if (!trimmed) {
-      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
-      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+      // Check if we should keep the list open
+      if (inNumberedList) {
+        const nextContent = peekNextContent(i);
+        if (nextContent && isNumberedItem(nextContent)) {
+          continue; // Stay in list
+        }
+        result.push('</ol>');
+        inNumberedList = false;
+      }
+      if (inBulletList) {
+        const nextContent = peekNextContent(i);
+        if (nextContent && isBulletItem(nextContent)) {
+          continue;
+        }
+        result.push('</ul>');
+        inBulletList = false;
+      }
       result.push('<br>');
       continue;
     }
