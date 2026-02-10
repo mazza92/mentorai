@@ -33,6 +33,55 @@ let currentVideo = null;
 let isProcessing = false;
 let chatHistory = []; // Track chat messages for persistence
 
+// Language-specific UI strings and prompt starters
+const PROMPT_STARTERS = {
+  en: {
+    welcome: "Ask any question about this video!",
+    placeholder: "Ask about this video...",
+    prompts: [
+      { short: "What is this video about?", full: "What is this video about?" },
+      { short: "Key takeaways?", full: "What are the key takeaways?" },
+      { short: "Summarize in 3 points", full: "Summarize in 3 points" }
+    ]
+  },
+  fr: {
+    welcome: "Posez vos questions sur cette vidéo !",
+    placeholder: "Posez votre question...",
+    prompts: [
+      { short: "De quoi parle cette vidéo ?", full: "De quoi parle cette vidéo ?" },
+      { short: "Points clés ?", full: "Quels sont les points clés ?" },
+      { short: "Résumé en 3 points", full: "Résume cette vidéo en 3 points" }
+    ]
+  },
+  es: {
+    welcome: "¡Haz cualquier pregunta sobre este video!",
+    placeholder: "Pregunta sobre este video...",
+    prompts: [
+      { short: "¿De qué trata?", full: "¿De qué trata este video?" },
+      { short: "Puntos clave?", full: "¿Cuáles son los puntos clave?" },
+      { short: "Resumen en 3 puntos", full: "Resume este video en 3 puntos" }
+    ]
+  },
+  de: {
+    welcome: "Stellen Sie Fragen zu diesem Video!",
+    placeholder: "Fragen Sie zu diesem Video...",
+    prompts: [
+      { short: "Worum geht es?", full: "Worum geht es in diesem Video?" },
+      { short: "Wichtigste Punkte?", full: "Was sind die wichtigsten Punkte?" },
+      { short: "In 3 Punkten", full: "Fasse dieses Video in 3 Punkten zusammen" }
+    ]
+  },
+  pt: {
+    welcome: "Faça qualquer pergunta sobre este vídeo!",
+    placeholder: "Pergunte sobre este vídeo...",
+    prompts: [
+      { short: "Sobre o que é?", full: "Sobre o que é este vídeo?" },
+      { short: "Pontos-chave?", full: "Quais são os pontos-chave?" },
+      { short: "Resumo em 3 pontos", full: "Resuma este vídeo em 3 pontos" }
+    ]
+  }
+};
+
 // Generate anonymous user ID for MVP (no login required)
 function getAnonymousUserId() {
   let anonId = localStorage.getItem('lurnia_anon_id');
@@ -62,6 +111,10 @@ async function init() {
 
   currentUser = user;
   showMainView();
+
+  // Initialize with default English prompts
+  updateSuggestedQuestions('en');
+
   detectCurrentVideo();
 
   // Load quota in background
@@ -69,6 +122,43 @@ async function init() {
 
   // Setup event listeners
   setupEventListeners();
+}
+
+/**
+ * Update suggested questions and UI text based on video language
+ */
+function updateSuggestedQuestions(langCode) {
+  // Normalize language code (e.g., "fr-FR" -> "fr")
+  const baseLang = langCode ? langCode.split('-')[0].toLowerCase() : 'en';
+  const langData = PROMPT_STARTERS[baseLang] || PROMPT_STARTERS.en;
+
+  const welcomeText = document.getElementById('welcomeText');
+  const container = document.getElementById('suggestedQuestions');
+
+  if (welcomeText) {
+    welcomeText.textContent = langData.welcome;
+  }
+
+  // Update input placeholder
+  if (questionInput) {
+    questionInput.placeholder = langData.placeholder;
+  }
+
+  if (container) {
+    container.innerHTML = langData.prompts.map(p =>
+      `<button class="suggested-btn" data-question="${escapeHtml(p.full)}">${escapeHtml(p.short)}</button>`
+    ).join('');
+
+    // Attach click handlers
+    container.querySelectorAll('.suggested-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const question = btn.dataset.question;
+        questionInput.value = question;
+        handleInputChange();
+        handleSendQuestion();
+      });
+    });
+  }
 }
 
 function setupEventListeners() {
@@ -90,15 +180,7 @@ function setupEventListeners() {
   });
   sendBtn.addEventListener('click', handleSendQuestion);
 
-  // Suggested questions
-  document.querySelectorAll('.suggested-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const question = btn.dataset.question;
-      questionInput.value = question;
-      handleInputChange();
-      handleSendQuestion();
-    });
-  });
+  // Note: Suggested question handlers are attached dynamically in updateSuggestedQuestions()
 
   // Listen for video detection from content script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -494,6 +576,16 @@ async function handleSendQuestion() {
           console.log('[Popup] ✓ Got transcript client-side:', transcriptResult.charCount, 'chars, lang:', transcriptResult.language);
           transcript = transcriptResult.text;
           videoLanguage = transcriptResult.language; // Caption language from YouTube
+
+          // Store language in currentVideo for persistence
+          if (currentVideo && videoLanguage) {
+            currentVideo.language = videoLanguage;
+          }
+
+          // Update UI prompts to match video language
+          if (videoLanguage) {
+            updateSuggestedQuestions(videoLanguage);
+          }
         } else {
           console.log('[Popup] ✗ Client-side transcript failed:', transcriptResult?.error || 'no response from content script');
         }
@@ -873,18 +965,20 @@ function restoreMessage(content, type, timestamps = []) {
 }
 
 function clearMessages() {
-  const welcomeMsg = messages.querySelector('.welcome-message');
   messages.innerHTML = '';
 
-  // Add back welcome message
-  if (!welcomeMsg) {
-    const welcome = document.createElement('div');
-    welcome.className = 'welcome-message';
-    welcome.innerHTML = '<p>Ask any question about this video and get AI-powered answers.</p>';
-    messages.appendChild(welcome);
-  } else {
-    messages.appendChild(welcomeMsg);
-  }
+  // Recreate welcome message with proper structure
+  const welcome = document.createElement('div');
+  welcome.className = 'welcome-message';
+  welcome.innerHTML = `
+    <p id="welcomeText">Ask any question about this video!</p>
+    <div id="suggestedQuestions" class="suggested-questions"></div>
+  `;
+  messages.appendChild(welcome);
+
+  // Populate with language-appropriate prompts
+  const videoLang = currentVideo?.language || 'en';
+  updateSuggestedQuestions(videoLang);
 }
 
 // Initialize on load
