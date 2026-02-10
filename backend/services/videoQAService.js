@@ -515,11 +515,18 @@ class VideoQAService {
 
     // --- PHASE 4: FIX BROKEN NUMBERED LISTS ---
     // Handles AI output like:
-    // "1. First: description\n1. Second: description\n1. Third: description"
-    // Converts to: "1. First: description\n\n2. Second: description\n\n3. Third: description"
+    // "Intro text: 1. First item\n1. Second item\n1. Third item"
+    // Converts to: "Intro text:\n\n1. First item\n\n2. Second item\n\n3. Third item"
+
+    // Pre-process: Split lines where numbered item is embedded mid-line
+    // Pattern: "text: 1. Item" or "text. 1. Item" -> split before the number
+    enhanced = enhanced.replace(/([.:!?])\s*(1\.?\s+)/g, '$1\n\n$2');
+
+    // Also handle "1." without space: "text: 1.Item" -> "text:\n\n1. Item"
+    enhanced = enhanced.replace(/([.:!?])\s*(1\.)([A-ZÀ-Ö])/g, '$1\n\n$2 $3');
 
     // Check if we have a numbered list that might be broken
-    if (/^1\.\s+/m.test(enhanced)) {
+    if (/1\.\s*/m.test(enhanced)) {
       // Split the text to process numbered list sections
       let currentNumber = 0;
       let result = '';
