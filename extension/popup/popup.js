@@ -730,6 +730,9 @@ function addMessage(content, type, timestamps = []) {
     saveChatHistory(currentVideo.videoId);
   }
 
+  // Show export button when we have chat history
+  updateExportButton();
+
   return messageEl.id;
 }
 
@@ -909,14 +912,19 @@ async function loadChatHistory(videoId) {
       requestAnimationFrame(() => {
         messages.scrollTop = messages.scrollHeight;
       });
+
+      // Show export button for restored chats
+      updateExportButton();
     } else {
       // Clear chat for new video
       chatHistory = [];
       clearMessages();
+      updateExportButton();
     }
   } catch (error) {
     console.error('Error loading chat history:', error);
     chatHistory = [];
+    updateExportButton();
   }
 }
 
@@ -981,6 +989,22 @@ function clearMessages() {
   // Populate with language-appropriate prompts
   const videoLang = currentVideo?.language || 'en';
   updateSuggestedQuestions(videoLang);
+
+  // Hide export button when no messages
+  updateExportButton();
+}
+
+/**
+ * Show/hide export button based on chat history
+ */
+function updateExportButton() {
+  if (exportBtn) {
+    if (chatHistory && chatHistory.length > 0) {
+      exportBtn.classList.remove('hidden');
+    } else {
+      exportBtn.classList.add('hidden');
+    }
+  }
 }
 
 /**
@@ -992,11 +1016,16 @@ function exportChatAsPDF() {
     return;
   }
 
-  // Build HTML content for print
-  const videoTitle = currentVideo?.title || 'YouTube Video';
-  const videoChannel = currentVideo?.channel || 'Unknown Channel';
+  // Get video info - prefer DOM elements (always up to date) over currentVideo state
+  const videoTitleEl = document.getElementById('videoTitle');
+  const videoChannelEl = document.getElementById('videoChannel');
+  const videoThumbnailEl = document.getElementById('videoThumbnail');
+
+  const videoTitleText = videoTitleEl?.textContent || currentVideo?.title || 'YouTube Video';
+  const videoChannelText = videoChannelEl?.textContent || currentVideo?.channel || '';
   const videoId = currentVideo?.videoId || '';
   const videoUrl = videoId ? `https://youtube.com/watch?v=${videoId}` : '';
+  const thumbnailUrl = videoThumbnailEl?.src || (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : '');
   const exportDate = new Date().toLocaleDateString();
 
   let conversationHtml = '';
@@ -1017,7 +1046,7 @@ function exportChatAsPDF() {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Lurnia Chat - ${escapeHtml(videoTitle)}</title>
+  <title>Lurnia Chat - ${escapeHtml(videoTitleText)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -1029,62 +1058,99 @@ function exportChatAsPDF() {
       padding: 40px 20px;
     }
     .header {
-      border-bottom: 2px solid #3b82f6;
-      padding-bottom: 20px;
-      margin-bottom: 30px;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 32px;
+      color: white;
     }
-    .logo {
+    .header-top {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
+      gap: 12px;
+      margin-bottom: 20px;
     }
     .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-icon svg {
       width: 24px;
       height: 24px;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      border-radius: 6px;
     }
     .logo-text {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 700;
-      color: #3b82f6;
+      letter-spacing: -0.5px;
     }
-    .video-info {
-      background: #f8fafc;
+    .video-card {
+      background: white;
+      border-radius: 12px;
       padding: 16px;
+      display: flex;
+      gap: 16px;
+      color: #1a1a1a;
+    }
+    .video-thumbnail {
+      width: 120px;
+      height: 68px;
       border-radius: 8px;
-      margin-bottom: 8px;
+      object-fit: cover;
+      background: #e2e8f0;
+      flex-shrink: 0;
+    }
+    .video-details {
+      flex: 1;
+      min-width: 0;
     }
     .video-title {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       color: #1e293b;
       margin-bottom: 4px;
+      line-height: 1.3;
     }
     .video-channel {
-      font-size: 14px;
+      font-size: 13px;
       color: #64748b;
+      margin-bottom: 6px;
     }
     .video-link {
-      font-size: 12px;
+      font-size: 11px;
       color: #3b82f6;
       text-decoration: none;
       word-break: break-all;
     }
     .meta {
       font-size: 12px;
-      color: #94a3b8;
+      color: rgba(255,255,255,0.8);
+      margin-top: 16px;
+      text-align: right;
+    }
+    .conversation-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
     }
     .conversation {
-      margin-top: 24px;
+      margin-top: 8px;
     }
     .message {
       margin-bottom: 20px;
       page-break-inside: avoid;
     }
     .role {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -1094,67 +1160,101 @@ function exportChatAsPDF() {
     .assistant-msg .role { color: #8b5cf6; }
     .content {
       background: #f8fafc;
-      padding: 12px 16px;
-      border-radius: 8px;
+      padding: 14px 18px;
+      border-radius: 12px;
       font-size: 14px;
+      line-height: 1.6;
     }
     .user-msg .content {
-      background: #eff6ff;
+      background: linear-gradient(135deg, #eff6ff, #f0f9ff);
       border-left: 3px solid #3b82f6;
     }
     .assistant-msg .content {
-      background: #faf5ff;
+      background: linear-gradient(135deg, #faf5ff, #f5f3ff);
       border-left: 3px solid #8b5cf6;
     }
-    .content p { margin-bottom: 8px; }
+    .content p { margin-bottom: 10px; }
     .content p:last-child { margin-bottom: 0; }
     .content ul, .content ol {
-      margin: 8px 0;
+      margin: 10px 0;
       padding-left: 24px;
     }
-    .content li { margin-bottom: 4px; }
+    .content li { margin-bottom: 6px; }
     .content strong { font-weight: 600; }
     .content em { font-style: italic; }
     .content code {
       background: #e2e8f0;
       padding: 2px 6px;
       border-radius: 4px;
-      font-family: monospace;
+      font-family: 'SF Mono', Monaco, monospace;
       font-size: 13px;
     }
     .footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid #e2e8f0;
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 2px solid #e2e8f0;
+      text-align: center;
+    }
+    .footer-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .footer-logo-icon {
+      width: 20px;
+      height: 20px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 5px;
+    }
+    .footer-text {
       font-size: 12px;
       color: #94a3b8;
-      text-align: center;
+    }
+    .footer a {
+      color: #3b82f6;
+      text-decoration: none;
     }
     @media print {
       body { padding: 20px; }
+      .header { break-inside: avoid; }
       .message { page-break-inside: avoid; }
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">
-      <div class="logo-icon"></div>
+    <div class="header-top">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </div>
       <span class="logo-text">Lurnia</span>
     </div>
-    <div class="video-info">
-      <div class="video-title">${escapeHtml(videoTitle)}</div>
-      <div class="video-channel">${escapeHtml(videoChannel)}</div>
-      ${videoUrl ? `<a class="video-link" href="${videoUrl}">${videoUrl}</a>` : ''}
+    <div class="video-card">
+      ${thumbnailUrl ? `<img class="video-thumbnail" src="${thumbnailUrl}" alt="Video thumbnail">` : ''}
+      <div class="video-details">
+        <div class="video-title">${escapeHtml(videoTitleText)}</div>
+        ${videoChannelText ? `<div class="video-channel">${escapeHtml(videoChannelText)}</div>` : ''}
+        ${videoUrl ? `<a class="video-link" href="${videoUrl}">${videoUrl}</a>` : ''}
+      </div>
     </div>
     <div class="meta">Exported on ${exportDate}</div>
   </div>
+  <div class="conversation-header">Conversation</div>
   <div class="conversation">
     ${conversationHtml}
   </div>
   <div class="footer">
-    Generated with Lurnia - AI-powered YouTube learning assistant<br>
-    <a href="https://lurnia.app">lurnia.app</a>
+    <div class="footer-logo">
+      <div class="footer-logo-icon"></div>
+      <span style="font-weight: 600; color: #1e293b;">Lurnia</span>
+    </div>
+    <div class="footer-text">
+      AI-powered YouTube learning assistant<br>
+      <a href="https://lurnia.app">lurnia.app</a>
+    </div>
   </div>
 </body>
 </html>

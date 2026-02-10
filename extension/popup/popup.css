@@ -206,8 +206,34 @@ body {
 }
 
 #statusText {
+  flex: 1;
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+/* Export Button */
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--primary-blue);
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--primary-blue);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.export-btn:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.export-btn.hidden {
+  display: none;
 }
 
 /* Video Info */
