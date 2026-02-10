@@ -753,8 +753,10 @@ class VideoQAService {
     const frenchPatterns = [
       /\b(donne|donnes|liste|montre|quels sont|quelles sont)\s+(moi\s+)?(les\s+)?(\d+|tous|toutes|meilleurs|meilleures)\s+/i,
       /\btop\s+\d+\b/i,
-      /\b\d+\s+(choses|éléments|façons|étapes|conseils|stratégies|business|idées|points)\b/i,
+      /\b\d+\s+(choses|éléments|façons|étapes|conseils|stratégies|business|idées|points|astuces|clés|techniques|méthodes|outils|exemples|raisons|avantages)\b/i,
       /\bà\s+lancer\b/i, // "businesses to launch"
+      /\b(quels|quelles)\s+sont\s+les\s+\d+\s+/i, // "quelles sont les 3 astuces"
+      /\bles\s+\d+\s+(meilleures?|principales?|premières?)\s+/i, // "les 3 meilleures..."
     ];
 
     const allPatterns = [...englishPatterns, ...frenchPatterns];
@@ -998,30 +1000,42 @@ Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\nCo
         // Build prompt instruction based on question type
         const promptInstruction = isEnumeration
           ? (isFrench
-              ? `🚨 CRITICAL: This is a NUMBERED LIST question. You MUST format like this:
+              ? `🚨🚨🚨 LISTE NUMÉROTÉE OBLIGATOIRE - RÈGLE ABSOLUE 🚨🚨🚨
 
-Optional intro sentence.
+FORMAT EXACT À SUIVRE (copier ce format EXACTEMENT):
 
-1. **Premier business**: Description en 15-25 mots.
-2. **Deuxième business**: Description en 15-25 mots.
-3. **Troisième business**: Description en 15-25 mots.
-...continue jusqu'à ${itemCount || 'N'}...
+1. **Premier élément**: Description en 15-25 mots.
+2. **Deuxième élément**: Description en 15-25 mots.
+3. **Troisième élément**: Description en 15-25 mots.
+${itemCount ? `...continuer jusqu'à ${itemCount}...` : ''}
 
 Références: [timestamps]
 
-⚠️ EVERY item MUST start with its NUMBER (1., 2., 3., etc.). DO NOT skip numbers!`
-              : `🚨 CRITICAL: This is a NUMBERED LIST question. You MUST format like this:
+⛔ ERREURS INTERDITES (votre réponse sera REJETÉE si vous faites ces erreurs):
+- ❌ INTERDIT: Écrire un élément SANS son numéro (ex: "Document de..." au lieu de "2. Document de...")
+- ❌ INTERDIT: Utiliser des tirets (-) ou puces (•) au lieu de numéros
+- ❌ INTERDIT: Oublier le numéro sur N'IMPORTE QUEL élément
 
-Optional intro sentence.
+✅ OBLIGATOIRE: CHAQUE ligne d'élément DOIT commencer par "1. ", "2. ", "3. ", etc.
+✅ VÉRIFIEZ: Avant de répondre, comptez que CHAQUE élément a son numéro!`
+              : `🚨🚨🚨 NUMBERED LIST REQUIRED - ABSOLUTE RULE 🚨🚨🚨
+
+EXACT FORMAT TO FOLLOW (copy this format EXACTLY):
 
 1. **First item**: Description in 15-25 words.
 2. **Second item**: Description in 15-25 words.
 3. **Third item**: Description in 15-25 words.
-...continue to ${itemCount || 'N'}...
+${itemCount ? `...continue to ${itemCount}...` : ''}
 
 References: [timestamps]
 
-⚠️ EVERY item MUST start with its NUMBER (1., 2., 3., etc.). DO NOT skip numbers!`)
+⛔ FORBIDDEN ERRORS (your response will be REJECTED if you make these errors):
+- ❌ FORBIDDEN: Writing an item WITHOUT its number (e.g., "Document..." instead of "2. Document...")
+- ❌ FORBIDDEN: Using dashes (-) or bullets (•) instead of numbers
+- ❌ FORBIDDEN: Forgetting the number on ANY item
+
+✅ REQUIRED: EVERY item line MUST start with "1. ", "2. ", "3. ", etc.
+✅ VERIFY: Before responding, count that EVERY item has its number!`)
           : (isFrench
               ? 'Répondez naturellement et de manière conversationnelle. FORMATAGE: Paragraphes COURTS (1-2 phrases) avec une LIGNE VIDE entre chaque. Utilisez des emojis pour les sections. Terminez par "Références: [timestamps]"'
               : 'Answer naturally and conversationally. FORMATTING: SHORT paragraphs (1-2 sentences) with a BLANK LINE between each. Use emojis for sections. End with "References: [timestamps]"');

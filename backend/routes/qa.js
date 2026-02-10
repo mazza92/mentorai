@@ -441,7 +441,7 @@ router.get('/suggested-prompts/:projectId', async (req, res) => {
  */
 router.post('/video-direct', async (req, res) => {
   try {
-    const { videoId, question, userId, videoTitle, channelName, transcript: clientTranscript } = req.body;
+    const { videoId, question, userId, videoTitle, channelName, transcript: clientTranscript, videoLanguage } = req.body;
 
     if (!videoId || !question) {
       return res.status(400).json({ error: 'Video ID and question are required' });
@@ -455,6 +455,7 @@ router.post('/video-direct', async (req, res) => {
     console.log('[QA Direct] Question:', question.substring(0, 50) + (question.length > 50 ? '...' : ''));
     console.log('[QA Direct] UserId:', userId);
     console.log('[QA Direct] Client transcript:', clientTranscript ? `${clientTranscript.length} chars` : 'not provided');
+    console.log('[QA Direct] Video language from captions:', videoLanguage || 'not provided');
 
     // Check question quota before processing
     try {
@@ -503,10 +504,24 @@ router.post('/video-direct', async (req, res) => {
     const transcript = { text: transcriptText }; // Wrap in object format expected by service
     const videoAnalysis = { title: videoTitle || 'YouTube Video', author: channelName || 'Unknown' };
 
-    // Detect language from question (simple heuristic)
-    const frenchIndicators = /[àâäéèêëïîôùûüç]|qu'|l'|d'|n'|c'|j'|s'|est-ce|qu'est|c'est|j'ai|je suis|comment|pourquoi|qu'est-ce/i;
-    const detectedLang = frenchIndicators.test(question) ? 'fr' : 'en';
-    console.log('[QA Direct] Detected question language:', detectedLang);
+    // Determine response language:
+    // 1. Primary: Use video's caption language (most reliable - from YouTube metadata)
+    // 2. Fallback: Detect from question text if caption language not available
+    let responseLanguage = videoLanguage; // e.g., 'fr', 'en', 'es', etc.
+
+    if (!responseLanguage) {
+      // Fallback: detect from question text
+      const frenchPatterns = [
+        /[àâäéèêëïîôùûüçœæ]/i,
+        /\b(qu'|l'|d'|n'|c'|j'|s'|m'|t')\w/i,
+        /\b(qui|que|quoi|quel|comment|pourquoi|combien)\b/i,
+        /\b(sont|suis|est|les|des|une|cette)\b/i
+      ];
+      responseLanguage = frenchPatterns.some(p => p.test(question)) ? 'fr' : 'en';
+      console.log('[QA Direct] Language from question detection:', responseLanguage);
+    } else {
+      console.log('[QA Direct] Using video caption language:', responseLanguage);
+    }
 
     const qaResult = await videoQAService.answerQuestion(
       question,
@@ -514,7 +529,7 @@ router.post('/video-direct', async (req, res) => {
       transcript,
       [], // No chat history
       '', // No personalized context
-      detectedLang // Auto-detect from question
+      responseLanguage // From video captions or question detection
     );
 
     // Increment question count
