@@ -601,13 +601,14 @@ class VideoQAService {
           continue;
         }
 
-        // Empty line ends the list
+        // Empty line - flush buffer but DON'T reset inList
+        // (empty lines are spacing between list items, not list terminators)
         if (!trimmedLine) {
           if (listBuffer) {
             result += listBuffer + '\n';
             listBuffer = '';
           }
-          inList = false;
+          // Keep inList = true so next "1." gets auto-incremented
           result += '\n';
           continue;
         }
