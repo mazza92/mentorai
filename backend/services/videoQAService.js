@@ -1059,24 +1059,25 @@ References: [timestamps]
         // Remove ALL <cite> tags (including empty ones, with attributes, etc.)
         // This regex matches: <cite>, </cite>, <cite></cite>, <cite> </cite>, <cite ...>, etc.
         // Do this multiple times to catch nested or adjacent tags
+        let cleanedAnswer = answer;
         for (let i = 0; i < 3; i++) {
-          answer = answer.replace(/<cite[^>]*>[\s]*<\/cite>/gi, ''); // Empty cite tags
-          answer = answer.replace(/<cite[^>]*>/gi, ''); // Opening cite tags
-          answer = answer.replace(/<\/cite>/gi, ''); // Closing cite tags
+          cleanedAnswer = cleanedAnswer.replace(/<cite[^>]*>[\s]*<\/cite>/gi, ''); // Empty cite tags
+          cleanedAnswer = cleanedAnswer.replace(/<cite[^>]*>/gi, ''); // Opening cite tags
+          cleanedAnswer = cleanedAnswer.replace(/<\/cite>/gi, ''); // Closing cite tags
         }
         // Clean up any extra whitespace left behind
-        answer = answer.replace(/\s{2,}/g, ' '); // Multiple spaces to single space
-        answer = answer.replace(/\s+([.,;:!?])/g, '$1'); // Remove space before punctuation
-        answer = answer.replace(/([.,;:!?])\s{2,}/g, '$1 '); // Fix spaces after punctuation
+        cleanedAnswer = cleanedAnswer.replace(/\s{2,}/g, ' '); // Multiple spaces to single space
+        cleanedAnswer = cleanedAnswer.replace(/\s+([.,;:!?])/g, '$1'); // Remove space before punctuation
+        cleanedAnswer = cleanedAnswer.replace(/([.,;:!?])\s{2,}/g, '$1 '); // Fix spaces after punctuation
 
         // Enhance readability with better formatting
-        answer = this.enhanceReadability(answer, userQuestion);
+        cleanedAnswer = this.enhanceReadability(cleanedAnswer, userQuestion);
 
         // Convert markdown to HTML for frontend rendering
-        const htmlAnswer = this.markdownToHtml(answer);
+        const htmlAnswer = this.markdownToHtml(cleanedAnswer);
 
         // Analyze answer for actionable insights
-        const insights = this.analyzeInsights(answer, userQuestion);
+        const insights = this.analyzeInsights(cleanedAnswer, userQuestion);
 
         // Extract visual context for each citation
         const uniqueCitations = [...new Set(citations)];
@@ -1086,7 +1087,7 @@ References: [timestamps]
         console.log('Visual context:', Object.keys(visualContext).length, 'timestamps with visual data');
 
         return {
-          answer: answer.trim(), // Markdown format
+          answer: cleanedAnswer.trim(), // Markdown format
           answerHtml: htmlAnswer, // HTML format for easy rendering
           citations: uniqueCitations,
           visualContext: visualContext, // New: visual context for each citation
