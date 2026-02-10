@@ -31,6 +31,7 @@ const planStat = document.getElementById('planStat');
 let currentUser = null;
 let currentVideo = null;
 let isProcessing = false;
+let chatHistory = []; // Track chat messages for persistence
 
 // Generate anonymous user ID for MVP (no login required)
 function getAnonymousUserId() {
@@ -304,7 +305,7 @@ async function fetchVideoInfo(videoId) {
   }
 }
 
-function handleVideoDetected(data) {
+async function handleVideoDetected(data) {
   currentVideo = data;
 
   updateStatus('ready', 'Ready to answer questions');
@@ -317,6 +318,9 @@ function handleVideoDetected(data) {
 
   // Enable input
   questionInput.disabled = false;
+
+  // Load saved chat history for this video
+  await loadChatHistory(data.videoId);
 }
 
 function updateStatus(status, text) {
@@ -437,7 +441,8 @@ function addMessage(content, type, timestamps = []) {
   messageEl.className = `message ${type}`;
   messageEl.id = `msg-${Date.now()}`;
 
-  let html = escapeHtml(content);
+  // For assistant messages, render markdown; for user messages, escape HTML
+  let html = type === 'assistant' ? simpleMarkdown(content) : escapeHtml(content);
 
   // Add clickable timestamps for assistant messages
   if (type === 'assistant' && timestamps && timestamps.length > 0) {
@@ -463,6 +468,12 @@ function addMessage(content, type, timestamps = []) {
   messages.appendChild(messageEl);
   messages.scrollTop = messages.scrollHeight;
 
+  // Save to chat history (for persistence)
+  chatHistory.push({ content, type, timestamps });
+  if (currentVideo) {
+    saveChatHistory(currentVideo.videoId);
+  }
+
   return messageEl.id;
 }
 
@@ -470,6 +481,40 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Simple markdown to HTML converter for assistant messages
+function simpleMarkdown(text) {
+  if (!text) return '';
+
+  // First escape HTML to prevent XSS
+  let html = escapeHtml(text);
+
+  // Bold: **text** or __text__
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+  // Italic: *text* or _text_
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+  // Line breaks
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = html.replace(/\n/g, '<br>');
+
+  // Bullet points
+  html = html.replace(/^[\s]*[-•]\s+(.+)/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+
+  // Numbered lists
+  html = html.replace(/^[\s]*\d+\.\s+(.+)/gm, '<li>$1</li>');
+
+  // Wrap in paragraph
+  if (!html.startsWith('<')) {
+    html = '<p>' + html + '</p>';
+  }
+
+  return html;
 }
 
 function addLoadingMessage() {
@@ -519,6 +564,97 @@ async function loadUserQuota() {
     // Set defaults for anonymous/new users
     const defaultLimit = currentUser.isAnonymous ? 5 : 500;
     quotaText.textContent = `0/${defaultLimit} questions`;
+  }
+}
+
+// Chat Persistence
+async function loadChatHistory(videoId) {
+  try {
+    const result = await chrome.storage.local.get(`chat_${videoId}`);
+    const savedChat = result[`chat_${videoId}`];
+
+    if (savedChat && savedChat.messages && savedChat.messages.length > 0) {
+      console.log('[Popup] Restoring', savedChat.messages.length, 'messages for video', videoId);
+      chatHistory = savedChat.messages;
+
+      // Clear existing messages (keep welcome)
+      const welcomeMsg = messages.querySelector('.welcome-message');
+      messages.innerHTML = '';
+      if (welcomeMsg) messages.appendChild(welcomeMsg);
+
+      // Restore messages
+      for (const msg of chatHistory) {
+        restoreMessage(msg.content, msg.type, msg.timestamps || []);
+      }
+    } else {
+      // Clear chat for new video
+      chatHistory = [];
+      clearMessages();
+    }
+  } catch (error) {
+    console.error('Error loading chat history:', error);
+    chatHistory = [];
+  }
+}
+
+async function saveChatHistory(videoId) {
+  if (!videoId) return;
+
+  try {
+    await chrome.storage.local.set({
+      [`chat_${videoId}`]: {
+        messages: chatHistory,
+        timestamp: Date.now()
+      }
+    });
+    console.log('[Popup] Saved', chatHistory.length, 'messages for video', videoId);
+  } catch (error) {
+    console.error('Error saving chat history:', error);
+  }
+}
+
+function restoreMessage(content, type, timestamps = []) {
+  // Similar to addMessage but doesn't save (to avoid loop)
+  const messageEl = document.createElement('div');
+  messageEl.className = `message ${type}`;
+  messageEl.id = `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  let html = type === 'assistant' ? simpleMarkdown(content) : escapeHtml(content);
+
+  if (type === 'assistant' && timestamps && timestamps.length > 0) {
+    html += '<div class="timestamps">';
+    timestamps.forEach(ts => {
+      html += `<span class="timestamp" data-time="${ts.seconds}">${escapeHtml(ts.label)}</span>`;
+    });
+    html += '</div>';
+  }
+
+  messageEl.innerHTML = html;
+
+  if (type === 'assistant') {
+    messageEl.querySelectorAll('.timestamp').forEach(el => {
+      el.addEventListener('click', () => {
+        const time = parseInt(el.dataset.time);
+        seekVideo(time);
+      });
+    });
+  }
+
+  messages.appendChild(messageEl);
+}
+
+function clearMessages() {
+  const welcomeMsg = messages.querySelector('.welcome-message');
+  messages.innerHTML = '';
+
+  // Add back welcome message
+  if (!welcomeMsg) {
+    const welcome = document.createElement('div');
+    welcome.className = 'welcome-message';
+    welcome.innerHTML = '<p>Ask any question about this video and get AI-powered answers.</p>';
+    messages.appendChild(welcome);
+  } else {
+    messages.appendChild(welcomeMsg);
   }
 }
 

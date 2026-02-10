@@ -503,13 +503,18 @@ router.post('/video-direct', async (req, res) => {
     const transcript = { text: transcriptText }; // Wrap in object format expected by service
     const videoAnalysis = { title: videoTitle || 'YouTube Video', author: channelName || 'Unknown' };
 
+    // Detect language from question (simple heuristic)
+    const frenchIndicators = /[àâäéèêëïîôùûüç]|qu'|l'|d'|n'|c'|j'|s'|est-ce|qu'est|c'est|j'ai|je suis|comment|pourquoi|qu'est-ce/i;
+    const detectedLang = frenchIndicators.test(question) ? 'fr' : 'en';
+    console.log('[QA Direct] Detected question language:', detectedLang);
+
     const qaResult = await videoQAService.answerQuestion(
       question,
       videoAnalysis,
       transcript,
       [], // No chat history
       '', // No personalized context
-      'en' // Default language
+      detectedLang // Auto-detect from question
     );
 
     // Increment question count
