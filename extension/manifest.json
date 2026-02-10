@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Lurnia - YouTube Learning Companion",
+  "version": "1.0.0",
+  "description": "Ask questions about any YouTube video and get AI-powered answers with timestamps",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "contextMenus",
+    "alarms",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://youtube.com/*",
+    "https://lurnia.app/*",
+    "https://mentorai-production.up.railway.app/*",
+    "http://localhost:3001/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://youtube.com/*"],
+      "js": ["content/youtube-detector.js"],
+      "css": ["content/youtube-overlay.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

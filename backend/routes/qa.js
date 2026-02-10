@@ -441,7 +441,7 @@ router.get('/suggested-prompts/:projectId', async (req, res) => {
  */
 router.post('/video-direct', async (req, res) => {
   try {
-    const { videoId, question, userId, videoTitle, channelName } = req.body;
+    const { videoId, question, userId, videoTitle, channelName, transcript: clientTranscript } = req.body;
 
     if (!videoId || !question) {
       return res.status(400).json({ error: 'Video ID and question are required' });
@@ -454,6 +454,7 @@ router.post('/video-direct', async (req, res) => {
     console.log('[QA Direct] Request for video:', videoId);
     console.log('[QA Direct] Question:', question.substring(0, 50) + (question.length > 50 ? '...' : ''));
     console.log('[QA Direct] UserId:', userId);
+    console.log('[QA Direct] Client transcript:', clientTranscript ? `${clientTranscript.length} chars` : 'not provided');
 
     // Check question quota before processing
     try {
@@ -476,20 +477,30 @@ router.post('/video-direct', async (req, res) => {
       // Continue anyway for now - don't block users on quota errors
     }
 
-    // Fetch transcript on-demand using channel transcript service (has multiple fallbacks)
-    const transcriptService = require('../services/channelTranscriptService');
-    const captionResult = await transcriptService.fetchTranscript(videoId);
+    // Use client-provided transcript if available (bypasses IP blocking)
+    // Otherwise, fetch transcript on-demand using channel transcript service
+    let transcriptText = clientTranscript;
 
-    if (!captionResult.available || !captionResult.text) {
-      return res.status(400).json({
-        error: 'No transcript available',
-        message: 'This video does not have captions available. Try a different video.'
-      });
+    if (!transcriptText) {
+      console.log('[QA Direct] No client transcript, fetching server-side...');
+      const transcriptService = require('../services/channelTranscriptService');
+      const captionResult = await transcriptService.fetchTranscript(videoId);
+
+      if (!captionResult.available || !captionResult.text) {
+        return res.status(400).json({
+          error: 'No transcript available',
+          message: 'This video does not have captions available. Try a different video.'
+        });
+      }
+
+      transcriptText = captionResult.text;
+    } else {
+      console.log('[QA Direct] Using client-provided transcript');
     }
 
     // Use videoQAService to answer the question
     // Signature: answerQuestion(userQuestion, videoAnalysis, transcript, chatHistory, personalizedContext, userLanguage)
-    const transcript = { text: captionResult.text }; // Wrap in object format expected by service
+    const transcript = { text: transcriptText }; // Wrap in object format expected by service
     const videoAnalysis = { title: videoTitle || 'YouTube Video', author: channelName || 'Unknown' };
 
     const qaResult = await videoQAService.answerQuestion(
