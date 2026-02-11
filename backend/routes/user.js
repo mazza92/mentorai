@@ -99,6 +99,7 @@ router.get('/:userId', async (req, res) => {
         user.videosThisMonth = 0;
         user.questionsThisMonth = 0;
         user.exportsThisMonth = 0;
+        user.shareBonusThisMonth = false; // Reset share bonus eligibility
         user.lastResetDate = now;
         mockUsers.set(userId, user);
       }
@@ -157,11 +158,13 @@ router.get('/:userId', async (req, res) => {
         videosThisMonth: 0,
         questionsThisMonth: 0,
         exportsThisMonth: 0,
+        shareBonusThisMonth: false, // Reset share bonus eligibility
         lastResetDate: now,
       });
       user.videosThisMonth = 0;
       user.questionsThisMonth = 0;
       user.exportsThisMonth = 0;
+      user.shareBonusThisMonth = false;
     }
 
     res.json({ user });
@@ -535,23 +538,88 @@ router.post('/:userId/increment-video', async (req, res) => {
   }
 });
 
+// In-memory fingerprint tracking (for abuse detection)
+const fingerprintBonusTracker = new Map(); // fingerprint -> { lastBonus: Date, count: number }
+
 // Grant bonus questions (for sharing, referrals, etc.)
+// Limited to 1 share bonus per month per user to prevent abuse
 router.post('/:userId/bonus-questions', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { count = 5, source = 'share' } = req.body;
+    const { count = 5, source = 'share', fingerprint } = req.body;
 
-    // Validate count (max 10 bonus questions per request)
-    const bonusCount = Math.min(Math.max(1, parseInt(count) || 5), 10);
+    // Validate count (max 5 bonus questions per request for share)
+    const bonusCount = Math.min(Math.max(1, parseInt(count) || 5), 5);
+
+    // Fingerprint-based abuse detection (for anonymous users creating multiple accounts)
+    if (fingerprint && source === 'share') {
+      const fpTrack = fingerprintBonusTracker.get(fingerprint);
+      const now = new Date();
+
+      if (fpTrack) {
+        // Check if this fingerprint already got bonus this month
+        const sameMonth = fpTrack.lastBonus.getMonth() === now.getMonth() &&
+                         fpTrack.lastBonus.getFullYear() === now.getFullYear();
+
+        if (sameMonth && fpTrack.count >= 1) {
+          console.log(`[Bonus] Fingerprint ${fingerprint} blocked - already claimed ${fpTrack.count} times this month`);
+          return res.json({
+            success: false,
+            error: 'fingerprint_blocked',
+            message: 'Share bonus limit reached for this device'
+          });
+        }
+
+        // Reset count if new month
+        if (!sameMonth) {
+          fpTrack.count = 0;
+        }
+      }
+    }
+
+    // Helper to check if bonus was already claimed this month
+    const isSameMonth = (date) => {
+      if (!date) return false;
+      const bonusDate = new Date(date);
+      const now = new Date();
+      return bonusDate.getMonth() === now.getMonth() &&
+             bonusDate.getFullYear() === now.getFullYear();
+    };
 
     // Use mock mode if Firestore is not available
     if (useMockMode || !process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID === 'your_project_id') {
       let user = mockUsers.get(userId) || { userId, tier: 'free', questionsThisMonth: 0 };
+
+      // Check if share bonus already claimed this month
+      if (source === 'share' && user.shareBonusThisMonth && isSameMonth(user.lastShareBonusDate)) {
+        return res.json({
+          success: false,
+          error: 'already_claimed',
+          message: 'Share bonus already claimed this month',
+          nextAvailable: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
+        });
+      }
+
       // Decrease questions used (min 0) to effectively grant bonus
       user.questionsThisMonth = Math.max(0, (user.questionsThisMonth || 0) - bonusCount);
       user.bonusGranted = (user.bonusGranted || 0) + bonusCount;
       user.lastBonusSource = source;
       user.lastBonusDate = new Date();
+
+      // Track share bonus specifically
+      if (source === 'share') {
+        user.shareBonusThisMonth = true;
+        user.lastShareBonusDate = new Date();
+
+        // Track fingerprint
+        if (fingerprint) {
+          const fpTrack = fingerprintBonusTracker.get(fingerprint) || { count: 0 };
+          fpTrack.lastBonus = new Date();
+          fpTrack.count += 1;
+          fingerprintBonusTracker.set(fingerprint, fpTrack);
+        }
+      }
+
       mockUsers.set(userId, user);
       return res.json({
         success: true,
@@ -566,7 +634,7 @@ router.post('/:userId/bonus-questions', async (req, res) => {
 
       if (!userDoc.exists) {
         // Create user with bonus already applied
-        await firestore.collection('users').doc(userId).set({
+        const userData = {
           userId,
           tier: 'free',
           questionsThisMonth: 0,
@@ -575,7 +643,24 @@ router.post('/:userId/bonus-questions', async (req, res) => {
           lastBonusDate: new Date(),
           createdAt: new Date(),
           lastResetDate: new Date(),
-        });
+        };
+
+        // Track share bonus specifically
+        if (source === 'share') {
+          userData.shareBonusThisMonth = true;
+          userData.lastShareBonusDate = new Date();
+
+          // Track fingerprint for abuse prevention
+          if (fingerprint) {
+            userData.fingerprint = fingerprint;
+            const fpTrack = fingerprintBonusTracker.get(fingerprint) || { count: 0 };
+            fpTrack.lastBonus = new Date();
+            fpTrack.count += 1;
+            fingerprintBonusTracker.set(fingerprint, fpTrack);
+          }
+        }
+
+        await firestore.collection('users').doc(userId).set(userData);
         return res.json({
           success: true,
           bonusGranted: bonusCount,
@@ -584,17 +669,46 @@ router.post('/:userId/bonus-questions', async (req, res) => {
         });
       }
 
-      const currentCount = userDoc.data().questionsThisMonth || 0;
-      const newCount = Math.max(0, currentCount - bonusCount);
-      const totalBonus = (userDoc.data().bonusGranted || 0) + bonusCount;
+      const existingData = userDoc.data();
 
-      await firestore.collection('users').doc(userId).update({
+      // Check if share bonus already claimed this month
+      if (source === 'share' && existingData.shareBonusThisMonth && isSameMonth(existingData.lastShareBonusDate?.toDate ? existingData.lastShareBonusDate.toDate() : existingData.lastShareBonusDate)) {
+        return res.json({
+          success: false,
+          error: 'already_claimed',
+          message: 'Share bonus already claimed this month',
+          nextAvailable: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
+        });
+      }
+
+      const currentCount = existingData.questionsThisMonth || 0;
+      const newCount = Math.max(0, currentCount - bonusCount);
+      const totalBonus = (existingData.bonusGranted || 0) + bonusCount;
+
+      const updateData = {
         questionsThisMonth: newCount,
         bonusGranted: totalBonus,
         lastBonusSource: source,
         lastBonusDate: new Date(),
         updatedAt: new Date(),
-      });
+      };
+
+      // Track share bonus specifically
+      if (source === 'share') {
+        updateData.shareBonusThisMonth = true;
+        updateData.lastShareBonusDate = new Date();
+
+        // Track fingerprint for abuse prevention
+        if (fingerprint) {
+          updateData.fingerprint = fingerprint;
+          const fpTrack = fingerprintBonusTracker.get(fingerprint) || { count: 0 };
+          fpTrack.lastBonus = new Date();
+          fpTrack.count += 1;
+          fingerprintBonusTracker.set(fingerprint, fpTrack);
+        }
+      }
+
+      await firestore.collection('users').doc(userId).update(updateData);
 
       return res.json({
         success: true,
