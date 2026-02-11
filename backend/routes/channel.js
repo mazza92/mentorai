@@ -66,6 +66,23 @@ router.post('/import', async (req, res) => {
 
     console.log(`[API] Resolved channel ID: ${channelId}`);
 
+    // Check channel size before importing (fetch metadata first)
+    const channelInfo = await simpleChannelService.fetchChannelInfo(channelId);
+    const MAX_VIDEOS = 500;
+
+    if (channelInfo.videoCount > MAX_VIDEOS) {
+      console.log(`[API] Channel too large: ${channelInfo.videoCount} videos (max: ${MAX_VIDEOS})`);
+      return res.status(400).json({
+        success: false,
+        error: 'channel_too_large',
+        message: `This channel has ${channelInfo.videoCount} videos, which exceeds our limit of ${MAX_VIDEOS} videos. For very large channels, please use the "Single Video" mode to import specific videos.`,
+        channelName: channelInfo.title,
+        videoCount: channelInfo.videoCount,
+        limit: MAX_VIDEOS,
+        suggestion: 'single_video'
+      });
+    }
+
     // Step 1: Quick import - get channel info and video list (no transcripts, returns in 1-2s)
     const quickImport = await simpleChannelService.importChannel(channelId, userId, {
       fetchTranscripts: false, // Don't fetch ANY transcripts - do it all in background
@@ -134,6 +151,17 @@ router.post('/import', async (req, res) => {
 
   } catch (error) {
     console.error('[API] Channel import error:', error);
+
+    // Check if it's a transaction size error (Firestore limit)
+    if (error.message.includes('Transaction too big') ||
+        error.message.includes('INVALID_ARGUMENT') && error.message.includes('transaction')) {
+      return res.status(400).json({
+        success: false,
+        error: 'channel_too_large',
+        message: 'This channel has too many videos to process at once. Please use the "Single Video" mode to import specific videos instead.',
+        suggestion: 'single_video'
+      });
+    }
 
     // Check if it's a bot detection error
     if (error.message.includes('Too Many Requests') ||

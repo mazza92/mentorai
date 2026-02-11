@@ -49,6 +49,13 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [quotaUsage, setQuotaUsage] = useState<{used: number, limit: number} | undefined>(undefined)
 
+  // Large channel error state
+  const [largeChannelError, setLargeChannelError] = useState<{
+    channelName?: string
+    videoCount?: number
+    limit?: number
+  } | null>(null)
+
   // Helper to check if user is anonymous
   const isAnonymousUser = (userId: string) => {
     return !userId || userId === 'anonymous' || userId.startsWith('anon_') || userId.startsWith('session_')
@@ -163,6 +170,7 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     setImportStatus(null)
     setProgress(null)
     setCurrentProjectId(null)
+    setLargeChannelError(null)
     processingStartTime.current = Date.now()
 
     // Track URL submission
@@ -228,8 +236,19 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
     } catch (err: any) {
       console.error('Channel import error:', err)
 
+      // Handle large channel error (400)
+      if (err.response?.status === 400 && err.response?.data?.error === 'channel_too_large') {
+        const errorData = err.response.data
+        setLargeChannelError({
+          channelName: errorData.channelName,
+          videoCount: errorData.videoCount,
+          limit: errorData.limit
+        })
+        setError(null) // Clear generic error, show special UI instead
+        trackError('channel_too_large', `${errorData.videoCount} videos`, 'channel_import')
+      }
       // Handle quota exceeded error with user-friendly modals
-      if (err.response?.status === 403) {
+      else if (err.response?.status === 403) {
         const errorData = err.response.data
         const quota = errorData.quota
 
@@ -256,7 +275,7 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
         setError(null)
       } else if (err.response?.data?.error) {
         // Other API errors - show user-friendly message
-        setError(err.response.data.error)
+        setError(err.response.data.message || err.response.data.error)
         trackError('api_error', err.response.data.error, 'channel_import')
       } else if (err.code === 'ECONNABORTED') {
         setError(t('channel.error_timeout') || 'Request timeout. The channel might be too large. Please try again.')
@@ -378,6 +397,54 @@ export default function ChannelImport({ userId, onImportComplete }: ChannelImpor
               Preparing channel... This may take a moment for large channels.
             </p>
           )}
+        </div>
+      )}
+
+      {/* Large Channel Error */}
+      {largeChannelError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-amber-800 font-medium">
+                {t('channel.error_too_large_title') || 'Channel Too Large'}
+              </p>
+              <p className="text-amber-700 text-sm mt-1">
+                {largeChannelError.channelName && (
+                  <strong>{largeChannelError.channelName}</strong>
+                )}{' '}
+                {t('channel.error_too_large_message', {
+                  videoCount: largeChannelError.videoCount,
+                  limit: largeChannelError.limit
+                }) || `has ${largeChannelError.videoCount} videos, which exceeds our limit of ${largeChannelError.limit} videos.`}
+              </p>
+              <div className="mt-3 p-3 bg-white/70 rounded-lg">
+                <p className="text-amber-900 font-medium text-sm mb-2">
+                  {t('channel.error_too_large_alternatives') || 'What you can do:'}
+                </p>
+                <ul className="space-y-1.5 text-sm text-amber-800">
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-600">•</span>
+                    <span>
+                      {t('channel.error_too_large_option1') || 'Use "Single Video" mode to import specific videos from this channel'}
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-600">•</span>
+                    <span>
+                      {t('channel.error_too_large_option2') || 'Try a smaller channel with fewer videos'}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <button
+                onClick={() => setLargeChannelError(null)}
+                className="mt-3 text-amber-700 hover:text-amber-900 text-sm font-medium underline"
+              >
+                {t('common.close') || 'Close'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

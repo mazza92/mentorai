@@ -475,15 +475,40 @@ class SimpleChannelService {
       updatedAt: new Date().toISOString()
     });
 
-    // Store videos (batch write for performance)
-    const batch = firestore.batch();
-    videos.forEach(video => {
-      const videoRef = channelRef.collection('videos').doc(video.id);
-      batch.set(videoRef, video);
-    });
+    // Store videos in batches (Firestore limit: 500 operations per batch)
+    const BATCH_SIZE = 400; // Stay under 500 limit with safety margin
+    const videoBatches = this.chunkArray(videos, BATCH_SIZE);
 
-    await batch.commit();
+    console.log(`[SimpleChannel] Storing ${videos.length} videos in ${videoBatches.length} batches...`);
+
+    for (let i = 0; i < videoBatches.length; i++) {
+      const batch = firestore.batch();
+      const videoBatch = videoBatches[i];
+
+      videoBatch.forEach(video => {
+        const videoRef = channelRef.collection('videos').doc(video.id);
+        batch.set(videoRef, video);
+      });
+
+      await batch.commit();
+      console.log(`[SimpleChannel] ✓ Batch ${i + 1}/${videoBatches.length} committed (${videoBatch.length} videos)`);
+    }
+
     console.log(`[SimpleChannel] ✓ Stored ${videos.length} videos in Firestore`);
+  }
+
+  /**
+   * Split array into chunks
+   * @param {Array} array
+   * @param {number} size
+   * @returns {Array<Array>}
+   */
+  chunkArray(array, size) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
   }
 
   /**
