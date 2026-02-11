@@ -1,7 +1,8 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, Play, Clock, Eye } from 'lucide-react'
+import { ArrowRight, Play, Eye } from 'lucide-react'
 import Footer from '@/components/Footer'
+import SEOHeader from '@/components/SEOHeader'
 
 export const metadata: Metadata = {
   title: 'Guides IA de vidéos YouTube | Lurnia',
@@ -48,27 +49,9 @@ export default async function GuidesDirectoryPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">L</span>
-              </div>
-              <span className="font-bold text-xl text-slate-900">Lurnia</span>
-            </Link>
-            <Link
-              href="/"
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all text-sm"
-            >
-              Essayer Lurnia
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SEOHeader />
 
-      <main className="pt-24 pb-20">
+      <main className="pt-20 pb-20">
         <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
           {/* Hero Section */}
           <div className="text-center mb-16">

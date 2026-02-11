@@ -34,12 +34,13 @@ export const api = {
   /**
    * Get user quota information
    */
-  async getQuota(userId) {
+  async getQuota(userId, fingerprint = null) {
     const response = await fetch(`${API_BASE}/user/${userId}/check-question`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({ fingerprint })
     });
 
     if (!response.ok) {
@@ -52,6 +53,31 @@ export const api = {
       limit: data.limit || 500,
       plan: data.tier || 'free'
     };
+  },
+
+  /**
+   * Grant bonus questions to user (for sharing, referrals, etc.)
+   */
+  async grantBonusQuestions(userId, count, source = 'share', fingerprint = null) {
+    try {
+      const response = await fetch(`${API_BASE}/user/${userId}/bonus-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ count, source, fingerprint })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return { success: false, ...errorData };
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Grant bonus questions error:', error);
+      return { success: false, error: 'network_error' };
+    }
   },
 
   /**

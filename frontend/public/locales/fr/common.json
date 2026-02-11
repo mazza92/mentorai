@@ -47,6 +47,7 @@
     "most_popular": "Le plus populaire",
     "current_plan": "Formule actuelle",
     "upgrade_to": "Passer à {{plan}}",
+    "sign_in_to_upgrade": "Se connecter pour passer Pro",
     "manage_subscription": "Gérer votre abonnement",
     "features": {
       "videos_per_month": "{{count}} vidéos par mois",

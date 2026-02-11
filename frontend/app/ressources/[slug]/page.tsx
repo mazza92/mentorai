@@ -169,11 +169,13 @@ export default function ArticlePage({ params }: { params: { slug: string } }) {
         <header className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-b border-slate-200/50 z-50 shadow-sm">
           <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
             <div className="flex items-center justify-between h-16">
-              <Link href="/" className="flex items-center gap-2 group">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Zap className="w-5 h-5 text-white" />
+              <Link href="/" className="flex items-center space-x-2 group">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 group-hover:scale-110 transition-transform">
+                  <Zap className="w-4 h-4 text-white" />
                 </div>
-                <span className="text-xl font-bold text-slate-900">Lurnia</span>
+                <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Lurnia
+                </span>
               </Link>
 
               <nav className="hidden md:flex items-center gap-6">

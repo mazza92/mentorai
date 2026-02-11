@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lurnia - YouTube Learning Companion",
   "version": "1.0.0",
-  "description": "Lurnia is an AI-powered learning companion that enhances video comprehension through real-time Q&A and timestamp-linked insights. Not affiliated with YouTube.",
+  "description": "Ask AI questions about any YouTube video. Get instant answers with timestamps. Not affiliated with YouTube.",
   "permissions": [
     "storage",
     "activeTab",

@@ -31,8 +31,9 @@
         break;
 
       case 'SEEK_VIDEO':
+        console.log('[Lurnia Content] Received SEEK_VIDEO, time:', message.time);
         seekToTime(message.time);
-        sendResponse({ success: true });
+        sendResponse({ success: true, seekedTo: message.time });
         break;
 
       case 'GET_CURRENT_TIME':
@@ -593,7 +594,14 @@
    * Seek video to specific time
    */
   function seekToTime(seconds) {
+    // Try to find video element if not cached
+    if (!videoElement) {
+      videoElement = document.querySelector('video.html5-main-video');
+      console.log('[Lurnia Content] Video element re-acquired:', !!videoElement);
+    }
+
     if (videoElement) {
+      console.log('[Lurnia Content] Seeking to', seconds, 'seconds');
       videoElement.currentTime = seconds;
 
       // Also trigger play if paused
@@ -603,6 +611,8 @@
 
       // Visual feedback
       showSeekFeedback(seconds);
+    } else {
+      console.error('[Lurnia Content] No video element found for seek');
     }
   }
 

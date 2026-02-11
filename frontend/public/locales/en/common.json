@@ -47,6 +47,7 @@
     "most_popular": "Most Popular",
     "current_plan": "Current Plan",
     "upgrade_to": "Upgrade to {{plan}}",
+    "sign_in_to_upgrade": "Sign in to Upgrade",
     "manage_subscription": "Manage your subscription",
     "features": {
       "videos_per_month": "{{count}} videos per month",

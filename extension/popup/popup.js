@@ -28,6 +28,18 @@ const questionsStat = document.getElementById('questionsStat');
 const planStat = document.getElementById('planStat');
 const exportBtn = document.getElementById('exportBtn');
 
+// Conversion elements
+const quotaBanner = document.getElementById('quotaBanner');
+const quotaBannerTitle = document.getElementById('quotaBannerTitle');
+const quotaBannerSubtitle = document.getElementById('quotaBannerSubtitle');
+const shareForMoreBtn = document.getElementById('shareForMoreBtn');
+const upgradeBannerBtn = document.getElementById('upgradeBannerBtn');
+const limitModal = document.getElementById('limitModal');
+const limitValueMsg = document.getElementById('limitValueMsg');
+const shareModalBtn = document.getElementById('shareModalBtn');
+const upgradeModalBtn = document.getElementById('upgradeModalBtn');
+const limitModalClose = document.getElementById('limitModalClose');
+
 // State
 let currentUser = null;
 let currentVideo = null;
@@ -83,14 +95,51 @@ const PROMPT_STARTERS = {
   }
 };
 
-// Generate anonymous user ID for MVP (no login required)
-function getAnonymousUserId() {
-  let anonId = localStorage.getItem('lurnia_anon_id');
-  if (!anonId) {
-    anonId = 'ext_anon_' + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('lurnia_anon_id', anonId);
+// Generate a browser fingerprint for abuse prevention
+// Uses non-identifying device characteristics to detect multi-accounting
+function generateFingerprint() {
+  const components = [
+    screen.width,
+    screen.height,
+    screen.colorDepth,
+    new Date().getTimezoneOffset(),
+    navigator.language,
+    navigator.platform,
+    navigator.hardwareConcurrency || 0,
+    navigator.deviceMemory || 0
+  ];
+  // Simple hash function
+  const str = components.join('|');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
   }
-  return anonId;
+  return 'fp_' + Math.abs(hash).toString(36);
+}
+
+// Generate anonymous user ID for MVP (no login required)
+// Uses chrome.storage.sync to persist across extension reinstalls (tied to Chrome account)
+async function getAnonymousUserId() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get('lurnia_anon_id', async (result) => {
+      let anonId = result.lurnia_anon_id;
+
+      if (!anonId) {
+        // Generate new ID with timestamp to ensure uniqueness
+        anonId = 'ext_anon_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
+
+        // Save to sync storage (persists across reinstalls if Chrome signed in)
+        await new Promise(r => chrome.storage.sync.set({ lurnia_anon_id: anonId }, r));
+
+        // Also save to local as backup
+        localStorage.setItem('lurnia_anon_id', anonId);
+      }
+
+      resolve(anonId);
+    });
+  });
 }
 
 // Initialize
@@ -100,13 +149,19 @@ async function init() {
 
   if (!user || !user.id) {
     // Create anonymous user for MVP
+    const anonId = await getAnonymousUserId();
     user = {
-      id: getAnonymousUserId(),
+      id: anonId,
       name: 'Guest',
       email: '',
       picture: '',
-      isAnonymous: true
+      isAnonymous: true,
+      fingerprint: generateFingerprint()
     };
+    await storage.setUser(user);
+  } else if (!user.fingerprint) {
+    // Add fingerprint to existing user if missing
+    user.fingerprint = generateFingerprint();
     await storage.setUser(user);
   }
 
@@ -183,6 +238,13 @@ function setupEventListeners() {
   sendBtn.addEventListener('click', handleSendQuestion);
 
   // Note: Suggested question handlers are attached dynamically in updateSuggestedQuestions()
+
+  // Conversion/upgrade buttons
+  if (shareForMoreBtn) shareForMoreBtn.addEventListener('click', handleShareForMore);
+  if (upgradeBannerBtn) upgradeBannerBtn.addEventListener('click', handleUpgrade);
+  if (shareModalBtn) shareModalBtn.addEventListener('click', handleShareForMore);
+  if (upgradeModalBtn) upgradeModalBtn.addEventListener('click', handleUpgrade);
+  if (limitModalClose) limitModalClose.addEventListener('click', hideLimitModal);
 
   // Listen for video detection from content script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -700,9 +762,9 @@ function addMessage(content, type, timestamps = []) {
   // For assistant messages, render markdown; for user messages, escape HTML
   let html = type === 'assistant' ? simpleMarkdown(content) : escapeHtml(content);
 
-  // Add clickable timestamps for assistant messages
+  // Add extra clickable timestamps row for assistant messages (if not already inline)
   if (type === 'assistant' && timestamps && timestamps.length > 0) {
-    html += '<div class="timestamps">';
+    html += '<div class="timestamps-row">';
     timestamps.forEach(ts => {
       html += `<span class="timestamp" data-time="${ts.seconds}">${escapeHtml(ts.label)}</span>`;
     });
@@ -711,12 +773,37 @@ function addMessage(content, type, timestamps = []) {
 
   messageEl.innerHTML = html;
 
-  // Add click handlers for timestamps
+  // Add click handlers for all timestamps (both inline and in row)
   if (type === 'assistant') {
     messageEl.querySelectorAll('.timestamp').forEach(el => {
-      el.addEventListener('click', () => {
-        const time = parseInt(el.dataset.time);
-        seekVideo(time);
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const timeData = el.dataset.time || el.textContent;
+        if (!timeData) {
+          console.error('[Lurnia] No time data found on timestamp element');
+          return;
+        }
+
+        let seconds;
+
+        // Handle both "MM:SS" format and raw seconds
+        if (timeData.includes(':')) {
+          const parts = timeData.split(':');
+          if (parts.length === 3) {
+            // HH:MM:SS
+            seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+          } else {
+            // MM:SS
+            seconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+          }
+        } else {
+          seconds = parseInt(timeData);
+        }
+
+        console.log('[Lurnia] Seeking to', seconds, 'seconds');
+        seekVideo(seconds);
       });
     });
   }
@@ -747,7 +834,6 @@ function simpleMarkdown(text) {
   if (!text) return '';
 
   // Strip reference lines (we show timestamps separately)
-  // Matches: "Références: [2:19], [5:17]" or "References: [1:23], [4:56]" etc.
   let cleanText = text
     .replace(/\n*R[ée]f[ée]rences?\s*:?\s*(\[\d+:\d+\],?\s*)+\.?/gi, '')
     .replace(/\n*References?\s*:?\s*(\[\d+:\d+\],?\s*)+\.?/gi, '')
@@ -756,19 +842,45 @@ function simpleMarkdown(text) {
   // First escape HTML to prevent XSS
   let html = escapeHtml(cleanText);
 
+  // Convert inline timestamps [0:46] to clickable badges
+  html = html.replace(/\[(\d{1,2}:\d{2})\]/g, '<span class="timestamp" data-time="$1">$1</span>');
+
   // Headers: ## Header -> <h3>Header</h3>
   html = html.replace(/^###\s+(.+)$/gm, '<h4 class="md-header">$1</h4>');
   html = html.replace(/^##\s+(.+)$/gm, '<h3 class="md-header">$1</h3>');
   html = html.replace(/^#\s+(.+)$/gm, '<h3 class="md-header">$1</h3>');
 
-  // Emoji headers (🎯 Strategy, etc.) - make them bold headers
-  html = html.replace(/^([\u{1F300}-\u{1F9FF}])\s+(.+)$/gmu, '<div class="md-section"><strong>$1 $2</strong></div>');
+  // Section headers with emojis (⚡ Étapes du testing, 🔄 Stratégie, etc.)
+  // Only match SHORT lines (under 50 chars) to avoid styling paragraphs as headers
+  const emojiClass = '[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}⚡⚠🔄💡📌🎯✅❌📝🔑💰📊🚀]';
+
+  // Handle timestamp followed by emoji section header on same line
+  // Only if the title part is short (under 50 chars) - indicates a header, not a paragraph
+  const timestampEmojiHeaderRegex = new RegExp(
+    `(<span class="timestamp"[^>]*>[^<]+<\\/span>)\\s*(${emojiClass})\\s*(.{1,50})$`,
+    'gmu'
+  );
+  html = html.replace(timestampEmojiHeaderRegex,
+    '$1<div class="md-section-header"><span class="emoji">$2</span><span>$3</span></div>');
+
+  // Handle standalone emoji section headers (emoji at start of line)
+  // Only match short lines (header-like) - not full paragraphs
+  const standaloneEmojiHeaderRegex = new RegExp(
+    `^(${emojiClass})\\s*(.{1,50})$`,
+    'gmu'
+  );
+  html = html.replace(standaloneEmojiHeaderRegex,
+    '<div class="md-section-header"><span class="emoji">$1</span><span>$2</span></div>');
+
+  // Warning/info callouts - lines starting with ⚠ or containing important warnings
+  html = html.replace(/<div class="md-section-header"><span class="emoji">⚠<\/span><span>(.+?)<\/span><\/div>/g,
+    '<div class="md-callout warning"><span class="md-callout-icon">⚠️</span>$1</div>');
 
   // Bold: **text** or __text__
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
 
-  // Italic: *text* or _text_
+  // Italic: *text* or _text_ (but not if it's a list item)
   html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
   html = html.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
 
@@ -781,9 +893,9 @@ function simpleMarkdown(text) {
   let inBulletList = false;
   let inNumberedList = false;
 
-  // Helper to check if a line is a numbered list item
+  // Helper to check if a line is a list item (including asterisks)
   const isNumberedItem = (line) => /^(\d+)[.)]\s+.+/.test(line?.trim() || '');
-  const isBulletItem = (line) => /^[-•]\s+.+/.test(line?.trim() || '');
+  const isBulletItem = (line) => /^[-•*]\s+.+/.test(line?.trim() || '');
 
   // Helper to find next non-empty line
   const peekNextContent = (fromIndex) => {
@@ -798,13 +910,10 @@ function simpleMarkdown(text) {
     if (!line) {
       // Empty line - check if we should keep the list open
       if (inNumberedList) {
-        // Peek ahead: if next content is also a numbered item, keep list open
         const nextContent = peekNextContent(i);
         if (nextContent && isNumberedItem(nextContent)) {
-          // Stay in list, just add spacing
           continue;
         }
-        // Otherwise close the list
         result.push('</ol>');
         inNumberedList = false;
       }
@@ -820,7 +929,8 @@ function simpleMarkdown(text) {
       continue;
     }
 
-    const bulletMatch = line.match(/^[-•]\s+(.+)/);
+    // Match bullet items (-, •, or *)
+    const bulletMatch = line.match(/^[-•*]\s+(.+)/);
     const numberedMatch = line.match(/^(\d+)[.)]\s+(.+)/);
 
     if (bulletMatch) {
@@ -856,8 +966,10 @@ function simpleMarkdown(text) {
   html = html.replace(/<p class="md-para"><\/p>/g, '');
   html = html.replace(/<br>\s*<br>/g, '</p><p class="md-para">');
 
-  // Wrap in paragraph
-  if (html && !html.match(/^<(p|ul|ol|h[34]|div)/)) {
+  // Wrap in paragraph if needed (but not if it contains block elements)
+  // Block elements like div, ul, ol, h3, h4 shouldn't be inside <p> tags
+  const hasBlockElements = /<(div|ul|ol|h[34])[\s>]/i.test(html);
+  if (html && !html.match(/^<(p|ul|ol|h[34]|div)/) && !hasBlockElements) {
     html = '<p class="md-para">' + html + '</p>';
   }
 
@@ -891,11 +1003,20 @@ function removeMessage(id) {
 async function seekVideo(seconds) {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab) {
-      chrome.tabs.sendMessage(tab.id, { type: 'SEEK_VIDEO', time: seconds });
+    if (tab && tab.id) {
+      console.log('[Lurnia] Sending SEEK_VIDEO to tab', tab.id, 'time:', seconds);
+      chrome.tabs.sendMessage(tab.id, { type: 'SEEK_VIDEO', time: seconds }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Lurnia] Seek message error:', chrome.runtime.lastError.message);
+        } else {
+          console.log('[Lurnia] Seek response:', response);
+        }
+      });
+    } else {
+      console.error('[Lurnia] No active tab found for seek');
     }
   } catch (error) {
-    console.error('Seek error:', error);
+    console.error('[Lurnia] Seek error:', error);
   }
 }
 
@@ -904,19 +1025,211 @@ async function loadUserQuota() {
   if (!currentUser || !currentUser.id) return;
 
   try {
-    const quota = await api.getQuota(currentUser.id);
+    const quota = await api.getQuota(currentUser.id, currentUser.fingerprint);
 
     currentUser.quota = quota;
     currentUser.plan = quota.plan;
     await storage.setUser(currentUser);
 
-    quotaText.textContent = `${quota.questions}/${quota.limit} questions`;
+    updateQuotaDisplay(quota);
   } catch (error) {
     console.error('Quota error:', error);
-    // Set defaults for anonymous/new users
-    const defaultLimit = currentUser.isAnonymous ? 5 : 500;
-    quotaText.textContent = `0/${defaultLimit} questions`;
+    // Use previously cached quota if available (from storage)
+    // This prevents manipulation by blocking network requests
+    if (currentUser.quota && typeof currentUser.quota.questions === 'number') {
+      console.log('Using cached quota from storage');
+      updateQuotaDisplay(currentUser.quota);
+    } else {
+      // No cached quota - show conservative defaults (assume limit reached)
+      // User must have successful API call to unlock questions
+      updateQuotaDisplay({ questions: 10, limit: 10, plan: 'free', error: true });
+    }
   }
+}
+
+/**
+ * Update quota display with progressive warnings
+ */
+function updateQuotaDisplay(quota) {
+  const { questions, limit, plan } = quota;
+  const remaining = limit - questions;
+  const usagePercent = (questions / limit) * 100;
+
+  // Update quota text
+  quotaText.textContent = `${questions}/${limit} questions`;
+
+  // Remove previous state classes
+  quotaText.classList.remove('warning', 'danger');
+
+  // Pro users don't need warnings
+  if (plan === 'pro' || plan === 'premium') {
+    hideQuotaBanner();
+    return;
+  }
+
+  // Check usage levels and show appropriate UI
+  if (remaining <= 0) {
+    // Limit reached - show modal
+    quotaText.classList.add('danger');
+    showLimitModal(questions);
+    showQuotaBanner('danger', 'Monthly limit reached', 'Upgrade for unlimited questions');
+  } else if (usagePercent >= 80) {
+    // 80%+ usage - show warning banner
+    quotaText.classList.add('warning');
+    showQuotaBanner('warning', 'Running low on questions', `${remaining} question${remaining === 1 ? '' : 's'} left this month`);
+  } else {
+    // Normal usage - hide banner
+    hideQuotaBanner();
+  }
+}
+
+/**
+ * Show quota warning/upgrade banner
+ */
+function showQuotaBanner(type, title, subtitle) {
+  if (!quotaBanner) return;
+
+  quotaBanner.classList.remove('hidden', 'warning', 'danger');
+  quotaBanner.classList.add(type);
+
+  if (quotaBannerTitle) quotaBannerTitle.textContent = title;
+  if (quotaBannerSubtitle) quotaBannerSubtitle.textContent = subtitle;
+}
+
+/**
+ * Hide quota banner
+ */
+function hideQuotaBanner() {
+  if (quotaBanner) quotaBanner.classList.add('hidden');
+}
+
+/**
+ * Show limit reached modal with value message
+ */
+function showLimitModal(questionsUsed) {
+  if (!limitModal) return;
+
+  // Show value message - what they accomplished
+  if (limitValueMsg) {
+    const videosLearned = Math.max(1, Math.floor(questionsUsed / 2)); // Estimate videos learned
+    limitValueMsg.innerHTML = `You've learned from <strong>${videosLearned} video${videosLearned === 1 ? '' : 's'}</strong> this month!`;
+  }
+
+  limitModal.classList.remove('hidden');
+}
+
+/**
+ * Hide limit modal
+ */
+function hideLimitModal() {
+  if (limitModal) limitModal.classList.add('hidden');
+}
+
+/**
+ * Handle share for more questions
+ */
+async function handleShareForMore() {
+  // Create share URL
+  const shareUrl = 'https://lurnia.app?ref=extension';
+  const shareText = 'I use Lurnia to learn from YouTube videos with AI! Ask any question and get instant answers with timestamps. Try it free:';
+
+  // Try Web Share API first (mobile-friendly)
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'Lurnia - AI YouTube Learning',
+        text: shareText,
+        url: shareUrl
+      });
+      // Grant bonus questions after successful share - will show success message if valid
+      await grantBonusQuestions(5);
+      return;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.log('Share failed, falling back to copy');
+      }
+    }
+  }
+
+  // Fallback: copy to clipboard
+  try {
+    await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+    // Grant bonus questions - will show success message if valid
+    await grantBonusQuestions(5);
+  } catch (err) {
+    console.error('Copy failed:', err);
+    // Open Twitter as last resort
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(twitterUrl, '_blank');
+    await grantBonusQuestions(5);
+  }
+}
+
+/**
+ * Show share success feedback
+ */
+function showShareSuccess() {
+  if (shareForMoreBtn) {
+    const originalText = shareForMoreBtn.innerHTML;
+    shareForMoreBtn.innerHTML = '✓ Copied! +5 added';
+    shareForMoreBtn.style.background = 'rgba(16, 185, 129, 0.2)';
+    setTimeout(() => {
+      shareForMoreBtn.innerHTML = originalText;
+      shareForMoreBtn.style.background = '';
+    }, 2000);
+  }
+}
+
+/**
+ * Grant bonus questions to user
+ */
+async function grantBonusQuestions(count) {
+  if (!currentUser || !currentUser.id) return;
+
+  try {
+    // Call API to grant bonus questions (include fingerprint for abuse prevention)
+    const result = await api.grantBonusQuestions(currentUser.id, count, 'share', currentUser.fingerprint);
+
+    if (result && result.success) {
+      // Reload quota to reflect new balance
+      await loadUserQuota();
+      hideLimitModal();
+      showShareSuccess();
+    } else if (result && result.error === 'already_claimed') {
+      // User already claimed share bonus this month
+      showAlreadyClaimedMessage();
+    } else if (result && result.error === 'fingerprint_blocked') {
+      // Multiple accounts from same device detected
+      showAlreadyClaimedMessage();
+    }
+  } catch (error) {
+    console.error('Failed to grant bonus questions:', error);
+    // Reload quota to see actual state
+    await loadUserQuota();
+  }
+}
+
+/**
+ * Show message when share bonus already claimed
+ */
+function showAlreadyClaimedMessage() {
+  if (shareForMoreBtn) {
+    const originalText = shareForMoreBtn.innerHTML;
+    shareForMoreBtn.innerHTML = '✓ Already earned this month';
+    shareForMoreBtn.style.background = 'rgba(107, 114, 128, 0.2)';
+    setTimeout(() => {
+      shareForMoreBtn.innerHTML = originalText;
+      shareForMoreBtn.style.background = '';
+    }, 3000);
+  }
+}
+
+/**
+ * Handle upgrade button click
+ */
+function handleUpgrade() {
+  // Open pricing page
+  window.open('https://lurnia.app/pricing?ref=extension', '_blank');
 }
 
 // Chat Persistence
@@ -981,8 +1294,9 @@ function restoreMessage(content, type, timestamps = []) {
 
   let html = type === 'assistant' ? simpleMarkdown(content) : escapeHtml(content);
 
+  // Add extra timestamps row if provided
   if (type === 'assistant' && timestamps && timestamps.length > 0) {
-    html += '<div class="timestamps">';
+    html += '<div class="timestamps-row">';
     timestamps.forEach(ts => {
       html += `<span class="timestamp" data-time="${ts.seconds}">${escapeHtml(ts.label)}</span>`;
     });
@@ -991,11 +1305,35 @@ function restoreMessage(content, type, timestamps = []) {
 
   messageEl.innerHTML = html;
 
+  // Add click handlers for all timestamps (both inline and in row)
   if (type === 'assistant') {
     messageEl.querySelectorAll('.timestamp').forEach(el => {
-      el.addEventListener('click', () => {
-        const time = parseInt(el.dataset.time);
-        seekVideo(time);
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const timeData = el.dataset.time || el.textContent;
+        if (!timeData) {
+          console.error('[Lurnia] No time data found on timestamp element');
+          return;
+        }
+
+        let seconds;
+
+        // Handle both "MM:SS" format and raw seconds
+        if (timeData.includes(':')) {
+          const parts = timeData.split(':');
+          if (parts.length === 3) {
+            seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+          } else {
+            seconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+          }
+        } else {
+          seconds = parseInt(timeData);
+        }
+
+        console.log('[Lurnia] Seeking to', seconds, 'seconds');
+        seekVideo(seconds);
       });
     });
   }

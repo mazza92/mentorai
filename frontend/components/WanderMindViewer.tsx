@@ -543,7 +543,7 @@ const QnAPanel = ({
   const chatEndRef = useRef<HTMLDivElement>(null)
   const lastMessageRef = useRef<HTMLDivElement>(null)
 
-  // Dynamic loading messages (NotebookLM/Claude-style)
+  // Dynamic loading messages
   const loadingMessages = [
     'Thinking...',
     'Analyzing content...',

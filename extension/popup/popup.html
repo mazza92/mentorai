@@ -90,6 +90,80 @@
         </div>
       </div>
 
+      <!-- Quota Warning/Upgrade Banner -->
+      <div id="quotaBanner" class="quota-banner hidden">
+        <div class="quota-banner-content">
+          <div class="quota-banner-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <div class="quota-banner-text">
+            <span id="quotaBannerTitle" class="quota-banner-title">Running low on questions</span>
+            <span id="quotaBannerSubtitle" class="quota-banner-subtitle">2 questions left this month</span>
+          </div>
+        </div>
+        <div class="quota-banner-actions">
+          <button id="shareForMoreBtn" class="share-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="18" cy="5" r="3"></circle>
+              <circle cx="6" cy="12" r="3"></circle>
+              <circle cx="18" cy="19" r="3"></circle>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            +5 Free
+          </button>
+          <button id="upgradeBannerBtn" class="upgrade-btn-small">Upgrade</button>
+        </div>
+      </div>
+
+      <!-- Limit Reached Modal -->
+      <div id="limitModal" class="limit-modal hidden">
+        <div class="limit-modal-content">
+          <div class="limit-modal-header">
+            <div class="limit-modal-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </div>
+            <h3>Monthly Limit Reached</h3>
+            <p id="limitValueMsg">You've learned from <strong>10 videos</strong> this month!</p>
+          </div>
+          <div class="limit-modal-options">
+            <button id="shareModalBtn" class="limit-option share-option">
+              <div class="option-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+              </div>
+              <div class="option-text">
+                <span class="option-title">Share Lurnia</span>
+                <span class="option-subtitle">Get 5 bonus questions</span>
+              </div>
+              <span class="option-badge free">Free</span>
+            </button>
+            <button id="upgradeModalBtn" class="limit-option upgrade-option">
+              <div class="option-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+              </div>
+              <div class="option-text">
+                <span class="option-title">Upgrade to Pro</span>
+                <span class="option-subtitle">Unlimited questions</span>
+              </div>
+              <span class="option-badge pro">€24.99/mo</span>
+            </button>
+          </div>
+          <button id="limitModalClose" class="limit-modal-close">Maybe later</button>
+        </div>
+      </div>
+
       <!-- Chat Container -->
       <div id="chatContainer" class="chat-container">
         <div id="messages" class="messages">

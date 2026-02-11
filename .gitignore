@@ -49,51 +49,32 @@ firebase-debug.log
 # YouTube cookies (sensitive)
 backend/cookies.txt
 
-# Internal documentation (keep only README, ARCHITECTURE, SETUP, QUICKSTART, DEPLOYMENT, PROJECT_SUMMARY)
-# Explicit list of internal docs to ignore
-TECHNICAL_OVERVIEW.md
-ENV_SETUP.md
-STRIPE_PAYMENT_TESTING.md
-PAYMENT_SETUP.md
-AI_WRITING_PROMPTS.md
-BATCH_CONTENT_CREATION_SYSTEM.md
-CONTENT_PRODUCTION_TRACKER.md
-CONTENT_SYSTEM_README.md
-CONTENT_STRATEGY_GUIDE.md
-COOKIE_REFRESH_SIMPLE.md
-DEPLOY_SPECIFIC_COMMIT.md
-DEPLOY_VERCEL.md
-DEPLOY_*.md
-!DEPLOYMENT.md
-GEMINI_*.md
-GOOGLE_*.md
-QUICK_*.md
-!QUICKSTART.md
-TROUBLESHOOT_*.md
-*_FIX.md
-*_FIXES*.md
-*_GUIDE.md
-*_SETUP.md
-!SETUP.md
-*_OPTIMIZATION*.md
-*_IMPLEMENTATION.md
-*_IMPROVEMENTS.md
-*_TROUBLESHOOTING.md
-*_CHECKLIST.md
-
-# Subdirectory docs
-backend/*.md
+# Internal documentation (keep only README)
+*.md
+!README.md
 !backend/README.md
-frontend/*.md
 !frontend/README.md
-email-templates/*.md
 !email-templates/README.md
-scripts/*.md
 
-# Test files
+# Test and debug files
 test-*.js
 backend/test-*.js
+**/debug-*
+**/test-*
+diagnose-*.js
+verify-*.js
+fix-*.js
+apply-*.js
+*.json3
+
+# Development scripts and artifacts
+install-*.ps1
+build-*.ps1
+*.zip
+*.mp4
+Screenshot*.png
 nul
 
-# Development scripts
-install-*.ps1
+# Store screenshots dev files
+extension/store-screenshots/*.html
+extension/store-screenshots/*.md

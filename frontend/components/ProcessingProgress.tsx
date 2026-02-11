@@ -43,7 +43,7 @@ export default function ProcessingProgress({
   // Audio extraction is fast
   const estimatedAudioTime = 30
 
-  // TOC generation is fast with Claude
+  // TOC generation is fast
   const estimatedTOCTime = 15
 
   // Analysis time (only for videos under 30 mins)

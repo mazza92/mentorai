@@ -20,7 +20,7 @@ interface PricingPlan {
 
 export default function Pricing() {
   const { t } = useTranslation('common')
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, signInWithGoogle } = useAuth()
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
@@ -61,6 +61,16 @@ export default function Pricing() {
   useEffect(() => {
     if (user) {
       fetchSubscriptionStatus()
+
+      // Check for pending upgrade intent after sign-in
+      const pendingUpgrade = sessionStorage.getItem('pendingUpgrade')
+      if (pendingUpgrade) {
+        sessionStorage.removeItem('pendingUpgrade')
+        // Small delay to ensure subscription status is fetched
+        setTimeout(() => {
+          handleSubscribe(pendingUpgrade, 'Pro')
+        }, 500)
+      }
     }
   }, [user])
 
@@ -78,7 +88,16 @@ export default function Pricing() {
 
   const handleSubscribe = async (priceId: string, planName: string) => {
     if (!user) {
-      alert(t('auth.please_sign_in'))
+      // Store intent to upgrade after sign-in
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pendingUpgrade', priceId)
+      }
+      // Trigger Google sign-in
+      try {
+        await signInWithGoogle()
+      } catch (error) {
+        console.error('Sign in error:', error)
+      }
       return
     }
 
@@ -206,10 +225,17 @@ export default function Pricing() {
                   >
                     {t('pricing.free_tier')}
                   </button>
+                ) : !user ? (
+                  <button
+                    onClick={() => handleSubscribe(plan.priceId, plan.name)}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-600 transition-all"
+                  >
+                    {t('pricing.sign_in_to_upgrade')}
+                  </button>
                 ) : (
                   <button
                     onClick={() => handleSubscribe(plan.priceId, plan.name)}
-                    disabled={!user || checkoutLoading === plan.priceId}
+                    disabled={checkoutLoading === plan.priceId}
                     className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-600 transition-all disabled:opacity-50"
                   >
                     {checkoutLoading === plan.priceId ? (
