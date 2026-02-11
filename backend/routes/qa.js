@@ -506,22 +506,32 @@ router.post('/video-direct', async (req, res) => {
     const videoAnalysis = { title: videoTitle || 'YouTube Video', author: channelName || 'Unknown' };
 
     // Determine response language:
-    // 1. Primary: Use video's caption language (most reliable - from YouTube metadata)
-    // 2. Fallback: Detect from question text if caption language not available
-    let responseLanguage = videoLanguage; // e.g., 'fr', 'en', 'es', etc.
+    // 1. Primary: Detect from question text (user's intent is most important)
+    // 2. Fallback: Use video's caption language if question language is ambiguous
+    // This prevents responding in French when user asks in English but has French subtitles
+    const frenchPatterns = [
+      /[àâäéèêëïîôùûüçœæ]/i,
+      /\b(qu'|l'|d'|n'|c'|j'|s'|m'|t')\w/i,
+      /\b(qui|que|quoi|quel|comment|pourquoi|combien)\b/i,
+      /\b(sont|suis|est|les|des|une|cette)\b/i
+    ];
+    const questionIsFrench = frenchPatterns.some(p => p.test(question));
 
-    if (!responseLanguage) {
-      // Fallback: detect from question text
-      const frenchPatterns = [
-        /[àâäéèêëïîôùûüçœæ]/i,
-        /\b(qu'|l'|d'|n'|c'|j'|s'|m'|t')\w/i,
-        /\b(qui|que|quoi|quel|comment|pourquoi|combien)\b/i,
-        /\b(sont|suis|est|les|des|une|cette)\b/i
-      ];
-      responseLanguage = frenchPatterns.some(p => p.test(question)) ? 'fr' : 'en';
-      console.log('[QA Direct] Language from question detection:', responseLanguage);
+    let responseLanguage;
+    if (questionIsFrench) {
+      responseLanguage = 'fr';
+      console.log('[QA Direct] Language from question: French');
+    } else if (question.length > 10) {
+      // Question is clearly English (or at least not French)
+      responseLanguage = 'en';
+      console.log('[QA Direct] Language from question: English');
+    } else if (videoLanguage) {
+      // Short/ambiguous question - fall back to video language
+      responseLanguage = videoLanguage;
+      console.log('[QA Direct] Short question, using video caption language:', responseLanguage);
     } else {
-      console.log('[QA Direct] Using video caption language:', responseLanguage);
+      responseLanguage = 'en';
+      console.log('[QA Direct] Default language: English');
     }
 
     const qaResult = await videoQAService.answerQuestion(
