@@ -535,6 +535,86 @@ router.post('/:userId/increment-video', async (req, res) => {
   }
 });
 
+// Grant bonus questions (for sharing, referrals, etc.)
+router.post('/:userId/bonus-questions', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { count = 5, source = 'share' } = req.body;
+
+    // Validate count (max 10 bonus questions per request)
+    const bonusCount = Math.min(Math.max(1, parseInt(count) || 5), 10);
+
+    // Use mock mode if Firestore is not available
+    if (useMockMode || !process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID === 'your_project_id') {
+      let user = mockUsers.get(userId) || { userId, tier: 'free', questionsThisMonth: 0 };
+      // Decrease questions used (min 0) to effectively grant bonus
+      user.questionsThisMonth = Math.max(0, (user.questionsThisMonth || 0) - bonusCount);
+      user.bonusGranted = (user.bonusGranted || 0) + bonusCount;
+      user.lastBonusSource = source;
+      user.lastBonusDate = new Date();
+      mockUsers.set(userId, user);
+      return res.json({
+        success: true,
+        bonusGranted: bonusCount,
+        questionsThisMonth: user.questionsThisMonth,
+        source
+      });
+    }
+
+    try {
+      const userDoc = await firestore.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) {
+        // Create user with bonus already applied
+        await firestore.collection('users').doc(userId).set({
+          userId,
+          tier: 'free',
+          questionsThisMonth: 0,
+          bonusGranted: bonusCount,
+          lastBonusSource: source,
+          lastBonusDate: new Date(),
+          createdAt: new Date(),
+          lastResetDate: new Date(),
+        });
+        return res.json({
+          success: true,
+          bonusGranted: bonusCount,
+          questionsThisMonth: 0,
+          source
+        });
+      }
+
+      const currentCount = userDoc.data().questionsThisMonth || 0;
+      const newCount = Math.max(0, currentCount - bonusCount);
+      const totalBonus = (userDoc.data().bonusGranted || 0) + bonusCount;
+
+      await firestore.collection('users').doc(userId).update({
+        questionsThisMonth: newCount,
+        bonusGranted: totalBonus,
+        lastBonusSource: source,
+        lastBonusDate: new Date(),
+        updatedAt: new Date(),
+      });
+
+      return res.json({
+        success: true,
+        bonusGranted: bonusCount,
+        questionsThisMonth: newCount,
+        source
+      });
+    } catch (firestoreError) {
+      console.error('Firestore error in bonus-questions, falling back to mock mode:', firestoreError.message);
+      let user = mockUsers.get(userId) || { userId, tier: 'free', questionsThisMonth: 0 };
+      user.questionsThisMonth = Math.max(0, (user.questionsThisMonth || 0) - bonusCount);
+      mockUsers.set(userId, user);
+      return res.json({ success: true, bonusGranted: bonusCount, source });
+    }
+  } catch (error) {
+    console.error('Error granting bonus questions:', error);
+    res.status(500).json({ error: 'Failed to grant bonus questions', details: error.message });
+  }
+});
+
 // Increment question count
 router.post('/:userId/increment-question', async (req, res) => {
   try {
