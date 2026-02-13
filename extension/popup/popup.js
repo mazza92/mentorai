@@ -38,6 +38,7 @@ const limitModal = document.getElementById('limitModal');
 const limitValueMsg = document.getElementById('limitValueMsg');
 const shareModalBtn = document.getElementById('shareModalBtn');
 const upgradeModalBtn = document.getElementById('upgradeModalBtn');
+const connectAccountBtn = document.getElementById('connectAccountBtn');
 const limitModalClose = document.getElementById('limitModalClose');
 
 // State
@@ -244,6 +245,7 @@ function setupEventListeners() {
   if (upgradeBannerBtn) upgradeBannerBtn.addEventListener('click', handleUpgrade);
   if (shareModalBtn) shareModalBtn.addEventListener('click', handleShareForMore);
   if (upgradeModalBtn) upgradeModalBtn.addEventListener('click', handleUpgrade);
+  if (connectAccountBtn) connectAccountBtn.addEventListener('click', handleConnectAccount);
   if (limitModalClose) limitModalClose.addEventListener('click', hideLimitModal);
 
   // Listen for video detection from content script
@@ -1226,10 +1228,125 @@ function showAlreadyClaimedMessage() {
 
 /**
  * Handle upgrade button click
+ * If user is anonymous, trigger login first then redirect to pricing
  */
-function handleUpgrade() {
-  // Open pricing page
-  window.open('https://lurnia.app/pricing?ref=extension', '_blank');
+async function handleUpgrade() {
+  if (currentUser && currentUser.isAnonymous) {
+    // User is anonymous - need to login first to connect their account
+    // This ensures their Pro subscription will be linked to the extension
+    try {
+      await handleConnectAccount();
+    } catch (error) {
+      console.error('Connect account error:', error);
+      // Fallback: just open pricing page
+      window.open('https://lurnia.app/pricing?ref=extension', '_blank');
+    }
+  } else {
+    // User is already logged in - just open pricing page
+    window.open('https://lurnia.app/pricing?ref=extension', '_blank');
+  }
+}
+
+/**
+ * Handle connect/sync account - for users who already have a website account
+ * This connects the extension to their existing Lurnia account
+ */
+async function handleConnectAccount() {
+  try {
+    const authUrl = api.getAuthUrl();
+
+    // Use chrome.identity for auth flow
+    chrome.identity.launchWebAuthFlow(
+      { url: authUrl, interactive: true },
+      async (redirectUrl) => {
+        if (chrome.runtime.lastError || !redirectUrl) {
+          console.error('Auth error:', chrome.runtime.lastError);
+          // Show error message
+          showConnectError();
+          return;
+        }
+
+        try {
+          // Extract user data from redirect URL
+          const url = new URL(redirectUrl);
+          const userId = url.searchParams.get('userId');
+          const userName = url.searchParams.get('name');
+          const userEmail = url.searchParams.get('email');
+          const userPicture = url.searchParams.get('picture');
+
+          if (userId) {
+            const user = {
+              id: userId,
+              name: userName || 'User',
+              email: userEmail || '',
+              picture: userPicture || '',
+              isAnonymous: false,
+              fingerprint: generateFingerprint()
+            };
+
+            await storage.setUser(user);
+            currentUser = user;
+
+            // Reload quota with new user ID
+            await loadUserQuota();
+
+            // Hide any open modals
+            hideLimitModal();
+
+            // Show success message
+            showConnectSuccess();
+
+            // Update settings view if visible
+            updateSettingsView();
+          } else {
+            console.error('No userId in redirect');
+            showConnectError();
+          }
+        } catch (parseError) {
+          console.error('Error parsing auth response:', parseError);
+          showConnectError();
+        }
+      }
+    );
+  } catch (error) {
+    console.error('Connect account error:', error);
+    showConnectError();
+  }
+}
+
+/**
+ * Show success message after connecting account
+ */
+function showConnectSuccess() {
+  // Update quota banner to show success
+  if (quotaBanner) {
+    quotaBanner.classList.remove('hidden', 'warning', 'danger');
+    quotaBanner.classList.add('success');
+    if (quotaBannerTitle) quotaBannerTitle.textContent = 'Account Connected!';
+    if (quotaBannerSubtitle) quotaBannerSubtitle.textContent = 'Your Pro subscription is now active';
+
+    // Hide after 3 seconds
+    setTimeout(() => {
+      hideQuotaBanner();
+    }, 3000);
+  }
+}
+
+/**
+ * Show error message if connect fails
+ */
+function showConnectError() {
+  if (quotaBanner) {
+    quotaBanner.classList.remove('hidden', 'warning', 'success');
+    quotaBanner.classList.add('danger');
+    if (quotaBannerTitle) quotaBannerTitle.textContent = 'Connection Failed';
+    if (quotaBannerSubtitle) quotaBannerSubtitle.textContent = 'Please try again';
+
+    // Hide after 3 seconds
+    setTimeout(() => {
+      hideQuotaBanner();
+    }, 3000);
+  }
 }
 
 // Chat Persistence

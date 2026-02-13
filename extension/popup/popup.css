@@ -936,6 +936,31 @@ body {
   color: white;
 }
 
+.connect-option .option-icon {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+.option-badge.sync {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+/* Success state for quota banner */
+.quota-banner.success {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.04));
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.quota-banner.success .quota-banner-icon {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.quota-banner.success .quota-banner-title {
+  color: #10b981;
+}
+
 .limit-modal-close {
   width: 100%;
   padding: 14px;
