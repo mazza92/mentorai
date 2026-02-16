@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lurnia Extension OG Image</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Background pattern */
+    .bg-pattern {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0);
+      background-size: 40px 40px;
+    }
+
+    /* Gradient orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.4;
+    }
+
+    .orb-1 {
+      width: 400px;
+      height: 400px;
+      background: #3b82f6;
+      top: -100px;
+      left: -100px;
+    }
+
+    .orb-2 {
+      width: 500px;
+      height: 500px;
+      background: #8b5cf6;
+      bottom: -150px;
+      right: -100px;
+    }
+
+    .orb-3 {
+      width: 300px;
+      height: 300px;
+      background: #06b6d4;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.2;
+    }
+
+    .container {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      height: 100%;
+      padding: 60px;
+    }
+
+    .left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-right: 40px;
+    }
+
+    .right {
+      width: 480px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Chrome badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 10px 20px;
+      border-radius: 50px;
+      margin-bottom: 30px;
+      backdrop-filter: blur(10px);
+    }
+
+    .badge svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .badge span {
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    /* Title */
+    h1 {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      color: #fff;
+    }
+
+    h1 .gradient {
+      background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Subtitle */
+    .subtitle {
+      font-size: 22px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 40px;
+    }
+
+    /* Features */
+    .features {
+      display: flex;
+      gap: 24px;
+    }
+
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #cbd5e1;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .feature-icon {
+      width: 28px;
+      height: 28px;
+      background: rgba(59, 130, 246, 0.2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .feature-icon svg {
+      width: 16px;
+      height: 16px;
+      color: #60a5fa;
+    }
+
+    /* Extension preview */
+    .extension-preview {
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      width: 380px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .preview-logo {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-logo svg {
+      width: 24px;
+      height: 24px;
+      color: #fff;
+    }
+
+    .preview-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .preview-status {
+      font-size: 13px;
+      color: #10b981;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .preview-status::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+    }
+
+    /* Chat bubbles */
+    .chat-bubble {
+      padding: 14px 18px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .chat-user {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: #fff;
+      margin-left: 40px;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-ai {
+      background: #f1f5f9;
+      color: #334155;
+      margin-right: 40px;
+      border-bottom-left-radius: 4px;
+    }
+
+    .timestamp {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #dbeafe;
+      color: #2563eb;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* Logo */
+    .logo {
+      position: absolute;
+      bottom: 50px;
+      left: 60px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg {
+      width: 22px;
+      height: 22px;
+      color: #fff;
+    }
+
+    .logo-text {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .logo-domain {
+      font-size: 16px;
+      color: #64748b;
+      margin-left: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-pattern"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="container">
+    <div class="left">
+      <!-- Chrome badge -->
+      <div class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="21.17" y1="8" x2="12" y2="8"></line>
+          <line x1="3.95" y1="6.06" x2="8.54" y2="14"></line>
+          <line x1="10.88" y1="21.94" x2="15.46" y2="14"></line>
+        </svg>
+        <span>Chrome Extension</span>
+      </div>
+
+      <!-- Title -->
+      <h1>
+        Ask Questions About<br>
+        <span class="gradient">Any YouTube Video</span>
+      </h1>
+
+      <!-- Subtitle -->
+      <p class="subtitle">
+        Get instant AI-powered answers with clickable timestamps.<br>
+        Free extension for Chrome, Edge & Brave.
+      </p>
+
+      <!-- Features -->
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <span>Instant Answers</span>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <span>Timestamps</span>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </div>
+          <span>Multi-Language</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <!-- Extension preview -->
+      <div class="extension-preview">
+        <div class="preview-header">
+          <div class="preview-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <div>
+            <div class="preview-title">Lurnia</div>
+            <div class="preview-status">Ready to answer</div>
+          </div>
+        </div>
+
+        <div class="chat-bubble chat-user">
+          What are the key points of this video?
+        </div>
+
+        <div class="chat-bubble chat-ai">
+          The video covers 3 main topics:
+          <br><br>
+          1. Introduction to the concept
+          <br>
+          2. Practical examples
+          <br>
+          3. Key takeaways
+          <br>
+          <span class="timestamp">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Jump to 2:34
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+    </div>
+    <span class="logo-text">Lurnia</span>
+    <span class="logo-domain">lurnia.app/extension</span>
+  </div>
+</body>
+</html>
