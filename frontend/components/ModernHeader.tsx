@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus, Crown, Globe, BookOpen } from 'lucide-react'
+import { Zap, Menu, X, User, LogOut, Settings, CreditCard, ChevronDown, MessageSquare, Plus, Crown, Globe, BookOpen, Chrome } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import ConversationHistory from '@/components/ConversationHistory'
@@ -152,6 +152,15 @@ export default function ModernHeader({ onNewProject, userId, currentProjectId, o
             >
               <BookOpen className="w-4 h-4" />
               <span>{t('header.guides')}</span>
+            </button>
+
+            {/* Desktop Extension Link */}
+            <button
+              onClick={() => router.push('/extension')}
+              className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700"
+            >
+              <Chrome className="w-4 h-4" />
+              <span>Extension</span>
             </button>
 
             {/* Desktop Pricing Link (always visible) */}
