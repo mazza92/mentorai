@@ -411,18 +411,24 @@ router.get('/by-slug/:slug', async (req, res) => {
 
 /**
  * GET /api/public-insights/list
- * List all published insights (for sitemap/directory)
- * Query params: ?limit=50&offset=0&channelId=optional
+ * List all published insights with pagination (for directory page)
+ * Query params:
+ *   - page: page number (1-based, default: 1)
+ *   - limit: items per page (default: 24, max: 100)
+ *   - channelId: filter by channel
+ *   - search: search in video titles
  */
 router.get('/list', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 24, 100);
+    const offset = (page - 1) * limit;
     const channelId = req.query.channelId;
+    const search = req.query.search?.toLowerCase().trim();
 
     const { firestore } = getFirestore();
 
-    // Simple query without orderBy to avoid needing composite index
-    // Sorting done in memory - fine for small collections
+    // Get all published insights
     let query = firestore.collection('public_insights')
       .where('status', '==', 'published');
 
@@ -451,19 +457,52 @@ router.get('/list', async (req, res) => {
       };
     });
 
+    // Apply search filter if provided
+    if (search) {
+      insights = insights.filter(i =>
+        i.videoTitle?.toLowerCase().includes(search) ||
+        i.channelName?.toLowerCase().includes(search)
+      );
+    }
+
     // Sort by publishedAt descending (newest first)
     insights.sort((a, b) => b.publishedAtTimestamp - a.publishedAtTimestamp);
 
-    // Apply limit after sorting
-    insights = insights.slice(0, limit);
+    // Calculate pagination
+    const totalCount = insights.length;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // Apply pagination
+    const paginatedInsights = insights.slice(offset, offset + limit);
 
     // Remove the timestamp helper field
-    insights = insights.map(({ publishedAtTimestamp, ...rest }) => rest);
+    const result = paginatedInsights.map(({ publishedAtTimestamp, ...rest }) => rest);
+
+    // Get unique channels for filter dropdown
+    const channelsMap = new Map();
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.channelId && data.channelName) {
+        channelsMap.set(data.channelId, data.channelName);
+      }
+    });
+    const channels = Array.from(channelsMap.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     res.json({
       success: true,
-      data: insights,
-      count: insights.length
+      data: result,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      },
+      channels,
+      count: result.length
     });
 
   } catch (error) {
