@@ -3,10 +3,18 @@ import articlesData from '@/data/articles.json'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
-async function getPublishedGuides(): Promise<{ slug: string; publishedAt: string }[]> {
+interface SitemapEntry {
+  loc: string
+  lastmod: string
+  changefreq: string
+  priority: number
+}
+
+async function getPublishedGuides(): Promise<SitemapEntry[]> {
   try {
-    const res = await fetch(`${API_URL}/api/public-insights/list?limit=100`, {
-      next: { revalidate: 3600 }
+    // Use dedicated sitemap endpoint that returns ALL guides (no pagination limit)
+    const res = await fetch(`${API_URL}/api/public-insights/sitemap`, {
+      next: { revalidate: 3600 } // Cache for 1 hour
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -45,6 +53,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.8,
     },
+    {
+      url: `${baseUrl}/extension`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
   ]
 
   // Dynamic article pages
@@ -55,13 +69,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: article.featured ? 0.9 : 0.7,
   }))
 
-  // Dynamic guide pages (pSEO - fetched from API)
+  // Dynamic guide pages (pSEO - fetched from API sitemap endpoint)
+  // Returns ALL published guides with full URLs
   const guides = await getPublishedGuides()
   const guidePages: MetadataRoute.Sitemap = guides.map(guide => ({
-    url: `${baseUrl}/guides/${guide.slug}`,
-    lastModified: guide.publishedAt ? new Date(guide.publishedAt) : new Date(),
-    changeFrequency: 'weekly' as const,
-    priority: 0.8,
+    url: guide.loc, // Already a full URL from backend
+    lastModified: guide.lastmod ? new Date(guide.lastmod) : new Date(),
+    changeFrequency: guide.changefreq as 'weekly' | 'daily' | 'monthly',
+    priority: guide.priority,
   }))
 
   return [...staticPages, ...articlePages, ...guidePages]
