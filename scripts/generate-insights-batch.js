@@ -1,30 +1,39 @@
 #!/usr/bin/env node
 
 /**
- * Generate public insights in batch for a channel (for SEO indexing).
+ * Generate public insights in batch for channels (for SEO indexing).
  *
  * Usage:
- *   node scripts/generate-insights-batch.js <channelId> [options]
+ *   node scripts/generate-insights-batch.js [channelId] [options]
+ *
+ * Modes:
+ *   <channelId>       Process a specific channel
+ *   --crawl-all       Process ALL imported channels automatically
  *
  * Options:
- *   --count=N        Max insights to generate (default: 10, max: 200)
- *   --all            Process all available videos (sets count=200)
- *   --publish        Auto-publish generated insights
- *   --skip-existing  Skip videos that already have insights (recommended)
- *   --stats          Show channel stats only (no generation)
- *   --no-revalidate  Skip cache revalidation after generation
+ *   --count=N         Max insights per channel (default: 10, max: 200)
+ *   --all             Process all available videos per channel (sets count=200)
+ *   --publish         Auto-publish generated insights
+ *   --skip-existing   Skip videos that already have insights (recommended)
+ *   --stats           Show stats only (no generation)
+ *   --no-revalidate   Skip cache revalidation after generation
  *
  * Examples:
+ *   # Process single channel
  *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --stats
  *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --all --skip-existing --publish
- *   node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --count=50 --skip-existing --publish
+ *
+ *   # Process ALL channels automatically
+ *   node scripts/generate-insights-batch.js --crawl-all --stats
+ *   node scripts/generate-insights-batch.js --crawl-all --all --skip-existing --publish
  *
  * Env:
  *   BACKEND_URL   Base URL of the backend API (default: production Railway)
  *   FRONTEND_URL  Base URL of the frontend (default: production Vercel)
  */
 
-const channelId = process.argv[2];
+const channelId = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
+const crawlAll = process.argv.includes('--crawl-all');
 const countArg = process.argv.find((a) => a.startsWith('--count='));
 const useAll = process.argv.includes('--all');
 const count = useAll ? 200 : (countArg ? parseInt(countArg.split('=')[1], 10) || 10 : 10);
@@ -55,23 +64,42 @@ function c(color, text) {
   return `${colors[color]}${text}${colors.reset}`;
 }
 
-if (!channelId || channelId.startsWith('--')) {
-  console.error('Usage: node scripts/generate-insights-batch.js <channelId> [options]\n');
+if (!channelId && !crawlAll) {
+  console.error('Usage: node scripts/generate-insights-batch.js [channelId] [options]\n');
+  console.error('Modes:');
+  console.error('  <channelId>       Process a specific channel');
+  console.error('  --crawl-all       Process ALL imported channels automatically\n');
   console.error('Options:');
-  console.error('  --count=N        Max insights to generate (default: 10, max: 200)');
-  console.error('  --all            Process all available videos (sets count=200)');
-  console.error('  --publish        Auto-publish generated insights');
-  console.error('  --skip-existing  Skip videos that already have insights (recommended)');
-  console.error('  --stats          Show channel stats only (no generation)');
-  console.error('  --no-revalidate  Skip cache revalidation after generation\n');
+  console.error('  --count=N         Max insights per channel (default: 10, max: 200)');
+  console.error('  --all             Process all available videos per channel (sets count=200)');
+  console.error('  --publish         Auto-publish generated insights');
+  console.error('  --skip-existing   Skip videos that already have insights (recommended)');
+  console.error('  --stats           Show channel stats only (no generation)');
+  console.error('  --no-revalidate   Skip cache revalidation after generation\n');
   console.error('Examples:');
+  console.error('  # Single channel');
   console.error('  node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --stats');
-  console.error('  node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --all --skip-existing --publish');
+  console.error('  node scripts/generate-insights-batch.js UCloXqLhp_KGhHBe1kwaL2Tg --all --skip-existing --publish\n');
+  console.error('  # All channels');
+  console.error('  node scripts/generate-insights-batch.js --crawl-all --stats');
+  console.error('  node scripts/generate-insights-batch.js --crawl-all --all --skip-existing --publish');
   process.exit(1);
 }
 
-async function getChannelStats() {
-  const url = `${backendUrl}/api/public-insights/channel-stats/${channelId}`;
+async function getAllChannels() {
+  const url = `${backendUrl}/api/public-insights/all-channels`;
+  const res = await fetch(url);
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.error || res.statusText);
+  }
+
+  return data;
+}
+
+async function getChannelStats(chId) {
+  const url = `${backendUrl}/api/public-insights/channel-stats/${chId}`;
   const res = await fetch(url);
   const data = await res.json().catch(() => ({}));
 
@@ -82,9 +110,9 @@ async function getChannelStats() {
   return data.data;
 }
 
-async function generateBatch() {
+async function generateBatch(chId) {
   const url = `${backendUrl}/api/public-insights/generate-batch`;
-  const body = JSON.stringify({ channelId, count, publish, skipExisting });
+  const body = JSON.stringify({ channelId: chId, count, publish, skipExisting });
 
   const res = await fetch(url, {
     method: 'POST',
@@ -178,6 +206,32 @@ function printStats(stats) {
   console.log('');
 }
 
+function printAllChannelsStats(data) {
+  console.log('\n' + c('bold', '=== All Channels Overview ==='));
+  console.log('');
+  console.log(`  Total channels:          ${c('bold', data.summary.totalChannels)}`);
+  console.log(`  Channels with videos:    ${c('green', data.summary.channelsWithAvailable)}`);
+  console.log(`  Channels complete:       ${c('blue', data.summary.channelsComplete)}`);
+  console.log(`  Total videos available:  ${c('magenta', data.summary.totalAvailableVideos)}`);
+  console.log('');
+
+  // Print table of channels
+  console.log(c('bold', 'Channels:'));
+  console.log(c('dim', '─'.repeat(90)));
+  console.log(`  ${c('bold', 'Channel Name'.padEnd(40))} ${c('bold', 'Videos'.padStart(8))} ${c('bold', 'With Tr.'.padStart(10))} ${c('bold', 'Insights'.padStart(10))} ${c('bold', 'Available'.padStart(10))} ${c('bold', 'Status'.padStart(10))}`);
+  console.log(c('dim', '─'.repeat(90)));
+
+  for (const ch of data.data) {
+    const name = ch.channelName.length > 38 ? ch.channelName.slice(0, 35) + '...' : ch.channelName;
+    const status = ch.isComplete ? c('green', '✓ Done') : c('yellow', 'Pending');
+    const available = ch.availableForGeneration > 0 ? c('magenta', String(ch.availableForGeneration).padStart(10)) : c('dim', '0'.padStart(10));
+
+    console.log(`  ${name.padEnd(40)} ${String(ch.totalVideos).padStart(8)} ${String(ch.videosWithTranscript).padStart(10)} ${String(ch.existingInsights).padStart(10)} ${available} ${status.padStart(10)}`);
+  }
+  console.log(c('dim', '─'.repeat(90)));
+  console.log('');
+}
+
 function printResults(result) {
   console.log('\n' + c('bold', '=== Generation Results ==='));
   console.log(`Channel: ${c('cyan', result.channelName)}`);
@@ -252,26 +306,21 @@ function printResults(result) {
   return result;
 }
 
-async function main() {
-  console.log(c('bold', '\nLurnia Batch Insight Generator'));
-  console.log(c('dim', `Backend: ${backendUrl}`));
-  console.log(c('dim', `Frontend: ${frontendUrl}`));
-  console.log('');
-
-  // Always show stats first
-  console.log('Fetching channel stats...');
-  const stats = await getChannelStats();
+async function processChannel(chId, channelName = null) {
+  // Show stats first
+  console.log(`\nFetching stats for ${channelName ? c('cyan', channelName) : chId}...`);
+  const stats = await getChannelStats(chId);
   printStats(stats);
 
   if (statsOnly) {
-    return;
+    return { skipped: true, reason: 'stats-only' };
   }
 
   // Check if there are videos available
   if (stats.availableForGeneration === 0 && skipExisting) {
     console.log(c('green', 'No new videos available for generation.'));
     console.log(c('dim', 'All videos with transcripts already have insights.'));
-    return;
+    return { skipped: true, reason: 'complete' };
   }
 
   // Show what we're about to do
@@ -282,33 +331,165 @@ async function main() {
   console.log('');
   console.log('Generating insights... (this may take a while)');
 
-  const result = await generateBatch();
+  const result = await generateBatch(chId);
   printResults(result);
 
-  // Revalidate cache if we generated/updated anything
-  const total = result.newlyCreated + result.updated;
-  if (total > 0 && !noRevalidate) {
-    console.log('');
-    console.log('Revalidating frontend cache...');
+  return result;
+}
 
-    // Get slugs of newly created insights
-    const newSlugs = result.newlyCreatedList?.map(r => r.slug) || [];
-    const revalidated = await revalidateCache(newSlugs);
+async function runCrawlAll() {
+  console.log(c('bold', '\nLurnia Batch Insight Generator - CRAWL ALL MODE'));
+  console.log(c('dim', `Backend: ${backendUrl}`));
+  console.log(c('dim', `Frontend: ${frontendUrl}`));
+  console.log('');
+
+  // Get all channels
+  console.log('Fetching all channels...');
+  const allChannelsData = await getAllChannels();
+
+  if (allChannelsData.data.length === 0) {
+    console.log(c('yellow', 'No channels found in the database.'));
+    return;
+  }
+
+  printAllChannelsStats(allChannelsData);
+
+  if (statsOnly) {
+    return;
+  }
+
+  // Filter channels that need processing
+  const channelsToProcess = allChannelsData.data.filter(ch => ch.availableForGeneration > 0);
+
+  if (channelsToProcess.length === 0) {
+    console.log(c('green', 'All channels are complete! No videos need insight generation.'));
+    return;
+  }
+
+  console.log(c('bold', `\n=== Processing ${channelsToProcess.length} channel(s) ===\n`));
+
+  // Track overall stats
+  const overallStats = {
+    channelsProcessed: 0,
+    channelsSkipped: 0,
+    totalNewlyCreated: 0,
+    totalUpdated: 0,
+    totalErrors: 0,
+    allNewSlugs: []
+  };
+
+  for (let i = 0; i < channelsToProcess.length; i++) {
+    const channel = channelsToProcess[i];
+    console.log(c('bold', `\n${'═'.repeat(60)}`));
+    console.log(c('bold', `Channel ${i + 1}/${channelsToProcess.length}: ${c('cyan', channel.channelName)}`));
+    console.log(c('bold', `${'═'.repeat(60)}`));
+
+    try {
+      const result = await processChannel(channel.channelId, channel.channelName);
+
+      if (result.skipped) {
+        overallStats.channelsSkipped++;
+      } else {
+        overallStats.channelsProcessed++;
+        overallStats.totalNewlyCreated += result.newlyCreated || 0;
+        overallStats.totalUpdated += result.updated || 0;
+        overallStats.totalErrors += result.errors || 0;
+
+        // Collect slugs for cache revalidation
+        if (result.newlyCreatedList) {
+          overallStats.allNewSlugs.push(...result.newlyCreatedList.map(r => r.slug));
+        }
+      }
+    } catch (error) {
+      console.error(c('red', `Error processing channel ${channel.channelName}: ${error.message}`));
+      overallStats.totalErrors++;
+    }
+
+    // Small delay between channels to avoid overwhelming the API
+    if (i < channelsToProcess.length - 1) {
+      console.log(c('dim', '\nWaiting 2 seconds before next channel...'));
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
+  // Print overall summary
+  console.log('\n' + c('bold', '═'.repeat(60)));
+  console.log(c('bold', '=== OVERALL SUMMARY ==='));
+  console.log(c('bold', '═'.repeat(60)));
+  console.log('');
+  console.log(`  Channels processed:      ${c('bold', overallStats.channelsProcessed)}`);
+  console.log(`  Channels skipped:        ${c('dim', overallStats.channelsSkipped)}`);
+  console.log('');
+  console.log(`  ${c('green', 'Total NEW insights:')}       ${c('bold', overallStats.totalNewlyCreated)}`);
+  console.log(`  ${c('yellow', 'Total updated:')}           ${c('bold', overallStats.totalUpdated)}`);
+  if (overallStats.totalErrors > 0) {
+    console.log(`  ${c('red', 'Total errors:')}            ${c('bold', overallStats.totalErrors)}`);
+  }
+  console.log('');
+
+  // Revalidate cache for all new insights
+  const totalGenerated = overallStats.totalNewlyCreated + overallStats.totalUpdated;
+  if (totalGenerated > 0 && !noRevalidate) {
+    console.log('Revalidating frontend cache...');
+    const revalidated = await revalidateCache(overallStats.allNewSlugs.slice(0, 20));
 
     if (revalidated && revalidated.length > 0) {
       console.log(c('green', `  Cache cleared for ${revalidated.length} path(s)`));
     }
 
-    // Notify search engines via IndexNow (Bing, Yandex, etc.)
-    if (newSlugs.length > 0) {
+    // Notify search engines
+    if (overallStats.allNewSlugs.length > 0) {
       console.log('Notifying search engines (IndexNow)...');
-      const submitted = await notifyIndexNow(newSlugs);
+      const submitted = await notifyIndexNow(overallStats.allNewSlugs.slice(0, 50));
       if (submitted) {
         console.log(c('green', `  Submitted ${submitted} URL(s) to Bing/Yandex`));
       }
     }
 
-    console.log(c('dim', `New insights live at ${frontendUrl}/guides`));
+    console.log(c('dim', `\nAll insights live at ${frontendUrl}/guides`));
+  }
+}
+
+async function runSingleChannel() {
+  console.log(c('bold', '\nLurnia Batch Insight Generator'));
+  console.log(c('dim', `Backend: ${backendUrl}`));
+  console.log(c('dim', `Frontend: ${frontendUrl}`));
+  console.log('');
+
+  const result = await processChannel(channelId);
+
+  // Revalidate cache if we generated/updated anything
+  if (!result.skipped) {
+    const total = (result.newlyCreated || 0) + (result.updated || 0);
+    if (total > 0 && !noRevalidate) {
+      console.log('');
+      console.log('Revalidating frontend cache...');
+
+      const newSlugs = result.newlyCreatedList?.map(r => r.slug) || [];
+      const revalidated = await revalidateCache(newSlugs);
+
+      if (revalidated && revalidated.length > 0) {
+        console.log(c('green', `  Cache cleared for ${revalidated.length} path(s)`));
+      }
+
+      if (newSlugs.length > 0) {
+        console.log('Notifying search engines (IndexNow)...');
+        const submitted = await notifyIndexNow(newSlugs);
+        if (submitted) {
+          console.log(c('green', `  Submitted ${submitted} URL(s) to Bing/Yandex`));
+        }
+      }
+
+      console.log(c('dim', `New insights live at ${frontendUrl}/guides`));
+    }
+  }
+}
+
+async function main() {
+  if (crawlAll) {
+    await runCrawlAll();
+  } else {
+    await runSingleChannel();
   }
 }
 

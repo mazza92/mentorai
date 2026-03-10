@@ -599,6 +599,87 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
+ * GET /api/public-insights/all-channels
+ * List all imported channels with their insight generation stats
+ * Used by batch script to crawl all channels automatically
+ */
+router.get('/all-channels', async (req, res) => {
+  try {
+    const { firestore } = getFirestore();
+
+    // Get all channels
+    const channelsSnap = await firestore.collection('channels').get();
+
+    if (channelsSnap.empty) {
+      return res.json({
+        success: true,
+        data: [],
+        count: 0
+      });
+    }
+
+    const channels = [];
+
+    for (const channelDoc of channelsSnap.docs) {
+      const channelData = channelDoc.data();
+      const channelId = channelDoc.id;
+
+      // Count videos with transcripts
+      const videosSnap = await channelDoc.ref.collection('videos').get();
+      const totalVideos = videosSnap.size;
+      const videosWithTranscript = videosSnap.docs.filter(d => d.data().transcript).length;
+
+      // Count existing insights for this channel
+      const insightsSnap = await firestore.collection('public_insights')
+        .where('channelId', '==', channelId)
+        .select('status')
+        .get();
+
+      const existingInsights = insightsSnap.size;
+      const publishedInsights = insightsSnap.docs.filter(d => d.data().status === 'published').length;
+      const availableForGeneration = videosWithTranscript - existingInsights;
+
+      channels.push({
+        channelId,
+        channelName: channelData.channelName || 'Unknown',
+        totalVideos,
+        videosWithTranscript,
+        existingInsights,
+        publishedInsights,
+        availableForGeneration,
+        isComplete: availableForGeneration <= 0
+      });
+    }
+
+    // Sort: channels with available videos first, then by name
+    channels.sort((a, b) => {
+      if (a.availableForGeneration > 0 && b.availableForGeneration <= 0) return -1;
+      if (a.availableForGeneration <= 0 && b.availableForGeneration > 0) return 1;
+      return a.channelName.localeCompare(b.channelName);
+    });
+
+    res.json({
+      success: true,
+      data: channels,
+      count: channels.length,
+      summary: {
+        totalChannels: channels.length,
+        channelsWithAvailable: channels.filter(c => c.availableForGeneration > 0).length,
+        channelsComplete: channels.filter(c => c.isComplete).length,
+        totalAvailableVideos: channels.reduce((sum, c) => sum + Math.max(0, c.availableForGeneration), 0)
+      }
+    });
+
+  } catch (error) {
+    console.error('[PublicInsights] All channels error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * GET /api/public-insights/sitemap
  * Generate sitemap data for all published insights
  */
