@@ -75,7 +75,7 @@ export default function Home() {
     if (!currentProject) {
       trackLandingPageView()
       initScrollTracking()
-      
+
       // Store UTM params for attribution
       getUTMParams()
     }
@@ -83,6 +83,34 @@ export default function Home() {
       resetScrollTracking()
     }
   }, [currentProject])
+
+  // Add noindex meta tag for URLs with video/project params to prevent duplicate content indexing
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const urlParams = new URLSearchParams(window.location.search)
+    const hasVideoParam = urlParams.has('video') || urlParams.has('project')
+
+    if (hasVideoParam) {
+      // Add noindex meta tag
+      let robotsMeta = document.querySelector('meta[name="robots"]') as HTMLMetaElement
+      if (!robotsMeta) {
+        robotsMeta = document.createElement('meta')
+        robotsMeta.name = 'robots'
+        document.head.appendChild(robotsMeta)
+      }
+      robotsMeta.content = 'noindex, follow'
+
+      // Also ensure canonical points to clean URL
+      let canonicalLink = document.querySelector('link[rel="canonical"]') as HTMLLinkElement
+      if (!canonicalLink) {
+        canonicalLink = document.createElement('link')
+        canonicalLink.rel = 'canonical'
+        document.head.appendChild(canonicalLink)
+      }
+      canonicalLink.href = 'https://lurnia.app/'
+    }
+  }, [])
 
   useEffect(() => {
     // Check if Supabase is configured

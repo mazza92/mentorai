@@ -5,16 +5,32 @@ import Footer from '@/components/Footer'
 import SEOHeader from '@/components/SEOHeader'
 import GuidesFilters from './GuidesFilters'
 
-export const metadata: Metadata = {
-  title: 'Guides IA de vidéos YouTube | Lurnia',
-  description: 'Découvrez nos guides vidéo YouTube : points clés, timestamps et analyses générés par intelligence artificielle.',
-  openGraph: {
+interface PageProps {
+  searchParams: Promise<{ page?: string; channel?: string; search?: string }>
+}
+
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const params = await searchParams
+  const hasFilters = params.page || params.channel || params.search
+
+  return {
     title: 'Guides IA de vidéos YouTube | Lurnia',
-    description: 'Découvrez nos guides vidéo YouTube.',
-    type: 'website'
-  },
-  alternates: {
-    canonical: 'https://lurnia.app/guides'
+    description: 'Découvrez nos guides vidéo YouTube : points clés, timestamps et analyses générés par intelligence artificielle.',
+    openGraph: {
+      title: 'Guides IA de vidéos YouTube | Lurnia',
+      description: 'Découvrez nos guides vidéo YouTube.',
+      type: 'website'
+    },
+    alternates: {
+      canonical: 'https://lurnia.app/guides'
+    },
+    // Add noindex for filtered/paginated pages to avoid duplicate content
+    ...(hasFilters && {
+      robots: {
+        index: false,
+        follow: true
+      }
+    })
   }
 }
 
@@ -71,10 +87,6 @@ async function getInsights(page: number = 1, channelId?: string, search?: string
       channels: []
     }
   }
-}
-
-interface PageProps {
-  searchParams: Promise<{ page?: string; channel?: string; search?: string }>
 }
 
 export default async function GuidesDirectoryPage({ searchParams }: PageProps) {

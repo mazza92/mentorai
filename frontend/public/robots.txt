@@ -6,6 +6,14 @@ Disallow: /auth/
 Disallow: /settings
 Disallow: /subscription/
 Disallow: /debug-ga
+Disallow: /extension-auth/
+
+# Block URL parameters that create duplicate content
+Disallow: /*?video=
+Disallow: /*?project=
+Disallow: /guides?channel=
+Disallow: /guides?search=
+Disallow: /guides?page=
 
 # Sitemap
 Sitemap: https://lurnia.app/sitemap.xml
