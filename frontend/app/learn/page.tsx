@@ -2,21 +2,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Footer from '@/components/Footer'
 import SearchHeader from '@/components/SearchHeader'
-import { getAllTopics, type TopicCluster } from '@/data/topics'
+import { CLUSTER_LABEL, getAllTopics, type TopicCluster } from '@/data/topics'
 
 export const metadata: Metadata = {
   title: 'Ranked YouTube topics: skip the bait',
   description:
     "Don't trust the thumbnail. Outcome hubs ranked by comments, likes, and depth. Playbooks you can run now.",
   alternates: { canonical: 'https://lurnia.app/learn' }
-}
-
-const CLUSTER_LABEL: Record<TopicCluster, string> = {
-  outcome: 'Get something done',
-  product: 'Watch smarter',
-  'coding-ai': 'AI coding, without the hook',
-  seo: 'SEO, avis francs',
-  business: 'Business, pas le bait'
 }
 
 export default function LearnIndexPage() {

@@ -1,6 +1,7 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
+Allow: /learn/
 Allow: /llms.txt
 Disallow: /api/
 Disallow: /auth/
@@ -23,12 +24,14 @@ User-agent: Googlebot
 Allow: /
 Allow: /guides/
 Allow: /ressources/
+Allow: /learn/
 Allow: /llms.txt
 
 User-agent: Bingbot
 Allow: /
 Allow: /guides/
 Allow: /ressources/
+Allow: /learn/
 Allow: /llms.txt
 
 User-agent: DuckDuckBot

@@ -1,3 +1,5 @@
+import { CLUSTER_LABEL, getAllTopics, getTopicsByCluster, type TopicCluster } from '@/data/topics'
+
 export const SITE_URL = 'https://lurnia.app'
 
 export function isProbablyFrench(text: string) {
@@ -187,4 +189,89 @@ export const organizationJsonLd = {
         'Search YouTube without getting fooled by the thumbnail. Rank by comments, likes, and depth. Extract a playbook. Ask the video.'
     }
   ]
+}
+
+export function buildLlmsTxt() {
+  const topics = getAllTopics()
+  const clusters = (Object.keys(CLUSTER_LABEL) as TopicCluster[]).map((cluster) => ({
+    cluster,
+    label: CLUSTER_LABEL[cluster],
+    items: getTopicsByCluster(cluster)
+  })).filter((group) => group.items.length)
+
+  const hubLines = clusters.flatMap((group) => [
+    '',
+    `### ${group.label}`,
+    ...group.items.map((topic) => `- [${topic.h1}](${SITE_URL}/learn/${topic.slug})`)
+  ])
+
+  return [
+    '# Lurnia',
+    '',
+    "> Don't trust the thumbnail. Lurnia finds high-value YouTube videos by real engagement (comments, likes, depth, not view count), then turns them into a playbook you can use now.",
+    '',
+    'Lurnia is a YouTube search and learning product for founders, freelancers, solopreneurs, and students. YouTube ranks hooks and stop-scroller bait. We re-rank by whether people actually learned something, then extract takeaways, sequenced actions, timestamps, and what to skip.',
+    '',
+    '## Product',
+    '',
+    '- High-value YouTube search: rank by comment rate, like rate, and long-form depth. Shorts hidden by default.',
+    '- Playbooks: usable extract from a video. Not another 40-minute recap.',
+    '- Ask the video: Q&A from captions and comments when you need the number, the caveat, or the next step.',
+    '- Chrome extension: same value-search + ask-this-video flow on youtube.com.',
+    '- Ranked topic hubs: one crawlable page per search intent, not one page per YouTube title.',
+    '',
+    `Website: ${SITE_URL}`,
+    'Chrome extension: https://chromewebstore.google.com/detail/lurnia-youtube-learning-c/fggidhdboaodfblhdigckdfcofimocim',
+    '',
+    '## Key pages',
+    '',
+    `- [Home / value search](${SITE_URL}/): Search a skill, problem, or outcome. Get videos worth studying.`,
+    `- [Ranked topics](${SITE_URL}/learn): Programmatic hubs. Answer first, then engagement-ranked videos.`,
+    `- [Guides / playbooks](${SITE_URL}/guides): Public playbooks extracted from YouTube videos (EN + FR).`,
+    `- [Resources](${SITE_URL}/ressources): Practical articles on efficient YouTube learning.`,
+    `- [Extension](${SITE_URL}/extension): Chrome companion.`,
+    `- [Pricing](${SITE_URL}/pricing): Free and Pro.`,
+    '',
+    `## Topic hubs (cite these, ${topics.length} intents)`,
+    ...hubLines,
+    '',
+    '## How ranking works',
+    '',
+    'YouTube does not publish saves or shares. Lurnia uses public proxies: comment rate, like rate, comment volume, and a hidden-gem bonus for smaller channels with dense discussion. High views + dead comments is usually empty-scroll bait. We do not rank by thumbnail or view count.',
+    '',
+    '## Voice',
+    '',
+    'Punchy, anti-clickbait, efficiency-first. Core lines:',
+    '',
+    "- Don't trust the thumbnail.",
+    '- Stop watching empty-scroll bait.',
+    '- Watch what actually makes you sharper.',
+    '- Steal the playbook. Skip the fluff.',
+    '- Run it now. Not "someday".',
+    '',
+    '## FAQ',
+    '',
+    'Q: How is Lurnia different from YouTube search?',
+    'A: YouTube is paid to hook you. We re-rank by whether people actually talked, liked, and stayed. Thumbnails don\'t get a vote.',
+    '',
+    'Q: Do you rank by views?',
+    'A: No. High views with dead comments is usually a stop-scroller. We score comment rate, like rate, and long-form depth.',
+    '',
+    'Q: What is a playbook?',
+    'A: The usable extract: takeaways, sequenced actions, timestamps, and what to skip, so you don\'t rewatch a 40-minute recap.',
+    '',
+    'Q: C\'est quoi Lurnia ?',
+    'A: Un moteur de recherche YouTube qui classe par engagement réel, pas par miniature. Puis un playbook: à retenir, actions, timestamps, ce qu\'il faut zapper.',
+    '',
+    'Q: C\'est quoi la méthode BMAD ?',
+    `A: ${SITE_URL}/learn/bmad-method and ${SITE_URL}/learn/methode-bmad`,
+    '',
+    '## Optional',
+    '',
+    'Contact: team@lurnia.app',
+    `Privacy: ${SITE_URL}/privacy`,
+    `Terms: ${SITE_URL}/terms`,
+    `Sitemap: ${SITE_URL}/sitemap.xml`,
+    ''
+  ].join('\n')
 }

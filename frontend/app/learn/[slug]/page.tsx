@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { MessageSquare, ThumbsUp, Clock, ArrowRight } from 'lucide-react'
 import Footer from '@/components/Footer'
 import SearchHeader from '@/components/SearchHeader'
-import { getAllTopics, getRelatedTopics, getTopic } from '@/data/topics'
+import { getAllTopics, getRelatedTopics, getTopic, getTwinTopic } from '@/data/topics'
 import { SITE_URL } from '@/lib/seo'
 import { fetchRankedVideos, formatClock, formatCompact } from '@/lib/valueSearch'
 
@@ -19,10 +19,22 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const topic = getTopic(params.slug)
   if (!topic) return { title: 'Topic not found' }
 
+  const twin = getTwinTopic(topic)
+  const languages = twin
+    ? {
+        [topic.lang]: `${SITE_URL}/learn/${topic.slug}`,
+        [twin.lang]: `${SITE_URL}/learn/${twin.slug}`,
+        'x-default': `${SITE_URL}/learn/${topic.lang === 'en' ? topic.slug : twin.slug}`
+      }
+    : undefined
+
   return {
     title: topic.title,
     description: topic.description,
-    alternates: { canonical: `${SITE_URL}/learn/${topic.slug}` },
+    alternates: {
+      canonical: `${SITE_URL}/learn/${topic.slug}`,
+      languages
+    },
     openGraph: {
       title: topic.title,
       description: topic.description,
@@ -39,6 +51,7 @@ export default async function TopicHubPage({ params }: { params: { slug: string 
 
   const videos = await fetchRankedVideos(topic.query, { language: topic.lang, limit: 8 })
   const related = getRelatedTopics(topic)
+  const twin = getTwinTopic(topic)
   const url = `${SITE_URL}/learn/${topic.slug}`
 
   const faqJsonLd = {
@@ -89,6 +102,14 @@ export default async function TopicHubPage({ params }: { params: { slug: string 
           <Link href="/learn" className="hover:text-indigo-700">Topics</Link>
           <span className="px-2">/</span>
           <span className="text-slate-700">{topic.lang}</span>
+          {twin && (
+            <>
+              <span className="px-2">/</span>
+              <Link href={`/learn/${twin.slug}`} className="hover:text-indigo-700">
+                {twin.lang === 'fr' ? 'FR' : 'EN'}
+              </Link>
+            </>
+          )}
         </nav>
 
         <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-violet-600">
