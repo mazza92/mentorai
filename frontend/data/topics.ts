@@ -41,16 +41,25 @@ export const TOPICS: Topic[] = [
     cluster: 'outcome',
     query: 'freelance pricing how to price your services',
     h1: 'Freelance pricing videos worth studying',
-    title: 'Freelance pricing: skip the thumbnail bait',
+    title: 
+      
+      
+      "GitHub Spec Kit: AI coding playbook",
     description:
-      "Don't trust the thumbnail. High-discussion videos on how to price a freelance offer, ranked by comments and likes, not views.",
+      
+      
+      
+      "Don't trust the thumbnail. This page ranks the best videos about GitHub Spec Kit, focusing on practical applications and skipping the clickbait.",
     definition:
-      'Freelance pricing is how you set a rate or a package so the work pays, not just keeps you busy. Most YouTube videos on this are hooks about "charge more" with no numbers. Rank by comment rate: people argue about retainers, value-based pricing, and what actually booked. Open the playbook for the rate card, the script, and what to skip.',
+      
+      
+      
+      "GitHub Spec Kit is a spec-first workflow for AI coding: write the contract, then let the model implement. YouTube videos often overpromise or lack depth. This page curates and ranks the most valuable content.",
     howWeRank:
       'We start from relevant videos, then score comment rate, like rate, and long-form depth. Shorts stay hidden. High views with dead comments usually means a stop-scroller.',
     faqs: [
-      { q: 'How should I price freelance work?', a: 'Pick a model (hourly, project, retainer, value-based), then steal the wording and numbers from videos people actually discussed. Do not copy a viral thumbnail rate.' },
-      { q: 'Why not just watch the most-viewed pricing video?', a: 'View count rewards hooks. Comment and like rate reward videos people used. That is the list we show.' }
+      { q: "What is GitHub Spec Kit?", a: "GitHub Spec Kit is a methodology for AI-assisted coding where you define the software's specifications first, and then an AI model generates the code based on those specs. It's about contract-first development with AI." },
+      { q: "Why should I use GitHub Spec Kit?", a: "It helps ensure that the AI-generated code meets your exact requirements by focusing on clear specifications upfront. This can lead to more reliable and predictable AI coding outcomes, reducing rework and improving code quality." }
     ],
     related: ['cold-email', 'validate-saas-idea', 'time-blocking']
   },

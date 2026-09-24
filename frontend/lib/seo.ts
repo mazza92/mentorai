@@ -62,6 +62,11 @@ export const SERP_OVERRIDES: Record<string, { title: string; description: string
     title: 'La Fabrique à idiots (Micode): le playbook',
     description:
       "Ne te fie pas à la miniature. Résumé utile de La Fabrique à idiots: thèses, timestamps, ce qu'il faut zapper."
+  },
+  "formation-chatgpt-comment-utiliser-chatgpt-en-2025-Tuok-M": {
+    title: "ChatGPT: The 2025 User Guide (Don't Trust the Thumbn",
+    description:
+      "Master ChatGPT in 2025. This guide cuts through the clickbait, showing you how to use ChatGPT effectively, beyond the hype. Get real strategies for AI."
   }
 }
 
