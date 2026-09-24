@@ -20,7 +20,7 @@ interface PricingPlan {
 
 export default function Pricing() {
   const { t } = useTranslation('common')
-  const { user, loading: authLoading, signInWithGoogle } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
@@ -86,15 +86,9 @@ export default function Pricing() {
 
   const handleSubscribe = async (priceId: string, planName: string) => {
     if (!user) {
-      // Store intent to upgrade after sign-in
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('pendingUpgrade', priceId)
-      }
-      // Trigger Google sign-in
-      try {
-        await signInWithGoogle()
-      } catch (error) {
-        console.error('Sign in error:', error)
+        window.location.href = '/auth?mode=signup'
       }
       return
     }

@@ -6,11 +6,12 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
 import { trackEvent, trackSignupConversion } from '@/components/GoogleAnalytics'
-import { Loader2, Mail, Lock, LogIn, UserPlus, Chrome, Zap, Sparkles, Video, MessageSquare, CheckCircle2, ArrowRight } from 'lucide-react'
+import GoogleSignInButton, { hasGoogleIdentityClient } from '@/components/GoogleSignInButton'
+import { Loader2, Mail, Lock, LogIn, UserPlus, Zap, Sparkles, Video, MessageSquare, CheckCircle2, ArrowRight } from 'lucide-react'
 
 export default function Auth() {
   const { t } = useTranslation('common')
-  const { user, signIn, signUp, signInWithGoogle, loading: authLoading } = useAuth()
+  const { user, signIn, signUp, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -98,30 +99,6 @@ export default function Auth() {
       setError(err.message || 'An error occurred. Please try again.')
       console.error('Auth error:', err)
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      // Track Google sign-in attempt
-      trackEvent('login', {
-        method: 'google'
-      })
-
-      await signInWithGoogle()
-      // OAuth redirect will happen, so we don't need to set loading to false
-      // The user will be redirected to Google, then back to /auth/callback
-    } catch (err: any) {
-      console.error('Google sign-in error:', err)
-      // Check for specific error messages
-      if (err?.message?.includes('provider is not enabled') || err?.code === 400) {
-        setError(t('auth.error_google_not_enabled'))
-      } else {
-        setError(err?.message || t('auth.error_google_failed'))
-      }
       setLoading(false)
     }
   }
@@ -236,21 +213,20 @@ export default function Auth() {
               </div>
             )}
 
-            {/* Google Sign In - Prominent */}
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="w-full py-3.5 px-4 border-2 border-slate-200 rounded-xl font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mb-6 shadow-sm hover:shadow-md"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Chrome className="w-5 h-5 mr-3" />
-                  {t('auth.continue_with_google')}
-                </>
-              )}
-            </button>
+            <GoogleSignInButton
+              onError={(message) => {
+                setError(message)
+                setLoading(false)
+              }}
+              onSuccess={() => {
+                trackEvent('login', { method: 'google' })
+                trackSignupConversion()
+                window.location.href = '/'
+              }}
+            />
+            {!hasGoogleIdentityClient() && (
+              <p className="mb-6 text-center text-sm text-slate-500">Google sign-in is not configured yet.</p>
+            )}
 
             <div className="relative mb-6">
               <div className="absolute inset-0 flex items-center">
