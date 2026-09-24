@@ -118,59 +118,6 @@ function ExtensionAuthContent() {
   )
 }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-        {/* Logo */}
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-500 mb-6 shadow-lg">
-          <Zap className="w-8 h-8 text-white" />
-        </div>
-
-        {status === 'loading' && (
-          <>
-            <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-slate-900 mb-2">Connecting Extension</h2>
-            <p className="text-slate-600">{message}</p>
-          </>
-        )}
-
-        {status === 'authenticating' && (
-          <>
-            <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-slate-900 mb-2">Sign In Required</h2>
-            <p className="text-slate-600">{message}</p>
-            <p className="text-slate-500 text-sm mt-4">
-              You'll be redirected to Google to sign in.
-            </p>
-          </>
-        )}
-
-        {status === 'success' && (
-          <>
-            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-slate-900 mb-2">Connected!</h2>
-            <p className="text-slate-600">{message}</p>
-          </>
-        )}
-
-        {status === 'error' && (
-          <>
-            <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-slate-900 mb-2">Connection Failed</h2>
-            <p className="text-slate-600">{message}</p>
-            <button
-              onClick={() => window.close()}
-              className="mt-6 px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
-            >
-              Close Window
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function ExtensionAuth() {
   return (
     <Suspense
