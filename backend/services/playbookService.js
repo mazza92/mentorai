@@ -6,6 +6,7 @@ const { generateText } = require('./llmClient');
 class PlaybookService {
   constructor() {
     this.memory = new Map();
+    this.inflight = new Map();
   }
 
   async getOrGenerate(videoId, { language = 'en' } = {}) {
@@ -15,7 +16,20 @@ class PlaybookService {
     if (this.memory.has(cacheKey)) {
       return this.memory.get(cacheKey);
     }
+    if (this.inflight.has(cacheKey)) {
+      return this.inflight.get(cacheKey);
+    }
 
+    const job = this.loadOrCreate(videoId, lang, cacheKey);
+    this.inflight.set(cacheKey, job);
+    try {
+      return await job;
+    } finally {
+      this.inflight.delete(cacheKey);
+    }
+  }
+
+  async loadOrCreate(videoId, lang, cacheKey) {
     try {
       const { firestore } = getFirestore();
       if (firestore) {
@@ -32,38 +46,33 @@ class PlaybookService {
 
     const payload = await this.generate(videoId, lang);
     this.memory.set(cacheKey, payload);
-
-    try {
-      const { firestore } = getFirestore();
-      if (firestore) {
-        await firestore.collection('playbooks').doc(cacheKey).set({
-          ...payload,
-          generatedAt: new Date().toISOString()
-        });
-      }
-    } catch (err) {
-      console.warn('[Playbook] Cache write skipped:', err.message);
-    }
-
+    this.persist(cacheKey, payload);
     return payload;
   }
 
+  persist(cacheKey, payload) {
+    Promise.resolve()
+      .then(async () => {
+        const { firestore } = getFirestore();
+        if (!firestore) return;
+        await firestore.collection('playbooks').doc(cacheKey).set({
+          ...stripUndefined(payload),
+          generatedAt: new Date().toISOString()
+        });
+      })
+      .catch((err) => console.warn('[Playbook] Cache write skipped:', err.message));
+  }
+
   async generate(videoId, lang) {
-    const video = await valueSearchService.getVideo(videoId);
+    const started = Date.now();
+    const [video, comments, transcript] = await Promise.all([
+      this.loadVideo(videoId),
+      valueSearchService.fetchTopComments(videoId, 12).catch(() => []),
+      this.fetchCaptionsFast(videoId)
+    ]);
 
-    let transcriptText = '';
-    let transcriptSource = null;
-    try {
-      const transcript = await youtubeInnertubeService.fetchTranscript(videoId);
-      if (transcript?.success && transcript.text) {
-        transcriptText = transcript.text;
-        transcriptSource = transcript.source || 'captions';
-      }
-    } catch (err) {
-      console.warn('[Playbook] Transcript fetch failed:', err.message);
-    }
-
-    const comments = await valueSearchService.fetchTopComments(videoId, 25);
+    const transcriptText = transcript?.text || '';
+    const transcriptSource = transcript?.source || null;
     if (!transcriptText && !comments.length && !video.description) {
       const err = new Error('Not enough source material to build a playbook');
       err.code = 'NO_SOURCE';
@@ -80,6 +89,7 @@ class PlaybookService {
       aiGenerated = false;
     }
 
+    console.log(`[Playbook] Ready for ${videoId} in ${((Date.now() - started) / 1000).toFixed(1)}s (captions: ${!!transcriptText})`);
     return {
       video,
       transcriptAvailable: !!transcriptText,
@@ -91,69 +101,87 @@ class PlaybookService {
     };
   }
 
+  async loadVideo(videoId) {
+    try {
+      return await valueSearchService.getVideo(videoId);
+    } catch (err) {
+      console.warn('[Playbook] Video metadata fallback:', err.message);
+      return {
+        videoId,
+        title: 'YouTube video',
+        channel: '',
+        description: '',
+        published: '',
+        thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        durationSec: 0
+      };
+    }
+  }
+
+  async fetchCaptionsFast(videoId) {
+    try {
+      const transcript = await Promise.race([
+        youtubeInnertubeService.fetchTranscript(videoId, { skipSlowFallback: true }),
+        new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 6000))
+      ]);
+      if (transcript?.timedOut) {
+        console.warn(`[Playbook] Caption fetch timed out for ${videoId}`);
+      }
+      if (transcript?.success && transcript.text) return transcript;
+    } catch (err) {
+      console.warn('[Playbook] Transcript fetch failed:', err.message);
+    }
+    return { success: false, text: '', source: null };
+  }
+
   async generateContent(video, transcriptText, comments, lang) {
     const isFr = lang === 'fr';
-    const transcript = (transcriptText || '').slice(0, 14000);
+    const transcript = (transcriptText || '').slice(0, 6000);
     const commentBlock = comments
-      .slice(0, 20)
-      .map((c, i) => `${i + 1}. @${c.author}: ${c.text}`)
+      .slice(0, 8)
+      .map((c, i) => `${i + 1}. @${c.author}: ${String(c.text || '').slice(0, 280)}`)
       .join('\n');
 
-    const prompt = `You extract ACTIONABLE value from YouTube videos for entrepreneurs, freelancers, solopreneurs, and students.
-Ignore hype, sponsor reads, and generic motivation. Prefer tactics, frameworks, numbers, and next steps.
-Write in ${isFr ? 'French' : 'English'}.
-Never use an em dash. Make actions runnable now, not "this week" or "cette semaine".
+    const prompt = `Extract actionable value from this YouTube video. Ignore hype and sponsors.
+Write in ${isFr ? 'French' : 'English'}. Never use an em dash. Actions must be runnable now.
 Return ONLY valid JSON.
 
-VIDEO:
-Title: ${video.title}
-Channel: ${video.channel}
-Duration: ${Math.round((video.durationSec || 0) / 60)} min
-Views: ${video.views} | Likes: ${video.likes} | Comments: ${video.comments}
+VIDEO: ${video.title} | ${video.channel} | ${Math.round((video.durationSec || 0) / 60)} min
+Views ${video.views} | Likes ${video.likes} | Comments ${video.comments}
 
 TRANSCRIPT (may be empty):
-${transcript || '[No captions. Use description and comments only. Do not invent quotes or timestamps.]'}
+${transcript || '[No captions. Use description and comments only. Do not invent timestamps.]'}
 
 DESCRIPTION:
-${(video.description || '').slice(0, 2500)}
+${(video.description || '').slice(0, 1500)}
 
 TOP COMMENTS:
 ${commentBlock || '[None]'}
 
-JSON schema:
+JSON:
 {
-  "headline": "clear outcome-focused title, max 90 chars",
-  "oneLiner": "who this is for + what they can do after watching, max 160 chars",
-  "whyThisNotClickbait": "2 sentences on why this has real value vs typical viral filler",
+  "headline": "max 90 chars",
+  "oneLiner": "who + outcome, max 160 chars",
+  "whyThisNotClickbait": "2 sentences",
   "audience": "freelancers | founders | students | mixed",
-  "keyTakeaways": [
-    { "title": "short", "detail": "1-2 sentences, specific" }
-  ],
-  "playbook": [
-    { "step": 1, "action": "imperative verb phrase", "detail": "how to do it now", "timestamp": 0, "timestampFormatted": "0:00" }
-  ],
-  "skipFluff": ["what to skip or ignore from this video"],
-  "timestamps": [
-    { "timestamp": 0, "timestampFormatted": "M:SS", "title": "moment", "description": "why it matters" }
-  ],
-  "suggestedQuestions": ["question a practitioner would ask"],
-  "faqs": [
-    { "question": "...", "answer": "..." }
-  ]
+  "keyTakeaways": [{ "title": "short", "detail": "specific" }],
+  "playbook": [{ "step": 1, "action": "imperative", "detail": "how now", "timestamp": 0, "timestampFormatted": "0:00" }],
+  "skipFluff": ["item"],
+  "timestamps": [{ "timestamp": 0, "timestampFormatted": "M:SS", "title": "moment", "description": "why" }],
+  "suggestedQuestions": ["question"],
+  "faqs": [{ "question": "...", "answer": "..." }]
 }
 
-Rules:
-- 4-6 keyTakeaways, 4-6 playbook steps, 3-5 timestamps if captions exist else empty array
-- timestamps MUST match the transcript; if no captions, timestamps = []
-- skipFluff: 2-4 items
-- suggestedQuestions: 3
-- faqs: 3
-- Be concrete. No "consistency is key" filler.`;
+Rules: 4 takeaways, 4 playbook steps, 3 timestamps if captions else [], 2 skipFluff, 3 questions, 3 faqs. Concrete only.`;
 
     const text = await generateText(prompt, {
       json: true,
-      temperature: 0.4,
-      maxOutputTokens: 4096
+      temperature: 0.3,
+      maxOutputTokens: 1800,
+      model: 'gemini-2.0-flash'
     });
     return this.parseJson(text);
   }
@@ -225,8 +253,8 @@ Rules:
         step: i + 1,
         action: action.slice(0, 90),
         detail: (item.description || item.detail || action).slice(0, 240),
-        timestamp: typeof item.timestamp === 'number' ? item.timestamp : undefined,
-        timestampFormatted: item.timestampFormatted
+        timestamp: typeof item.timestamp === 'number' ? item.timestamp : 0,
+        timestampFormatted: item.timestampFormatted || ''
       };
     });
 
@@ -346,6 +374,18 @@ Rules:
     if (h) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     return `${m}:${String(s).padStart(2, '0')}`;
   }
+}
+
+function stripUndefined(value) {
+  if (Array.isArray(value)) return value.map(stripUndefined);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, stripUndefined(v)])
+    );
+  }
+  return value;
 }
 
 module.exports = new PlaybookService();

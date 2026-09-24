@@ -29,7 +29,7 @@ function isGeminiKeyError(error) {
   );
 }
 
-async function generateWithGemini(prompt, { temperature, maxOutputTokens }) {
+async function generateWithGemini(prompt, { temperature, maxOutputTokens, json, model: modelName }) {
   const apiKey = getGeminiKey();
   if (!apiKey) throw new Error('Gemini API not configured');
   if (Date.now() < skipGeminiUntil) {
@@ -37,13 +37,18 @@ async function generateWithGemini(prompt, { temperature, maxOutputTokens }) {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  const generationConfig = {
+    temperature,
+    maxOutputTokens,
+    topP: 0.9,
+    ...(json ? { responseMimeType: 'application/json' } : {})
+  };
+  if (String(modelName || '').includes('2.5')) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature,
-      maxOutputTokens,
-      topP: 0.9
-    }
+    model: modelName || 'gemini-2.0-flash',
+    generationConfig
   });
   const result = await model.generateContent(prompt);
   const text = result.response.text();
@@ -89,6 +94,7 @@ async function generateText(prompt, options = {}) {
   const temperature = options.temperature ?? 0.4;
   const maxOutputTokens = options.maxOutputTokens ?? 4096;
   const json = options.json === true;
+  const model = options.model || 'gemini-2.0-flash';
   const systemInstruction = options.systemInstruction || '';
   const fullPrompt = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
 
@@ -97,7 +103,7 @@ async function generateText(prompt, options = {}) {
 
   if (geminiKey && Date.now() >= skipGeminiUntil) {
     try {
-      return await generateWithGemini(fullPrompt, { temperature, maxOutputTokens });
+      return await generateWithGemini(fullPrompt, { temperature, maxOutputTokens, json, model });
     } catch (error) {
       if (isGeminiKeyError(error)) {
         skipGeminiUntil = Date.now() + 60 * 60 * 1000;

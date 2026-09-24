@@ -59,9 +59,26 @@ class YouTubeInnertubeService {
           console.log(`[Innertube] ✓ Smart bypass succeeded with ${result.strategy} strategy`);
           this.cache.set(videoId, result);
           return result;
+        } else if (options.skipSlowFallback) {
+          console.log(`[Innertube] Smart bypass failed; skipping yt-dlp for fast path`);
+          return {
+            success: false,
+            videoId,
+            error: result.error || 'Captions unavailable',
+            source: 'youtube-innertube'
+          };
         } else {
           console.log(`[Innertube] Smart bypass failed, falling back to yt-dlp...`);
         }
+      }
+
+      if (options.skipSlowFallback) {
+        return {
+          success: false,
+          videoId,
+          error: 'Captions unavailable',
+          source: 'youtube-innertube'
+        };
       }
 
       // Fallback to yt-dlp (with Puppeteer bot bypass)
