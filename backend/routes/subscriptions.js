@@ -130,6 +130,33 @@ async function getOrCreateCustomer(userId, email) {
   }
 }
 
+async function resolveProPriceId() {
+  const configured = (process.env.STRIPE_PRO_PRICE_ID || '').trim();
+  if (!configured || configured === 'price_pro') {
+    throw Object.assign(new Error('STRIPE_PRO_PRICE_ID is not set on the server'), { statusCode: 503 });
+  }
+
+  const price = await stripe.prices.retrieve(configured);
+  if (price.active) return price.id;
+
+  const productId = typeof price.product === 'string' ? price.product : price.product?.id;
+  const replacements = await stripe.prices.list({
+    product: productId,
+    active: true,
+    type: 'recurring',
+    limit: 20
+  });
+  const monthly = replacements.data.find((item) => item.recurring?.interval === 'month') || replacements.data[0];
+  if (!monthly) {
+    throw Object.assign(
+      new Error('The Stripe Pro price is inactive. Activate the €15 monthly price in Stripe and set STRIPE_PRO_PRICE_ID to that price ID.'),
+      { statusCode: 400 }
+    );
+  }
+  console.warn('[Stripe] STRIPE_PRO_PRICE_ID is inactive; using active price', monthly.id);
+  return monthly.id;
+}
+
 /**
  * POST /api/subscriptions/create-checkout-session
  * Create Stripe Checkout session for subscription
@@ -140,15 +167,13 @@ router.post('/create-checkout-session', async (req, res) => {
       return res.status(503).json({ error: 'Payment service is not configured. Please contact support.' });
     }
 
-    const { userId, email, priceId } = req.body;
+    const { userId, email } = req.body;
 
     if (!userId || !email) {
       return res.status(400).json({ error: 'User ID and email are required' });
     }
 
-    if (!priceId) {
-      return res.status(400).json({ error: 'Price ID is required' });
-    }
+    const resolvedPriceId = await resolveProPriceId();
 
     // Get or create Stripe customer
     const customerId = await getOrCreateCustomer(userId, email);
@@ -159,7 +184,7 @@ router.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price: resolvedPriceId,
           quantity: 1,
         },
       ],
@@ -174,8 +199,8 @@ router.post('/create-checkout-session', async (req, res) => {
     res.json({ sessionId: session.id, url: session.url });
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    res.status(500).json({
-      error: 'Failed to create checkout session',
+    res.status(error.statusCode || 500).json({
+      error: error.message && error.statusCode ? error.message : 'Failed to create checkout session',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

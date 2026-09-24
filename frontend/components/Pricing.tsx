@@ -42,7 +42,7 @@ export default function Pricing() {
     {
       name: t('pricing.pro_tier'),
       price: '€15',
-      priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
+      priceId: 'pro',
       description: t('pricing.pro_description'),
       features: [
         t('pricing.features.unlimited_search'),
@@ -93,19 +93,13 @@ export default function Pricing() {
       return
     }
 
-    if (!priceId) {
-      alert(`Price ID not configured. Please set NEXT_PUBLIC_STRIPE_${planName.toUpperCase()}_PRICE_ID`)
-      return
-    }
-
-    setCheckoutLoading(priceId)
+    setCheckoutLoading(priceId || planName)
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
       const response = await axios.post(`${apiUrl}/api/subscriptions/create-checkout-session`, {
         userId: user.id,
         email: user.email,
-        priceId: priceId,
       })
 
       // Redirect directly to Stripe Checkout URL (modern approach)
