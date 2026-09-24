@@ -381,7 +381,11 @@ async function handleValueSearch(rawQuery) {
     renderSearchResults(response.videos || []);
   } catch (error) {
     console.error('[Popup] Value search error:', error);
-    searchResults.innerHTML = `<div class="search-status">${escapeHtml(error.message || 'Search failed. Open YouTube and try again.')}</div>`;
+    const raw = error.message || '';
+    const friendly = /quota|busy|youtube.googleapis/i.test(raw)
+      ? 'YouTube search is busy right now. Try again in a bit.'
+      : (raw || 'Search failed. Open YouTube and try again.');
+    searchResults.innerHTML = `<div class="search-status">${escapeHtml(friendly)}</div>`;
   } finally {
     if (valueSearchBtn) valueSearchBtn.disabled = false;
   }

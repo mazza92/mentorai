@@ -86,7 +86,12 @@ export default function ValueSearch({
       if (!data.videos?.length) setError('No strong matches. Try a sharper skill or outcome.')
     } catch (err: any) {
       setVideos([])
-      setError(err.response?.data?.message || err.message || 'Search failed')
+      const raw = err.response?.data?.message || err.message || ''
+      setError(
+        /quota|busy|youtube.googleapis/i.test(raw)
+          ? 'YouTube search is busy right now. Open a topic hub, or try again in a bit.'
+          : (err.response?.data?.message || 'Search failed. Try a sharper skill or outcome.')
+      )
     } finally {
       setLoading(false)
     }

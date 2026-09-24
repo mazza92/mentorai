@@ -27,9 +27,12 @@ router.post('/value', async (req, res) => {
     });
   } catch (error) {
     console.error('[Search] Value search failed:', error.message);
-    res.status(500).json({
+    const quota = /quota|innertube|busy/i.test(error.message || '');
+    res.status(quota ? 503 : 500).json({
       error: 'Search failed',
-      message: error.message
+      message: quota
+        ? 'YouTube search is busy right now. Try a topic hub, or search again in a bit.'
+        : 'Search failed. Try a shorter skill or outcome.'
     });
   }
 });
@@ -60,9 +63,12 @@ router.get('/value', async (req, res) => {
     });
   } catch (error) {
     console.error('[Search] Value search failed:', error.message);
-    res.status(500).json({
+    const quota = /quota|innertube|busy/i.test(error.message || '');
+    res.status(quota ? 503 : 500).json({
       error: 'Search failed',
-      message: error.message
+      message: quota
+        ? 'YouTube search is busy right now. Try a topic hub, or search again in a bit.'
+        : 'Search failed. Try a shorter skill or outcome.'
     });
   }
 });
