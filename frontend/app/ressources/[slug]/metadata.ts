@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import articlesData from '@/data/articles.json'
+import { guideSerpDescription } from '@/lib/seo'
 
 type Props = {
   params: { slug: string }
@@ -16,16 +17,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const canonicalUrl = `https://lurnia.app/ressources/${article.slug}`
 
+  const description = guideSerpDescription(article.metaDescription, article.title, article.slug)
+
   return {
     title: article.metaTitle,
-    description: article.metaDescription,
+    description,
     keywords: article.keywords.join(', '),
     alternates: {
       canonical: canonicalUrl,
     },
     openGraph: {
       title: article.metaTitle,
-      description: article.metaDescription,
+      description,
       url: canonicalUrl,
       siteName: 'Lurnia',
       images: [
@@ -44,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     twitter: {
       card: 'summary_large_image',
       title: article.metaTitle,
-      description: article.metaDescription,
+      description,
       images: [`https://lurnia.app/images/blog/${article.slug}.jpg`],
     },
     robots: {

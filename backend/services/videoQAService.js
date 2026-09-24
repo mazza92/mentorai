@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { marked } = require('marked');
+const { generateText } = require('./llmClient');
 
 // Configure marked for better HTML output
 marked.setOptions({
@@ -113,8 +114,8 @@ class VideoQAService {
       if (videoAnalysis.title) context += `Title: ${videoAnalysis.title}\n`;
       if (videoAnalysis.author) context += `Creator: ${videoAnalysis.author}\n`;
       if (videoAnalysis.description) {
-        const desc = videoAnalysis.description.length > 500
-          ? videoAnalysis.description.substring(0, 500) + '...'
+        const desc = videoAnalysis.description.length > 8000
+          ? videoAnalysis.description.substring(0, 8000) + '...'
           : videoAnalysis.description;
         context += `Description: ${desc}\n`;
       }
@@ -160,12 +161,22 @@ class VideoQAService {
       }
       context += '\n';
     } else if (transcript && transcript.text) {
-      // Fallback: use plain text transcript
+      // Fallback: use plain text transcript (may already include [M:SS] timestamps)
       context += 'FULL VIDEO TRANSCRIPT:\n';
       context += 'This is the PRIMARY source of information.\n\n';
       context += `${transcript.text}\n\n`;
     } else {
-      context += 'NOTE: Full transcript is being processed. Answers based on video metadata, description, and visual analysis.\n\n';
+      context += 'NOTE: Spoken captions were not available. Answer from title, description, and comments. Do not invent spoken quotes. If the user wants a playbook, still extract the best steps you can from the description and comments. Never tell them to try a different video.\n\n';
+    }
+
+    if (videoAnalysis && Array.isArray(videoAnalysis.comments) && videoAnalysis.comments.length > 0) {
+      context += 'TOP VIDEO COMMENTS (viewer discussion — use for FAQs, popular reactions, and timestamps viewers mention):\n';
+      videoAnalysis.comments.slice(0, 40).forEach((comment, index) => {
+        const likes = comment.likes ? ` (${comment.likes} likes)` : '';
+        const author = comment.author || 'Viewer';
+        context += `${index + 1}. @${author}${likes}: ${comment.text}\n`;
+      });
+      context += '\n';
     }
 
     // PRIORITY 2: Video summary (if available, provides high-level context)
@@ -957,6 +968,21 @@ IMPORTANT - RESPOND IN ENGLISH:
 - Use a friendly, helpful tone
 - Adapt your style to English conventions`;
 
+        const hasSpokenTranscript = !!(transcript && (transcript.text || (transcript.words && transcript.words.length)));
+        const noCaptionRule = hasSpokenTranscript ? '' : (isFrench ? `
+IMPORTANT - PAS DE SOUS-TITRES PARLÉS:
+- Tu as encore le titre, la description et les commentaires. Utilise-les.
+- Ne dis jamais que la vidéo n'a pas de captions comme seule réponse.
+- Ne dis jamais d'essayer une autre vidéo.
+- Si on demande un playbook, extraire le meilleur plan possible, en commençant par: "Je n'ai pas les captions parlées. D'après la description et les commentaires :"
+` : `
+CRITICAL - NO SPOKEN CAPTIONS:
+- You still have the title, description, and comments. Use them.
+- Never say "this video does not have captions" as the whole answer.
+- Never tell the user to try a different video.
+- If they asked for a playbook, give the best takeaways you can from description and comments, and start with: "I don't have spoken captions for this one. From the description and comments:"
+`);
+
         // Build format-specific instructions based on question type
         const formatInstructions = isEnumeration ? `
 🚨 ENUMERATION QUESTION DETECTED - CRITICAL NUMBERED LIST FORMATTING:
@@ -1112,6 +1138,7 @@ KEY FOR EXPLANATIONS:
 
         const systemInstruction = `You are a helpful expert teaching directly from this content. Be CONCISE and SCANNABLE - people read on phones.
 ${languageInstruction}
+${noCaptionRule}
 
 ${formatInstructions}
 
@@ -1179,17 +1206,15 @@ References: [timestamps]
         console.log('Sending Q&A query to Gemini...');
 
         // Use retry mechanism with exponential backoff to handle 503 overload errors
-        const { result, response, answer } = await this.retryWithBackoff(async () => {
-          const result = await this.model.generateContent(prompt);
-          const response = await result.response;
-          const answer = response.text();
+        const { answer } = await this.retryWithBackoff(async () => {
+          const answer = await generateText(prompt, { temperature: 0.7, maxOutputTokens: 4096 });
 
           if (!answer || !answer.trim()) {
             throw new Error('Empty response from Gemini');
           }
 
           console.log('Q&A response received successfully');
-          return { result, response, answer };
+          return { result: null, response: null, answer };
         });
 
         // Extract citations (timestamps) from the answer BEFORE enhancing readability
@@ -1374,11 +1399,9 @@ Generate 3-4 SHORT suggested questions (max 10-12 words each) as a JSON array. O
         console.log('Generating suggested prompts with Gemini...');
 
         // Use retry mechanism with exponential backoff to handle 503 overload errors
-        const { result, response, promptsText } = await this.retryWithBackoff(async () => {
-          const result = await this.model.generateContent(prompt);
-          const response = await result.response;
-          const promptsText = response.text();
-          return { result, response, promptsText };
+        const { promptsText } = await this.retryWithBackoff(async () => {
+          const promptsText = await generateText(prompt, { json: true, temperature: 0.5, maxOutputTokens: 1024 });
+          return { result: null, response: null, promptsText };
         }, 3); // Use 3 retries for prompts (less critical than Q&A)
 
         // Extract JSON from response

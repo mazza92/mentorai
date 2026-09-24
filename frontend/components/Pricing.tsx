@@ -32,26 +32,24 @@ export default function Pricing() {
       priceId: '',
       description: t('pricing.free_description'),
       features: [
-        t('pricing.features.channels_per_month', { count: 2 }),
-        t('pricing.features.questions_per_month', { count: 10 }),
-        t('pricing.features.questions_per_channel', { count: 5 }),
-        t('pricing.features.on_demand_transcripts'),
-        t('pricing.features.community_support'),
+        t('pricing.features.unlimited_search'),
+        t('pricing.features.playbooks_per_month', { count: 6 }),
+        t('pricing.features.questions_per_month', { count: 25 }),
+        t('pricing.features.ranked_not_views'),
       ],
       icon: <Zap className="w-6 h-6" />,
     },
     {
       name: t('pricing.pro_tier'),
-      price: '€24.99',
+      price: '€15',
       priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '',
       description: t('pricing.pro_description'),
       features: [
-        t('pricing.features.channels_per_month', { count: 15 }),
-        t('pricing.features.questions_per_month', { count: 500 }),
-        t('pricing.features.on_demand_transcripts'),
+        t('pricing.features.unlimited_search'),
+        t('pricing.features.playbooks_per_month', { count: 60 }),
+        t('pricing.features.questions_per_month', { count: 250 }),
+        t('pricing.features.export_playbooks'),
         t('pricing.features.priority_support'),
-        t('pricing.features.export_transcripts'),
-        t('pricing.features.early_access'),
       ],
       icon: <Crown className="w-6 h-6" />,
       popular: true,
@@ -261,6 +259,10 @@ export default function Pricing() {
             </button>
           </div>
         )}
+
+        <p className="mt-10 text-center text-sm text-slate-500">
+          Search is free. Reopening the same playbook does not count. Pro is €15/month, cancel anytime.
+        </p>
       </div>
     </div>
   )

@@ -441,7 +441,19 @@ router.get('/suggested-prompts/:projectId', async (req, res) => {
  */
 router.post('/video-direct', async (req, res) => {
   try {
-    const { videoId, question, userId, videoTitle, channelName, transcript: clientTranscript, videoLanguage, chatHistory } = req.body;
+    const {
+      videoId,
+      question,
+      userId,
+      videoTitle,
+      channelName,
+      transcript: clientTranscript,
+      videoLanguage,
+      chatHistory,
+      comments: clientComments,
+      videoDescription,
+      transcriptSource
+    } = req.body;
 
     if (!videoId || !question) {
       return res.status(400).json({ error: 'Video ID and question are required' });
@@ -457,6 +469,8 @@ router.post('/video-direct', async (req, res) => {
     console.log('[QA Direct] Client transcript:', clientTranscript ? `${clientTranscript.length} chars` : 'not provided');
     console.log('[QA Direct] Video language from captions:', videoLanguage || 'not provided');
     console.log('[QA Direct] Chat history:', chatHistory?.length || 0, 'previous exchanges');
+    console.log('[QA Direct] Comments:', Array.isArray(clientComments) ? clientComments.length : 0);
+    console.log('[QA Direct] Transcript source:', transcriptSource || 'unknown');
 
     // Check question quota before processing
     try {
@@ -480,30 +494,87 @@ router.post('/video-direct', async (req, res) => {
     }
 
     // Use client-provided transcript if available (bypasses IP blocking)
-    // Otherwise, fetch transcript on-demand using channel transcript service
+    // Otherwise, fetch transcript on-demand using Innertube/smart bypass first
     let transcriptText = clientTranscript;
+    let usedServerFallback = false;
 
     if (!transcriptText) {
       console.log('[QA Direct] No client transcript, fetching server-side...');
-      const transcriptService = require('../services/channelTranscriptService');
-      const captionResult = await transcriptService.fetchTranscript(videoId);
-
-      if (!captionResult.available || !captionResult.text) {
-        return res.status(400).json({
-          error: 'No transcript available',
-          message: 'This video does not have captions available. Try a different video.'
-        });
+      try {
+        const youtubeInnertubeService = require('../services/youtubeInnertubeService');
+        const innertubeResult = await youtubeInnertubeService.fetchTranscript(videoId);
+        if (innertubeResult?.success && innertubeResult.text) {
+          if (Array.isArray(innertubeResult.segments) && innertubeResult.segments.length > 0) {
+            transcriptText = innertubeResult.segments
+              .map((seg) => {
+                const t = Math.max(0, Math.floor(Number(seg.start) || 0));
+                const m = Math.floor(t / 60);
+                const s = String(t % 60).padStart(2, '0');
+                return `[${m}:${s}] ${seg.text || ''}`.trim();
+              })
+              .join('\n');
+          } else {
+            transcriptText = innertubeResult.text;
+          }
+          usedServerFallback = true;
+          console.log('[QA Direct] Innertube fallback succeeded');
+        }
+      } catch (innertubeErr) {
+        console.warn('[QA Direct] Innertube fallback failed:', innertubeErr.message);
       }
+    }
 
-      transcriptText = captionResult.text;
-    } else {
+    if (!transcriptText) {
+      try {
+        const transcriptService = require('../services/channelTranscriptService');
+        const captionResult = await transcriptService.fetchTranscript(videoId);
+        if (captionResult.available && captionResult.text) {
+          transcriptText = captionResult.text;
+          usedServerFallback = true;
+        }
+      } catch (captionErr) {
+        console.warn('[QA Direct] Caption service fallback failed:', captionErr.message);
+      }
+    }
+
+    let comments = Array.isArray(clientComments) ? clientComments : [];
+    if (comments.length === 0) {
+      try {
+        const valueSearchService = require('../services/valueSearchService');
+        comments = await valueSearchService.fetchTopComments(videoId, 25);
+        console.log('[QA Direct] Fetched', comments.length, 'comments via Data API');
+      } catch (commentErr) {
+        console.warn('[QA Direct] Comment fetch failed:', commentErr.message);
+      }
+    }
+
+    const hasComments = comments.length > 0;
+    const hasDescription = !!(videoDescription && String(videoDescription).trim());
+
+    if (!transcriptText && !hasComments && !hasDescription) {
+      return res.status(400).json({
+        error: 'No transcript available',
+        message: 'This video does not have captions, comments, or a description we can use. Try a video with captions turned on.'
+      });
+    }
+
+    if (clientTranscript) {
       console.log('[QA Direct] Using client-provided transcript');
+    } else if (usedServerFallback) {
+      console.log('[QA Direct] Using server-fetched transcript');
+    } else {
+      console.log('[QA Direct] Answering from comments/description (no transcript)');
     }
 
     // Use videoQAService to answer the question
     // Signature: answerQuestion(userQuestion, videoAnalysis, transcript, chatHistory, personalizedContext, userLanguage)
-    const transcript = { text: transcriptText }; // Wrap in object format expected by service
-    const videoAnalysis = { title: videoTitle || 'YouTube Video', author: channelName || 'Unknown' };
+    const transcript = { text: transcriptText || '' };
+    const videoAnalysis = {
+      title: videoTitle || 'YouTube Video',
+      author: channelName || 'Unknown',
+      description: videoDescription || '',
+      comments
+    };
 
     // Determine response language:
     // 1. Primary: Detect from question text (user's intent is most important)

@@ -25,8 +25,21 @@ const userAvatar = document.getElementById('userAvatar');
 const userName = document.getElementById('userName');
 const userEmail = document.getElementById('userEmail');
 const questionsStat = document.getElementById('questionsStat');
+const playbooksStat = document.getElementById('playbooksStat');
 const planStat = document.getElementById('planStat');
 const exportBtn = document.getElementById('exportBtn');
+const stealPlaybookBtn = document.getElementById('stealPlaybookBtn');
+const discoverTab = document.getElementById('discoverTab');
+const askTab = document.getElementById('askTab');
+const discoverView = document.getElementById('discoverView');
+const askView = document.getElementById('askView');
+const valueSearchForm = document.getElementById('valueSearchForm');
+const valueSearchInput = document.getElementById('valueSearchInput');
+const valueSearchBtn = document.getElementById('valueSearchBtn');
+const searchResults = document.getElementById('searchResults');
+const searchStarters = document.getElementById('searchStarters');
+const includeShorts = document.getElementById('includeShorts');
+const usagePill = document.getElementById('usagePill');
 
 // Conversion elements
 const quotaBanner = document.getElementById('quotaBanner');
@@ -46,25 +59,28 @@ let currentUser = null;
 let currentVideo = null;
 let isProcessing = false;
 let chatHistory = []; // Track chat messages for persistence
+let lastSearchVideos = [];
+let currentMode = 'discover';
+const POPUP_STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Language-specific UI strings and prompt starters
 const PROMPT_STARTERS = {
   en: {
-    welcome: "Ask any question about this video!",
-    placeholder: "Ask about this video...",
+    welcome: "Steal the playbook, then ask for the number.",
+    placeholder: "The number, the caveat, the next step...",
     prompts: [
-      { short: "What is this video about?", full: "What is this video about?" },
-      { short: "Key takeaways?", full: "What are the key takeaways?" },
-      { short: "Summarize in 3 points", full: "Summarize in 3 points" }
+      { short: "Steal the playbook", full: "Steal the playbook: key takeaways, timestamps, and what I can skip." },
+      { short: "What can I skip?", full: "What can I skip without losing the useful part?" },
+      { short: "What now?", full: "What should I do now based on this video?" }
     ]
   },
   fr: {
-    welcome: "Posez vos questions sur cette vidéo !",
-    placeholder: "Posez votre question...",
+    welcome: "Vole le playbook, puis demande le chiffre.",
+    placeholder: "Le chiffre, le caveat, la prochaine étape...",
     prompts: [
-      { short: "De quoi parle cette vidéo ?", full: "De quoi parle cette vidéo ?" },
-      { short: "Points clés ?", full: "Quels sont les points clés ?" },
-      { short: "Résumé en 3 points", full: "Résume cette vidéo en 3 points" }
+      { short: "Vole le playbook", full: "Vole le playbook: points clés, timestamps, et ce que je peux skip." },
+      { short: "Que skipper ?", full: "Que puis-je skipper sans perdre l'utile ?" },
+      { short: "Et maintenant ?", full: "Que dois-je faire maintenant d'après cette vidéo ?" }
     ]
   },
   es: {
@@ -145,6 +161,55 @@ async function getAnonymousUserId() {
 
 // Initialize
 async function init() {
+  setupEventListeners();
+
+  if (!globalThis.chrome?.runtime?.id) {
+    loginView.classList.add('hidden');
+    mainView.classList.remove('hidden');
+    searchStarters?.classList.add('hidden');
+    updateSuggestedQuestions('en');
+    updateQuotaDisplay({ questions: 4, limit: 25, playbooks: 1, playbookLimit: 6, plan: 'free' });
+    renderSearchResults([
+      {
+        videoId: 'preview1',
+        title: 'Hermes Agent Setup Tutorial - INSANE Agent on VPS in 8 Minutes',
+        channel: 'ByteGrad',
+        thumbnail: 'https://i.ytimg.com/vi/aqz-KE-bpKQ/mqdefault.jpg',
+        durationSec: 908,
+        valueScore: 90,
+        reasons: ['High discussion', 'Long-form'],
+        views: 9700,
+        comments: 412,
+        likes: 890
+      },
+      {
+        videoId: 'preview2',
+        title: 'Hostinger Hermes Agent Tutorial - Full VPS Setup Guide',
+        channel: 'Metics Media',
+        thumbnail: 'https://i.ytimg.com/vi/LXb3EKWsInQ/mqdefault.jpg',
+        durationSec: 1880,
+        valueScore: 90,
+        reasons: ['High like rate', 'Long-form'],
+        views: 22600,
+        comments: 0,
+        likes: 1400
+      },
+      {
+        videoId: 'preview3',
+        title: 'Secure Hermes Agent Setup on a cheap VPS',
+        channel: 'NetworkChuck',
+        thumbnail: 'https://i.ytimg.com/vi/jNQXAC9IVRw/mqdefault.jpg',
+        durationSec: 742,
+        valueScore: 74,
+        reasons: ['Hidden gem'],
+        views: 3100,
+        comments: 96,
+        likes: 210
+      }
+    ]);
+    return;
+  }
+
   // For MVP: use anonymous mode, skip login requirement
   let user = await storage.getUser();
 
@@ -172,13 +237,13 @@ async function init() {
   // Initialize with default English prompts
   updateSuggestedQuestions('en');
 
+  await restorePopupState();
+
   detectCurrentVideo();
 
   // Load quota in background
   loadUserQuota().catch(console.error);
-
-  // Setup event listeners
-  setupEventListeners();
+  if (currentMode === 'discover') valueSearchInput?.focus();
 }
 
 /**
@@ -218,9 +283,215 @@ function updateSuggestedQuestions(langCode) {
   }
 }
 
+function switchMode(mode) {
+  currentMode = mode === 'ask' ? 'ask' : 'discover';
+  const discover = currentMode === 'discover';
+  discoverTab?.classList.toggle('active', discover);
+  askTab?.classList.toggle('active', !discover);
+  discoverView?.classList.toggle('hidden', !discover);
+  askView?.classList.toggle('hidden', discover);
+  if (!discover) detectCurrentVideo();
+  persistPopupState();
+}
+
+function formatCompact(n) {
+  const num = Number(n) || 0;
+  if (num >= 1e9) return `${(num / 1e9).toFixed(1).replace(/\.0$/, '')}B`;
+  if (num >= 1e6) return `${(num / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+  if (num >= 1e3) return `${(num / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(num);
+}
+
+function formatClock(sec) {
+  const t = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = t % 60;
+  if (h) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+async function persistPopupState() {
+  if (!globalThis.chrome?.storage?.local) return;
+  try {
+    await storage.setPopupState({
+      mode: currentMode,
+      query: valueSearchInput?.value || '',
+      includeShorts: !!includeShorts?.checked,
+      videos: lastSearchVideos,
+      savedAt: Date.now()
+    });
+  } catch (error) {
+    console.warn('[Popup] Could not persist search', error);
+  }
+}
+
+async function restorePopupState() {
+  try {
+    const state = await storage.getPopupState();
+    if (!state || Date.now() - (state.savedAt || 0) > POPUP_STATE_TTL_MS) return;
+
+    if (includeShorts && typeof state.includeShorts === 'boolean') {
+      includeShorts.checked = state.includeShorts;
+    }
+    if (valueSearchInput && state.query) {
+      valueSearchInput.value = state.query;
+    }
+    if (Array.isArray(state.videos) && state.videos.length) {
+      lastSearchVideos = state.videos;
+      searchStarters?.classList.add('hidden');
+      renderSearchResults(state.videos, { persist: false });
+    }
+    if (state.mode === 'ask') {
+      switchMode('ask');
+    }
+  } catch (error) {
+    console.warn('[Popup] Could not restore search', error);
+  }
+}
+
+async function handleValueSearch(rawQuery) {
+  const query = (rawQuery ?? valueSearchInput?.value ?? '').trim();
+  if (!query || !searchResults) return;
+  if (valueSearchInput) valueSearchInput.value = query;
+  searchStarters?.classList.add('hidden');
+  if (valueSearchBtn) valueSearchBtn.disabled = true;
+
+  searchResults.innerHTML = '<div class="search-status"><span class="search-spinner" aria-hidden="true"></span>Scoring comments, likes, and depth</div>';
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'SEARCH_VALUE_VIDEOS',
+          query,
+          options: { includeShorts: !!includeShorts?.checked, limit: 12, tabId: tab?.id }
+        },
+        (result) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(result);
+        }
+      );
+    });
+
+    if (!response?.success) {
+      throw new Error(response?.error || 'Search failed');
+    }
+    renderSearchResults(response.videos || []);
+  } catch (error) {
+    console.error('[Popup] Value search error:', error);
+    searchResults.innerHTML = `<div class="search-status">${escapeHtml(error.message || 'Search failed. Open YouTube and try again.')}</div>`;
+  } finally {
+    if (valueSearchBtn) valueSearchBtn.disabled = false;
+  }
+}
+
+function renderSearchResults(videos, { persist = true } = {}) {
+  lastSearchVideos = Array.isArray(videos) ? videos : [];
+  if (!videos.length) {
+    searchStarters?.classList.remove('hidden');
+    discoverView?.classList.remove('has-results');
+    searchResults.innerHTML = '<div class="search-status">No strong matches. Try a sharper skill or outcome.</div>';
+    if (persist) persistPopupState();
+    return;
+  }
+
+  discoverView?.classList.add('has-results');
+
+  searchResults.innerHTML = videos.map((video) => {
+    const reasons = (video.reasons || []).slice(0, 1).map((r) => `<span class="value-chip">${escapeHtml(r)}</span>`).join('');
+    const score = Number(video.valueScore) || 0;
+    const scoreClass = score >= 85 ? 'high' : score >= 70 ? 'mid' : '';
+    const metricsHtml = video.views
+      ? `<span class="value-metrics">${formatCompact(video.views)}</span>`
+      : '';
+
+    return `
+      <article class="value-card" data-video-id="${escapeHtml(video.videoId)}" title="Open playbook">
+        <div class="value-score ${scoreClass}" aria-label="Value score ${score}">${score}</div>
+        <div class="value-thumb-wrap">
+          <img class="value-thumb" src="${escapeHtml(video.thumbnail || '')}" alt="">
+          <span class="value-duration">${formatClock(video.durationSec)}</span>
+        </div>
+        <div class="value-meta">
+          <h4>${escapeHtml(video.title || 'Untitled')}</h4>
+          <p class="value-sub">${escapeHtml(video.channel || '')}</p>
+          <div class="value-row">
+            <div class="value-reasons">${reasons}</div>
+            ${metricsHtml}
+            <button type="button" class="value-ask" data-ask="${escapeHtml(video.videoId)}">Ask</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  searchResults.querySelectorAll('.value-card').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.value-ask')) return;
+      openPlaybook(card.dataset.videoId);
+    });
+  });
+  searchResults.querySelectorAll('.value-ask').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openYouTubeVideo(btn.dataset.ask, true);
+    });
+  });
+  if (persist) persistPopupState();
+}
+
+async function openPlaybook(videoId) {
+  if (!videoId) return;
+
+  if (currentUser?.id && chrome?.runtime?.id) {
+    try {
+      const quota = await api.getPlaybookQuota(currentUser.id, videoId);
+      currentUser.quota = {
+        ...(currentUser.quota || {}),
+        playbooks: quota.playbooks,
+        playbookLimit: quota.playbookLimit,
+        plan: quota.plan || currentUser.plan
+      };
+      updateQuotaDisplay(currentUser.quota);
+      if (!quota.canOpen) {
+        showLimitModal(currentUser.quota.questions || 0, quota.playbooks, {
+          reason: 'playbook',
+          requiresSignup: currentUser.isAnonymous
+        });
+        return;
+      }
+    } catch (error) {
+      console.warn('[Popup] Playbook quota check failed', error);
+    }
+  }
+
+  const url = `${api.appUrl}/v/${videoId}?ref=extension`;
+  if (chrome?.tabs?.create) chrome.tabs.create({ url });
+  else window.open(url, '_blank', 'noopener');
+}
+
+async function openYouTubeVideo(videoId, switchToAsk) {
+  if (!videoId) return;
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id && tab.url && tab.url.includes('youtube.com')) {
+    await chrome.tabs.update(tab.id, { url });
+  } else if (tab?.id) {
+    await chrome.tabs.update(tab.id, { url });
+  } else {
+    await chrome.tabs.create({ url });
+  }
+  if (switchToAsk) {
+    switchMode('ask');
+    setTimeout(() => detectCurrentVideo(), 1200);
+  }
+}
+
 function setupEventListeners() {
   // Login
-  loginBtn.addEventListener('click', handleLogin);
+  loginBtn?.addEventListener('click', handleLogin);
 
   // Navigation
   settingsBtn.addEventListener('click', showSettingsView);
@@ -238,6 +509,22 @@ function setupEventListeners() {
   });
   sendBtn.addEventListener('click', handleSendQuestion);
 
+  if (discoverTab) discoverTab.addEventListener('click', () => switchMode('discover'));
+  if (askTab) askTab.addEventListener('click', () => switchMode('ask'));
+  if (valueSearchForm) {
+    valueSearchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleValueSearch();
+    });
+  }
+  searchStarters?.querySelectorAll('.starter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => handleValueSearch(chip.dataset.query));
+  });
+  stealPlaybookBtn?.addEventListener('click', () => {
+    if (currentVideo?.videoId) openPlaybook(currentVideo.videoId);
+  });
+  usagePill?.addEventListener('click', showSettingsView);
+
   // Note: Suggested question handlers are attached dynamically in updateSuggestedQuestions()
 
   // Conversion/upgrade buttons
@@ -248,12 +535,13 @@ function setupEventListeners() {
   if (connectAccountBtn) connectAccountBtn.addEventListener('click', handleConnectAccount);
   if (limitModalClose) limitModalClose.addEventListener('click', hideLimitModal);
 
-  // Listen for video detection from content script
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'VIDEO_DETECTED') {
-      handleVideoDetected(message.data);
-    }
-  });
+  if (chrome?.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === 'VIDEO_DETECTED') {
+        handleVideoDetected(message.data);
+      }
+    });
+  }
 }
 
 // View Management
@@ -281,15 +569,16 @@ function updateSettingsView() {
     if (currentUser.isAnonymous) {
       userAvatar.src = '';
       userName.textContent = 'Guest User';
-      userEmail.textContent = 'Sign in for more questions';
+      userEmail.textContent = 'Sign in for 6 playbooks and 25 questions';
     } else {
       userAvatar.src = currentUser.picture || '';
       userName.textContent = currentUser.name || 'User';
       userEmail.textContent = currentUser.email || '';
     }
 
-    const quota = currentUser.quota || { questions: 0, limit: 5 };
+    const quota = currentUser.quota || { questions: 0, limit: 25, playbooks: 0, playbookLimit: 6 };
     questionsStat.textContent = `${quota.questions}/${quota.limit}`;
+    if (playbooksStat) playbooksStat.textContent = `${quota.playbooks || 0}/${quota.playbookLimit || 6}`;
     planStat.textContent = currentUser.isAnonymous ? 'Guest' : (currentUser.plan || 'Free');
   }
 }
@@ -386,38 +675,43 @@ async function detectCurrentVideo() {
       if (videoId) {
         updateStatus('detecting', 'Fetching video info...');
 
+        await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: 'ENSURE_CONTENT_SCRIPT', tabId: tab.id }, () => resolve());
+        });
+
         // Try content script first, with timeout fallback
         try {
           chrome.tabs.sendMessage(tab.id, { type: 'GET_VIDEO_INFO' }, (response) => {
             if (chrome.runtime.lastError) {
               console.log('[Popup] Content script error, using fallback:', chrome.runtime.lastError.message);
-              fetchVideoInfo(videoId);
+              fetchVideoInfo(videoId, tab.id);
               return;
             }
             if (response && response.success) {
               console.log('[Popup] Got video info from content script');
-              handleVideoDetected(response.data);
+              handleVideoDetected(response.data, tab.id);
             } else {
               console.log('[Popup] No response from content script, using fallback');
-              fetchVideoInfo(videoId);
+              fetchVideoInfo(videoId, tab.id);
             }
           });
         } catch (e) {
           console.log('[Popup] sendMessage error, using fallback');
-          fetchVideoInfo(videoId);
+          fetchVideoInfo(videoId, tab.id);
         }
 
         // Fallback timeout - if nothing happens in 2 seconds, fetch directly
         setTimeout(() => {
           if (!currentVideo) {
             console.log('[Popup] Timeout, fetching video info directly');
-            fetchVideoInfo(videoId);
+            fetchVideoInfo(videoId, tab.id);
           }
         }, 2000);
       }
     } else {
       updateStatus('error', 'Open a YouTube video to start');
       videoInfo.classList.add('hidden');
+      stealPlaybookBtn?.classList.add('hidden');
     }
   } catch (error) {
     console.error('Video detection error:', error);
@@ -425,7 +719,7 @@ async function detectCurrentVideo() {
   }
 }
 
-async function fetchVideoInfo(videoId) {
+async function fetchVideoInfo(videoId, tabId) {
   // Prevent duplicate fetches
   if (currentVideo && currentVideo.videoId === videoId) return;
 
@@ -443,7 +737,7 @@ async function fetchVideoInfo(videoId) {
         title: data.title,
         channel: data.author_name,
         thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
-      });
+      }, tabId);
     } else {
       updateStatus('error', 'Could not fetch video info');
     }
@@ -453,10 +747,61 @@ async function fetchVideoInfo(videoId) {
   }
 }
 
-async function handleVideoDetected(data) {
-  currentVideo = data;
+function applyVideoDataStatus(videoData) {
+  if (!videoData) {
+    updateStatus('detecting', 'Loading captions and comments...');
+    return;
+  }
+  const hasTranscript = !!(videoData.timedTranscript || videoData.transcript);
+  const commentCount = videoData.comments?.length || 0;
+  if (hasTranscript) {
+    const extra = commentCount ? ` · ${commentCount} comments` : '';
+    updateStatus('ready', `Captions ready${extra}`);
+  } else if (commentCount || videoData.description) {
+    updateStatus('warning', commentCount
+      ? `No captions · using ${commentCount} comments`
+      : 'No captions · using description');
+  } else {
+    updateStatus('error', 'No captions or comments on this video');
+  }
+}
 
-  updateStatus('ready', 'Ready to answer questions');
+async function prefetchVideoData(videoId, tabId) {
+  if (!videoId || !tabId) return;
+  updateStatus('detecting', 'Loading captions and comments...');
+
+  const cached = await new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'GET_CACHED_VIDEO_DATA', videoId }, (res) => {
+      resolve(res?.data || null);
+    });
+  });
+  if (cached) {
+    currentVideo = { ...currentVideo, ...cached, videoId: currentVideo?.videoId || videoId };
+    applyVideoDataStatus(cached);
+    if (cached.language) updateSuggestedQuestions(cached.language);
+  }
+
+  chrome.runtime.sendMessage({ type: 'COLLECT_VIDEO_DATA', tabId, videoId }, (res) => {
+    if (chrome.runtime.lastError) {
+      console.log('[Popup] Collect error:', chrome.runtime.lastError.message);
+      if (!cached) updateStatus('warning', 'Captions still loading. Ask anyway');
+      return;
+    }
+    if (res?.success && res.data) {
+      currentVideo = { ...currentVideo, ...res.data, videoId: currentVideo?.videoId || videoId };
+      applyVideoDataStatus(res.data);
+      if (res.data.language) updateSuggestedQuestions(res.data.language);
+    } else if (!cached) {
+      updateStatus('warning', res?.error || 'Could not load captions yet');
+    }
+  });
+}
+
+async function handleVideoDetected(data, tabId) {
+  currentVideo = { ...currentVideo, ...data };
+
+  updateStatus('ready', 'Ready. Steal the playbook or ask.');
+  stealPlaybookBtn?.classList.remove('hidden');
 
   // Update video info display
   videoInfo.classList.remove('hidden');
@@ -472,6 +817,9 @@ async function handleVideoDetected(data) {
 
   // Check for pending answer from previous session
   await checkPendingAnswer(data.videoId);
+
+  const resolvedTabId = tabId || (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+  prefetchVideoData(data.videoId, resolvedTabId);
 }
 
 /**
@@ -568,6 +916,14 @@ function updateStatus(status, text) {
         <polyline points="22 4 12 14.01 9 11.01"></polyline>
       </svg>
     `;
+  } else if (status === 'warning') {
+    icon.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+    `;
   } else if (status === 'error') {
     icon.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -593,6 +949,17 @@ async function handleSendQuestion() {
   const question = questionInput.value.trim();
   if (!question || !currentVideo || isProcessing || !currentUser) return;
 
+  const quota = currentUser.quota || {};
+  const questionLimit = quota.limit || (currentUser.isAnonymous ? 3 : 25);
+  const questionsUsed = quota.questions || 0;
+  if (quota.canAsk === false || questionsUsed >= questionLimit) {
+    showLimitModal(questionsUsed, quota.playbooks || 0, {
+      reason: 'questions',
+      requiresSignup: currentUser.isAnonymous
+    });
+    return;
+  }
+
   isProcessing = true;
   sendBtn.disabled = true;
 
@@ -611,59 +978,71 @@ async function handleSendQuestion() {
   const loadingId = addLoadingMessage();
 
   try {
-    // Try to fetch transcript client-side first (bypasses server IP blocking)
-    let transcript = null;
-    let videoLanguage = null;
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      console.log('[Popup] Fetching transcript from tab:', tab?.id, tab?.url);
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    let videoData = currentVideo;
+    let transcript = currentVideo.timedTranscript || currentVideo.transcript || null;
+    let videoLanguage = currentVideo.language || null;
+    let comments = currentVideo.comments || [];
+    let videoDescription = currentVideo.description || '';
 
-      if (tab && tab.id) {
-        const transcriptResult = await new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            console.log('[Popup] Transcript fetch timeout (5s)');
-            resolve(null);
-          }, 5000);
+    if ((!transcript || comments.length === 0) && tab?.id) {
+      console.log('[Popup] Collecting captions + comments from watch page...');
+      const collected = await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          console.log('[Popup] Video data collect timeout (45s)');
+          resolve(null);
+        }, 45000);
 
-          chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSCRIPT' }, (response) => {
+        chrome.runtime.sendMessage(
+          { type: 'COLLECT_VIDEO_DATA', tabId: tab.id, videoId: currentVideo.videoId },
+          (response) => {
             clearTimeout(timeout);
             if (chrome.runtime.lastError) {
-              console.log('[Popup] Transcript fetch error:', chrome.runtime.lastError.message);
-              // Try to inject content script manually
-              console.log('[Popup] Content script may not be loaded. Try refreshing the YouTube page.');
+              console.log('[Popup] Collect error:', chrome.runtime.lastError.message);
               resolve(null);
-            } else {
-              resolve(response);
+              return;
             }
-          });
-        });
-
-        if (transcriptResult && transcriptResult.success) {
-          console.log('[Popup] ✓ Got transcript client-side:', transcriptResult.charCount, 'chars, lang:', transcriptResult.language);
-          transcript = transcriptResult.text;
-          videoLanguage = transcriptResult.language; // Caption language from YouTube
-
-          // Store language in currentVideo for persistence
-          if (currentVideo && videoLanguage) {
-            currentVideo.language = videoLanguage;
+            resolve(response?.success ? response.data : null);
           }
+        );
+      });
 
-          // Update UI prompts to match video language
-          if (videoLanguage) {
-            updateSuggestedQuestions(videoLanguage);
-          }
-        } else {
-          console.log('[Popup] ✗ Client-side transcript failed:', transcriptResult?.error || 'no response from content script');
-        }
-      } else {
-        console.log('[Popup] No active tab found');
+      if (collected) {
+        videoData = { ...currentVideo, ...collected };
+        currentVideo = videoData;
+        transcript = collected.timedTranscript || collected.transcript || transcript;
+        videoLanguage = collected.language || videoLanguage;
+        comments = collected.comments?.length ? collected.comments : comments;
+        videoDescription = collected.description || videoDescription;
+        applyVideoDataStatus(collected);
+        if (videoLanguage) updateSuggestedQuestions(videoLanguage);
       }
-    } catch (transcriptErr) {
-      console.log('[Popup] Transcript error:', transcriptErr.message);
     }
 
-    // Log what we're sending
-    console.log('[Popup] Sending to backend - transcript:', transcript ? transcript.length + ' chars' : 'none', ', lang:', videoLanguage || 'none');
+    if (!transcript && tab?.id) {
+      const fromPage = await new Promise((resolve) => {
+        chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSCRIPT' }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response);
+        });
+      });
+      if (fromPage?.success && (fromPage.text || fromPage.timedTranscript)) {
+        transcript = fromPage.timedTranscript || fromPage.text;
+        videoLanguage = fromPage.language || videoLanguage;
+        currentVideo = { ...currentVideo, transcript, timedTranscript: transcript, language: videoLanguage };
+        applyVideoDataStatus(currentVideo);
+      }
+    }
+
+    console.log(
+      '[Popup] Sending to backend - transcript:',
+      transcript ? transcript.length + ' chars' : 'none',
+      ', comments:', comments.length,
+      ', lang:', videoLanguage || 'none'
+    );
 
     // Convert chatHistory to backend format (pairs of {question, answer})
     const backendChatHistory = [];
@@ -689,7 +1068,11 @@ async function handleSendQuestion() {
           transcript,
           videoLanguage,
           userId: currentUser.id,
-          chatHistory: backendChatHistory // Send conversation history
+          chatHistory: backendChatHistory,
+          comments,
+          videoDescription,
+          transcriptSource: currentVideo.source || '',
+          tabId: tab?.id
         }
       }, (result) => {
         if (chrome.runtime.lastError) {
@@ -721,9 +1104,20 @@ async function handleSendQuestion() {
     console.error('Question error:', error);
     removeMessage(loadingId);
 
-    // Show appropriate error message
     const errorMsg = error.message || 'Something went wrong. Please try again.';
-    addMessage(errorMsg, 'assistant');
+    const hitLimit = /limit reached|sign up for more|403|upgrade/i.test(errorMsg);
+    if (hitLimit) {
+      await loadUserQuota();
+      showLimitModal(currentUser.quota?.questions || 0, currentUser.quota?.playbooks || 0, {
+        reason: 'questions',
+        requiresSignup: currentUser.isAnonymous || /sign up/i.test(errorMsg)
+      });
+      addMessage(currentUser.isAnonymous
+        ? 'Guest limit reached. Sign in for 6 playbooks and 25 questions.'
+        : 'Monthly limit reached. Upgrade to Pro for 60 playbooks and 250 questions.', 'assistant');
+    } else {
+      addMessage(errorMsg, 'assistant');
+    }
   } finally {
     isProcessing = false;
     handleInputChange();
@@ -1026,25 +1420,38 @@ async function seekVideo(seconds) {
 async function loadUserQuota() {
   if (!currentUser || !currentUser.id) return;
 
-  try {
-    const quota = await api.getQuota(currentUser.id, currentUser.fingerprint);
+  const defaultLimit = currentUser.isAnonymous ? 3 : 25;
+  const defaultPlaybooks = currentUser.isAnonymous ? 1 : 6;
 
-    currentUser.quota = quota;
+  try {
+    const [quota, playbooks] = await Promise.all([
+      api.getQuota(currentUser.id, currentUser.fingerprint),
+      api.getPlaybookQuota(currentUser.id).catch(() => null)
+    ]);
+
+    currentUser.quota = {
+      ...quota,
+      playbooks: playbooks?.playbooks ?? 0,
+      playbookLimit: playbooks?.playbookLimit ?? defaultPlaybooks
+    };
     currentUser.plan = quota.plan;
     await storage.setUser(currentUser);
 
-    updateQuotaDisplay(quota);
+    updateQuotaDisplay(currentUser.quota);
   } catch (error) {
     console.error('Quota error:', error);
-    // Use previously cached quota if available (from storage)
-    // This prevents manipulation by blocking network requests
     if (currentUser.quota && typeof currentUser.quota.questions === 'number') {
       console.log('Using cached quota from storage');
       updateQuotaDisplay(currentUser.quota);
     } else {
-      // No cached quota - show conservative defaults (assume limit reached)
-      // User must have successful API call to unlock questions
-      updateQuotaDisplay({ questions: 10, limit: 10, plan: 'free', error: true });
+      updateQuotaDisplay({
+        questions: defaultLimit,
+        limit: defaultLimit,
+        playbooks: defaultPlaybooks,
+        playbookLimit: defaultPlaybooks,
+        plan: currentUser.isAnonymous ? 'anonymous' : 'free',
+        error: true
+      });
     }
   }
 }
@@ -1054,33 +1461,53 @@ async function loadUserQuota() {
  */
 function updateQuotaDisplay(quota) {
   const { questions, limit, plan } = quota;
-  const remaining = limit - questions;
-  const usagePercent = (questions / limit) * 100;
+  const playbooks = quota.playbooks || 0;
+  const playbookLimit = quota.playbookLimit || (plan === 'pro' || plan === 'premium' ? 60 : plan === 'anonymous' ? 1 : 6);
+  const remaining = Math.max(0, (typeof quota.remaining === 'number' ? quota.remaining : limit - questions));
+  const playbooksLeft = Math.max(0, playbookLimit - playbooks);
+  const usagePercent = limit ? (questions / limit) * 100 : 0;
+  const questionsEmpty = remaining <= 0;
+  const playbooksEmpty = playbooksLeft <= 0;
+  const questionsLow = !questionsEmpty && (usagePercent >= 80 || remaining <= 2);
+  const playbooksLow = !playbooksEmpty && playbookLimit > 1 && playbooksLeft === 1;
 
-  // Update quota text
-  quotaText.textContent = `${questions}/${limit} questions`;
-
-  // Remove previous state classes
+  quotaText.textContent = `${questions}/${limit} Q · ${playbooks}/${playbookLimit} playbooks`;
   quotaText.classList.remove('warning', 'danger');
+  if (usagePill) {
+    usagePill.textContent = `${playbooks}/${playbookLimit} · ${questions}/${limit} Q`;
+    usagePill.title = currentUser?.isAnonymous
+      ? 'Guest plan. Sign in for 6 playbooks and 25 questions.'
+      : `${playbooks} of ${playbookLimit} playbooks · ${questions} of ${limit} questions`;
+    usagePill.classList.remove('warning', 'danger');
+  }
 
-  // Pro users don't need warnings
+  if (questionsStat) questionsStat.textContent = `${questions}/${limit}`;
+  if (playbooksStat) playbooksStat.textContent = `${playbooks}/${playbookLimit}`;
+
   if (plan === 'pro' || plan === 'premium') {
     hideQuotaBanner();
     return;
   }
 
-  // Check usage levels and show appropriate UI
-  if (remaining <= 0) {
-    // Limit reached - show modal
+  if (questionsEmpty || playbooksEmpty) {
     quotaText.classList.add('danger');
-    showLimitModal(questions);
-    showQuotaBanner('danger', 'Monthly limit reached', 'Upgrade for unlimited questions');
-  } else if (usagePercent >= 80) {
-    // 80%+ usage - show warning banner
+    usagePill?.classList.add('danger');
+    showQuotaBanner(
+      'danger',
+      'Monthly limit reached',
+      currentUser?.isAnonymous
+        ? 'Sign in for 6 playbooks and 25 questions'
+        : 'Pro is €15: 60 playbooks and 250 questions'
+    );
+  } else if (questionsLow || playbooksLow) {
     quotaText.classList.add('warning');
-    showQuotaBanner('warning', 'Running low on questions', `${remaining} question${remaining === 1 ? '' : 's'} left this month`);
+    usagePill?.classList.add('warning');
+    showQuotaBanner(
+      'warning',
+      'Running low this month',
+      `${remaining} question${remaining === 1 ? '' : 's'} · ${playbooksLeft} playbook${playbooksLeft === 1 ? '' : 's'} left`
+    );
   } else {
-    // Normal usage - hide banner
     hideQuotaBanner();
   }
 }
@@ -1108,13 +1535,38 @@ function hideQuotaBanner() {
 /**
  * Show limit reached modal with value message
  */
-function showLimitModal(questionsUsed) {
+function showLimitModal(questionsUsed, playbooksUsed = 0, options = {}) {
   if (!limitModal) return;
 
-  // Show value message - what they accomplished
+  const reason = options.reason || 'questions';
+  const guest = !!(currentUser?.isAnonymous || options.requiresSignup);
+
   if (limitValueMsg) {
-    const videosLearned = Math.max(1, Math.floor(questionsUsed / 2)); // Estimate videos learned
-    limitValueMsg.innerHTML = `You've learned from <strong>${videosLearned} video${videosLearned === 1 ? '' : 's'}</strong> this month!`;
+    if (reason === 'playbook') {
+      limitValueMsg.innerHTML = guest
+        ? `You've used this month's <strong>playbook</strong>. Sign in for 6 playbooks and 25 questions, or go Pro for €15.`
+        : `You've used this month's playbooks. Pro is €15: 60 playbooks and 250 questions.`;
+    } else {
+      const q = Number(questionsUsed) || 0;
+      const p = Number(playbooksUsed) || 0;
+      limitValueMsg.innerHTML = guest
+        ? `Guest limit reached. Sign in for <strong>6 playbooks</strong> and <strong>25 questions</strong>. Pro is €15.`
+        : `You've used <strong>${p} playbook${p === 1 ? '' : 's'}</strong> and <strong>${q} question${q === 1 ? '' : 's'}</strong>. Pro is €15: 60 playbooks and 250 questions.`;
+    }
+  }
+
+  const upgradeTitle = document.querySelector('#upgradeModalBtn .option-title');
+  const upgradeSub = document.querySelector('#upgradeModalBtn .option-subtitle');
+  if (upgradeTitle) upgradeTitle.textContent = guest ? 'Or go Pro' : 'Upgrade to Pro';
+  if (upgradeSub) upgradeSub.textContent = '60 playbooks · 250 questions';
+
+  const connectOption = document.getElementById('connectAccountBtn');
+  if (connectOption) {
+    connectOption.classList.toggle('hidden', !guest && !currentUser?.isAnonymous);
+    const connectTitle = connectOption.querySelector('.option-title');
+    const connectSub = connectOption.querySelector('.option-subtitle');
+    if (connectTitle) connectTitle.textContent = guest ? 'Sign in for more' : 'Already have Pro?';
+    if (connectSub) connectSub.textContent = guest ? '6 playbooks · 25 questions free' : 'Connect your account';
   }
 
   limitModal.classList.remove('hidden');
@@ -1133,13 +1585,13 @@ function hideLimitModal() {
 async function handleShareForMore() {
   // Create share URL
   const shareUrl = 'https://lurnia.app?ref=extension';
-  const shareText = 'I use Lurnia to learn from YouTube videos with AI! Ask any question and get instant answers with timestamps. Try it free:';
+  const shareText = "Don't trust the thumbnail. Lurnia ranks YouTube by real engagement, then steals the playbook:";
 
   // Try Web Share API first (mobile-friendly)
   if (navigator.share) {
     try {
       await navigator.share({
-        title: 'Lurnia - AI YouTube Learning',
+        title: 'Lurnia · Find signal, steal the playbook',
         text: shareText,
         url: shareUrl
       });

@@ -9,7 +9,7 @@ interface SEOHeaderProps {
 }
 
 export default function SEOHeader({
-  ctaText = 'Essayer Lurnia',
+  ctaText = 'Find signal',
   ctaHref = '/'
 }: SEOHeaderProps) {
   return (

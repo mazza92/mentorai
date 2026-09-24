@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import articlesData from '@/data/articles.json'
+import { getAllTopics } from '@/data/topics'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -42,6 +43,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
+      url: `${baseUrl}/learn`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.95,
+    },
+    {
       url: `${baseUrl}/guides`,
       lastModified: new Date(),
       changeFrequency: 'daily',
@@ -79,5 +86,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: guide.priority,
   }))
 
-  return [...staticPages, ...articlePages, ...guidePages]
+  const topicPages: MetadataRoute.Sitemap = getAllTopics().map((topic) => ({
+    url: `${baseUrl}/learn/${topic.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'daily' as const,
+    priority: 0.85,
+  }))
+
+  return [...staticPages, ...topicPages, ...articlePages, ...guidePages]
 }

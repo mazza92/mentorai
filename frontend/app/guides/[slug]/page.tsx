@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { guideSerpDescription, guideSerpTitle, isProbablyFrench } from '@/lib/seo'
 import Script from 'next/script'
 import Link from 'next/link'
 import { Play, ExternalLink, ArrowRight, Clock, Eye, MessageCircle, ChevronDown } from 'lucide-react'
@@ -136,26 +137,30 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
   if (!insight) {
     return {
-      title: 'Page non trouvee | Lurnia',
-      description: 'Le guide demandé n\'existe pas.'
+      title: 'Playbook not found',
+      description: 'This video playbook does not exist. Search a skill or outcome instead.'
     }
   }
 
+  const title = guideSerpTitle(insight.metaTitle, insight.videoTitle, insight.slug)
+  const description = guideSerpDescription(insight.metaDescription, insight.videoTitle, insight.slug)
+  const fr = isProbablyFrench(`${insight.metaTitle} ${insight.videoTitle} ${insight.slug}`)
+
   return {
-    title: insight.metaTitle,
-    description: insight.metaDescription,
+    title,
+    description,
     keywords: insight.keywords?.join(', '),
     openGraph: {
-      title: insight.metaTitle,
-      description: insight.metaDescription,
+      title,
+      description,
       images: [insight.thumbnail],
       type: 'article',
-      locale: 'fr_FR'
+      locale: fr ? 'fr_FR' : 'en_US'
     },
     twitter: {
       card: 'summary_large_image',
-      title: insight.metaTitle,
-      description: insight.metaDescription,
+      title,
+      description,
       images: [insight.thumbnail]
     },
     alternates: {

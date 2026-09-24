@@ -65,7 +65,7 @@ class SEOContentService {
       ? transcript.substring(0, 15000) + '\n\n[Transcription tronquée...]'
       : transcript;
 
-    return `Tu es un expert SEO francophone spécialisé dans la création de pages de résumé IA optimisées pour le référencement Google.
+    return `Tu es un expert SEO + GEO (Google + ChatGPT/Perplexity) qui écrit des titres qui CLICKENT. Ton de Lurnia: cash, anti-clickbait, efficacité. « Ne te fie pas à la miniature » / « Don't trust the thumbnail ».
 
 CONTEXTE DE LA VIDÉO:
 - Titre: ${video.title}
@@ -77,21 +77,24 @@ CONTEXTE DE LA VIDÉO:
 TRANSCRIPTION COMPLÈTE:
 ${truncatedTranscript}
 
+LANGUE: Si le titre/transcript est en anglais, écris TOUT en anglais. Sinon, français. Ne mélange pas.
+
 INSTRUCTIONS:
-Génère un contenu SEO structuré en JSON pour créer une page de résumé IA de haute qualité qui va se positionner sur Google.
+Génère un JSON SEO pour une page playbook qui se positionne sur l'intention réelle (avis, c'est quoi, tuto, comparatif). PAS un dump du titre YouTube.
 
 EXIGENCES CRITIQUES:
-1. TOUT le contenu DOIT être en FRANÇAIS
-2. Les timestamps DOIVENT correspondre à des moments réels mentionnés dans la transcription
-3. Chaque insight doit être factuel et vérifiable dans la transcription
-4. Le ton doit être professionnel mais accessible
-5. Optimise pour les mots-clés: "résumé IA", "résumé vidéo YouTube", le nom du créateur, et les thèmes principaux
+1. metaTitle ≤ 60 caractères. Inclure le sujet cherché (ex: "Linkuma avis", "BMAD c'est quoi", "Qwen vs Claude") + "playbook". JAMAIS le titre YouTube brut.
+2. metaDescription ≤ 155. Première phrase: "Ne te fie pas à la miniature." OU "Don't trust the thumbnail." Puis la promesse (à retenir / timestamps / ce qu'il faut zapper).
+3. seoTitle = H1 punchy (max 70). Pas "Résumé IA :".
+4. Timestamps = moments RÉELS du transcript.
+5. FAQs: au moins une question définitionnelle ("c'est quoi X ?", "X vs Y ?") pour les moteurs génératifs.
+6. Ton: cash, productif, "skip the empty-scroll". Pas corporate mou. Jamais de tiret cadratin (—). Dis "maintenant" / "now", jamais "cette semaine" / "this week".
 
 FORMAT JSON REQUIS (retourne UNIQUEMENT ce JSON, sans texte avant ou après):
 {
-  "seoTitle": "Résumé IA : [Titre accrocheur max 50 chars] | ${channelName}",
-  "metaTitle": "[60 caractères max - incluant 'Résumé IA' et le sujet principal]",
-  "metaDescription": "[155 caractères max - phrase d'accroche incitant au clic, mentionnant le créateur]",
+  "seoTitle": "[H1 punchy max 70 chars: sujet + playbook, pas le titre YouTube]",
+  "metaTitle": "[max 60: intention de recherche + playbook]",
+  "metaDescription": "[max 155: commence par Ne te fie pas à la miniature. / Don't trust the thumbnail.]",
 
   "quickInsights": [
     {

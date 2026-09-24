@@ -1,113 +1,99 @@
 /**
- * WanderCut Pricing Tiers Configuration
- * MVP Focus: Channel Upload Only (USP)
+ * Lurnia pricing
  *
- * Cost Analysis (On-Demand Transcript Fetching):
- * - Channel import (metadata): ~€0.01 (negligible)
- * - Question cost: ~€0.015 per question (Gemini API + 3 on-demand transcript fetches)
+ * Charge the aha (playbooks + questions). Search stays free: that is acquisition.
+ * Playbook quota is unique videos opened this month. Reopening the same video is free.
  *
- * Target: 70% profit margin
+ * Cost (cached playbooks + Gemini Q&A):
+ * - Search: YouTube Data API, cacheable, ~€0
+ * - New playbook: ~€0.03 once, then cache
+ * - Question: ~€0.015
+ *
+ * Stripe: keep STRIPE_PRO_PRICE_ID in env. Create a €15/month price in Stripe to match the UI.
  */
 
 const PRICING_TIERS = {
   anonymous: {
     id: 'anonymous',
-    name: 'Anonymous',
+    name: 'Try it',
     price: 0,
-    priceId: '', // No Stripe - teaser tier before signup
+    priceId: '',
     features: {
-      channelsPerMonth: 1,
-      questionsPerMonth: 1,
-      questionsPerChannel: 1,
+      searchesPerMonth: null,
+      playbooksPerMonth: 1,
+      questionsPerMonth: 3,
+      channelsPerMonth: 0,
+      questionsPerChannel: 3,
       features: [
-        '1 channel upload (teaser)',
-        '1 question (teaser)',
+        'Search high-value YouTube',
+        '1 playbook',
+        '3 questions',
         'Sign up for more'
       ]
     },
-    // Cost calculation: 1 channel × €0.01 + 1 question × €0.015 = €0.01 + €0.015 = €0.025
-    estimatedCost: 0.025,
-    estimatedCostEUR: 0.025,
-    margin: -100 // Teaser/acquisition cost
+    estimatedCostEUR: 0.08,
+    margin: -100
   },
 
   free: {
     id: 'free',
     name: 'Free',
     price: 0,
-    priceId: '', // No Stripe price ID for free tier
+    priceId: '',
     features: {
-      channelsPerMonth: 2,
-      questionsPerMonth: 10, // 5 questions per channel average
-      questionsPerChannel: 5, // Soft limit per channel
+      searchesPerMonth: null,
+      playbooksPerMonth: 6,
+      questionsPerMonth: 25,
+      channelsPerMonth: 0,
+      questionsPerChannel: null,
       features: [
-        '2 channel uploads per month',
-        '10 questions total (5 per channel)',
-        'On-demand transcript fetching',
-        'All AI-powered insights',
-        'Community support'
+        'Unlimited value search',
+        '6 playbooks / month',
+        '25 questions / month',
+        'Ranked by engagement, not views'
       ]
     },
-    // Cost calculation: 2 channels × €0.01 + 10 questions × €0.015 = €0.02 + €0.15 = €0.17
-    estimatedCost: 0.17,
-    estimatedCostEUR: 0.17,
-    margin: -100 // Acquisition cost
+    estimatedCostEUR: 0.55,
+    margin: -100
   },
 
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 24.99,
-    priceEUR: 24.99,
+    price: 15,
+    priceEUR: 15,
     priceId: process.env.STRIPE_PRO_PRICE_ID || 'price_pro',
     popular: true,
     features: {
-      channelsPerMonth: 15,
-      questionsPerMonth: 500, // ~33 questions per channel on average
-      questionsPerChannel: null, // No per-channel limit
+      searchesPerMonth: null,
+      playbooksPerMonth: 60,
+      questionsPerMonth: 250,
+      channelsPerMonth: 0,
+      questionsPerChannel: null,
       features: [
-        '15 channel uploads per month',
-        '500 questions per month',
-        'On-demand transcript fetching',
-        'All AI-powered insights',
-        'Priority support',
-        'Export transcripts',
-        'Early access to new features'
+        'Unlimited value search',
+        '60 playbooks / month',
+        '250 questions / month',
+        'Export playbooks',
+        'Priority support'
       ]
     },
-    // Cost calculation: 15 channels × €0.01 + 500 questions × €0.015 = €0.15 + €7.50 = €7.65
-    estimatedCost: 7.65,
-    estimatedCostEUR: 7.65,
-    margin: 69 // (24.99 - 7.65) / 24.99 = 69%
+    estimatedCostEUR: 4.2,
+    margin: 72
   }
 };
 
-/**
- * Get tier configuration by tier ID
- * @param {string} tierId - Tier ID (free, pro)
- * @returns {object} Tier configuration
- */
 function getTierConfig(tierId) {
   return PRICING_TIERS[tierId] || PRICING_TIERS.free;
 }
 
-/**
- * Get all tier configurations
- * @returns {array} Array of tier configurations
- */
 function getAllTiers() {
   return Object.values(PRICING_TIERS);
 }
 
-/**
- * Check if user can import a channel based on tier limits
- * @param {string} tier - User's tier
- * @param {number} channelsThisMonth - Channels imported this month
- * @returns {object} { canImport: boolean, limit: number, remaining: number }
- */
 function canImportChannel(tier, channelsThisMonth) {
   const config = getTierConfig(tier);
-  const limit = config.features.channelsPerMonth;
+  const limit = config.features.channelsPerMonth || 0;
   const remaining = Math.max(0, limit - channelsThisMonth);
 
   return {
@@ -118,20 +104,10 @@ function canImportChannel(tier, channelsThisMonth) {
   };
 }
 
-/**
- * Legacy function - kept for backward compatibility
- * @deprecated Use canImportChannel instead
- */
 function canProcessVideo(tier, videosThisMonth) {
-  return canImportChannel(tier, videosThisMonth);
+  return canOpenPlaybook(tier, videosThisMonth);
 }
 
-/**
- * Check if user can ask a question based on tier limits
- * @param {string} tier - User's tier
- * @param {number} questionsThisMonth - Questions asked this month
- * @returns {object} { canAsk: boolean, limit: number, remaining: number }
- */
 function canAskQuestion(tier, questionsThisMonth) {
   const config = getTierConfig(tier);
   const limit = config.features.questionsPerMonth;
@@ -145,14 +121,35 @@ function canAskQuestion(tier, questionsThisMonth) {
   };
 }
 
-/**
- * Get usage percentage for UI display
- * @param {number} used - Amount used
- * @param {number} limit - Total limit
- * @returns {number} Percentage (0-100)
- */
+function canOpenPlaybook(tier, playbooksThisMonth, videoId, openedIds) {
+  const config = getTierConfig(tier);
+  const limit = config.features.playbooksPerMonth;
+  const ids = Array.isArray(openedIds) ? openedIds : [];
+  const alreadyOpen = videoId && ids.includes(videoId);
+  const used = ids.length || playbooksThisMonth || 0;
+  const remaining = Math.max(0, limit - used);
+
+  if (alreadyOpen) {
+    return {
+      canOpen: true,
+      isNew: false,
+      limit,
+      remaining,
+      used
+    };
+  }
+
+  return {
+    canOpen: used < limit,
+    isNew: used < limit,
+    limit,
+    remaining,
+    used
+  };
+}
+
 function getUsagePercentage(used, limit) {
-  if (limit === 0) return 100;
+  if (!limit) return 0;
   return Math.min(100, Math.round((used / limit) * 100));
 }
 
@@ -161,7 +158,8 @@ module.exports = {
   getTierConfig,
   getAllTiers,
   canImportChannel,
-  canProcessVideo, // Legacy - use canImportChannel
+  canProcessVideo,
   canAskQuestion,
+  canOpenPlaybook,
   getUsagePercentage
 };

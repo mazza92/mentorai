@@ -14,11 +14,12 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   const hasFilters = params.page || params.channel || params.search
 
   return {
-    title: 'Guides IA de vidéos YouTube | Lurnia',
-    description: 'Découvrez nos guides vidéo YouTube : points clés, timestamps et analyses générés par intelligence artificielle.',
+    title: 'Playbooks YouTube: pas le bait de la miniature',
+    description:
+      'Ne te fie pas à la miniature. Playbooks extraits de vidéos à forte discussion: à retenir, timestamps, ce qu’il faut zapper.',
     openGraph: {
-      title: 'Guides IA de vidéos YouTube | Lurnia',
-      description: 'Découvrez nos guides vidéo YouTube.',
+      title: 'Playbooks YouTube: pas le bait de la miniature',
+      description: 'Guides extraits de vidéos que les gens ont vraiment apprises. Pas le hook. Pas le recap vide.',
       type: 'website'
     },
     alternates: {
@@ -116,10 +117,10 @@ export default async function GuidesDirectoryPage({ searchParams }: PageProps) {
           {/* Hero Section */}
           <div className="text-center mb-10">
             <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-6">
-              Guides IA de vidéos YouTube
+              Playbooks, not thumbnails
             </h1>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-              Découvrez les points clés des meilleures vidéos YouTube, analysées et synthétisées par notre intelligence artificielle.
+              High-discussion YouTube, extracted. Takeaways, timestamps, what to skip. We bury the empty-scroll.
             </p>
           </div>
 
@@ -270,16 +271,16 @@ export default async function GuidesDirectoryPage({ searchParams }: PageProps) {
           {/* CTA Section */}
           <section className="mt-20 text-center py-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl text-white">
             <h2 className="text-3xl font-bold mb-4">
-              Créez vos propres guides IA
+              Steal the playbook. Skip the bait.
             </h2>
             <p className="text-blue-100 mb-8 max-w-xl mx-auto text-lg">
-              Importez n'importe quelle vidéo YouTube et obtenez un guide intelligent en quelques secondes.
+              Search what you need done. We bury empty-scroll hooks and extract what you can use now.
             </p>
             <Link
               href="/"
               className="inline-flex items-center gap-2 px-8 py-4 bg-white text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition-colors text-lg"
             >
-              Commencer Gratuitement <ArrowRight className="w-5 h-5" />
+              Find signal <ArrowRight className="w-5 h-5" />
             </Link>
           </section>
 

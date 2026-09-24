@@ -9,6 +9,8 @@ const {
   getUsagePercentage
 } = require('../config/pricing');
 
+const userService = require('../services/userService');
+
 const router = express.Router();
 
 // Use shared mock storage
@@ -284,78 +286,38 @@ router.post('/:userId/increment-export', async (req, res) => {
   }
 });
 
+// Check unique playbook quota for the new product
+router.post('/:userId/check-playbook', async (req, res) => {
+  try {
+    const quota = await userService.checkPlaybookQuota(req.params.userId, req.body?.videoId);
+    return res.json({
+      canOpen: quota.canOpen,
+      tier: quota.tier,
+      playbooksThisMonth: quota.playbooksThisMonth,
+      limit: quota.limit,
+      remaining: quota.remaining
+    });
+  } catch (error) {
+    console.error('Error in check-playbook route:', error.message);
+    return res.status(500).json({ error: 'Failed to check playbook quota' });
+  }
+});
+
 // Check if user can ask a question (based on tier limits)
 router.post('/:userId/check-question', async (req, res) => {
   try {
-    const { userId } = req.params;
-
-    // Use mock mode if Firestore is not available
-    if (useMockMode || !process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID === 'your_project_id') {
-      const user = mockUsers.get(userId) || { tier: 'free', questionsThisMonth: 0 };
-      const result = canAskQuestion(user.tier, user.questionsThisMonth || 0);
-      return res.json({
-        canAsk: result.canAsk,
-        tier: user.tier,
-        questionsThisMonth: result.used,
-        limit: result.limit,
-        remaining: result.remaining
-      });
-    }
-
-    try {
-      const userDoc = await firestore.collection('users').doc(userId).get();
-
-      if (!userDoc.exists) {
-        const result = canAskQuestion('free', 0);
-        return res.json({
-          canAsk: true,
-          tier: 'free',
-          questionsThisMonth: 0,
-          limit: result.limit,
-          remaining: result.remaining
-        });
-      }
-
-      const user = userDoc.data();
-      const tier = user.tier || 'free';
-      const questionsThisMonth = user.questionsThisMonth || 0;
-
-      const result = canAskQuestion(tier, questionsThisMonth);
-
-      return res.json({
-        canAsk: result.canAsk,
-        tier,
-        questionsThisMonth: result.used,
-        limit: result.limit,
-        remaining: result.remaining
-      });
-    } catch (firestoreError) {
-      console.error('Firestore error in check-question, falling back to mock mode:', firestoreError.message);
-      // Fallback to mock mode
-      const { userId } = req.params;
-      const user = mockUsers.get(userId) || { tier: 'free', questionsThisMonth: 0 };
-      const result = canAskQuestion(user.tier, user.questionsThisMonth || 0);
-      return res.json({
-        canAsk: result.canAsk,
-        tier: user.tier,
-        questionsThisMonth: result.used,
-        limit: result.limit,
-        remaining: result.remaining
-      });
-    }
-  } catch (error) {
-    // Fallback to mock mode for any other errors
-    console.error('Error in check-question route:', error.message);
-    const { userId } = req.params;
-    const user = mockUsers.get(userId) || { tier: 'free', questionsThisMonth: 0 };
-    const result = canAskQuestion(user.tier, user.questionsThisMonth || 0);
+    const quota = await userService.checkQuestionQuota(req.params.userId);
     return res.json({
-      canAsk: result.canAsk,
-      tier: user.tier,
-      questionsThisMonth: result.used,
-      limit: result.limit,
-      remaining: result.remaining
+      canAsk: quota.canAsk,
+      tier: quota.tier,
+      questionsThisMonth: quota.questionsThisMonth,
+      limit: quota.limit,
+      remaining: quota.remaining,
+      requiresSignup: !!quota.requiresSignup
     });
+  } catch (error) {
+    console.error('Error in check-question route:', error.message);
+    return res.status(500).json({ error: 'Failed to check question quota' });
   }
 });
 

@@ -75,7 +75,37 @@ body {
   background: transparent;
 }
 
-/* ChatGPT/Gemini-style AI Response Formatting */
+/* Compact markdown in playbook chat bubbles */
+.playbook-chat-md p {
+  @apply mb-2 last:mb-0 text-[13px] leading-6 text-slate-700;
+}
+.playbook-chat-md h1,
+.playbook-chat-md h2,
+.playbook-chat-md h3 {
+  @apply mt-3 mb-1 text-[13px] font-bold text-slate-900 first:mt-0;
+}
+.playbook-chat-md strong {
+  @apply font-semibold text-slate-900;
+}
+.playbook-chat-md ul,
+.playbook-chat-md ol {
+  @apply my-2 ml-4 space-y-1;
+}
+.playbook-chat-md ul {
+  @apply list-disc;
+}
+.playbook-chat-md ol {
+  @apply list-decimal;
+}
+.playbook-chat-md li {
+  @apply text-[13px] leading-6 text-slate-700;
+}
+.playbook-chat-md code {
+  @apply rounded bg-white px-1 py-0.5 font-mono text-[12px] text-violet-700;
+}
+.playbook-chat-md .chat-ts {
+  @apply mx-0.5 inline-flex rounded bg-blue-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-blue-700;
+}
 .ai-response {
   @apply text-[15px] leading-relaxed;
 }

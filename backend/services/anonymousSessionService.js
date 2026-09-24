@@ -15,7 +15,7 @@
  * Current implementation uses in-memory Map (resets on server restart).
  */
 
-const { canProcessVideo, canImportChannel, canAskQuestion } = require('../config/pricing');
+const { canProcessVideo, canImportChannel, canAskQuestion, canOpenPlaybook } = require('../config/pricing');
 
 // In-memory session store (replace with Redis in production)
 const anonymousSessions = new Map();
@@ -89,6 +89,8 @@ function getSession(sessionId) {
       tier: 'anonymous',
       channelsImported: 1, // Already "used" to block channel imports
       questionsAsked: 1, // Already "used" to block questions
+      playbooksOpened: 1,
+      playbookIds: ['blocked'],
       createdAt: new Date(),
       lastActivity: new Date(),
       fingerprintBlocked: true
@@ -103,6 +105,8 @@ function getSession(sessionId) {
       tier: 'anonymous',
       channelsImported: 0,
       questionsAsked: 0,
+      playbooksOpened: 0,
+      playbookIds: [],
       createdAt: new Date(),
       lastActivity: new Date(),
       fingerprint
@@ -129,6 +133,8 @@ function getSession(sessionId) {
     // Reset session
     session.channelsImported = 0;
     session.questionsAsked = 0;
+    session.playbooksOpened = 0;
+    session.playbookIds = [];
     session.createdAt = new Date();
   }
 
@@ -251,6 +257,49 @@ function incrementVideoCount(sessionId) {
  * @param {string} sessionId - Browser session ID
  * @returns {boolean} Success status
  */
+function checkPlaybookQuota(sessionId, videoId) {
+  const session = getSession(sessionId);
+
+  if (!session) {
+    return {
+      canOpen: false,
+      isNew: false,
+      playbooksUsed: 0,
+      limit: 1,
+      remaining: 1,
+      requiresSignup: true,
+      tier: 'anonymous'
+    };
+  }
+
+  const ids = session.playbookIds || [];
+  const result = canOpenPlaybook('anonymous', ids.length, videoId, ids);
+
+  return {
+    canOpen: result.canOpen,
+    isNew: result.isNew,
+    playbooksUsed: result.used,
+    limit: result.limit,
+    remaining: result.remaining,
+    requiresSignup: !result.canOpen,
+    tier: 'anonymous'
+  };
+}
+
+function incrementPlaybookCount(sessionId, videoId) {
+  const session = getSession(sessionId);
+  if (!session) return false;
+
+  session.playbookIds = session.playbookIds || [];
+  if (videoId && !session.playbookIds.includes(videoId)) {
+    session.playbookIds.push(videoId);
+    session.playbooksOpened = session.playbookIds.length;
+  }
+  session.lastActivity = new Date();
+  anonymousSessions.set(sessionId, session);
+  return true;
+}
+
 function incrementQuestionCount(sessionId) {
   const session = getSession(sessionId);
 
@@ -322,9 +371,11 @@ module.exports = {
   checkChannelQuota,
   checkVideoQuota, // Legacy
   checkQuestionQuota,
+  checkPlaybookQuota,
   incrementChannelCount,
   incrementVideoCount, // Legacy
   incrementQuestionCount,
+  incrementPlaybookCount,
   cleanupExpiredSessions,
   getSessionStats
 };

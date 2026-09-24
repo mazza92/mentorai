@@ -14,41 +14,41 @@ export default function ExtensionPageClient() {
   const features = [
     {
       icon: MessageSquare,
-      title: 'Ask Any Question',
-      description: 'Get instant AI answers about any YouTube video content'
+      title: 'Find signal, not bait',
+      description: 'Search a skill. We bury empty-scroll hooks and rank by real engagement.'
     },
     {
       icon: Clock,
-      title: 'Clickable Timestamps',
-      description: 'Jump directly to the exact moment in the video'
+      title: 'Steal the playbook',
+      description: 'Takeaways, timestamps, what to skip. Not another 40-minute recap.'
     },
     {
       icon: Zap,
-      title: 'Works Instantly',
-      description: 'No setup needed - just click and ask on any YouTube video'
+      title: 'Ask the video',
+      description: 'The number, the caveat, the next step. From captions and comments, not vibes.'
     },
     {
       icon: Sparkles,
-      title: 'Multi-Language',
-      description: 'Ask in any language, get answers in your preferred language'
+      title: 'Shorts stay buried',
+      description: "Long-form depth by default. Empty stop-scrollers don't get a vote."
     }
   ]
 
   const steps = [
     {
       number: '1',
-      title: 'Install Extension',
+      title: 'Install',
       description: 'Add Lurnia to Chrome in one click'
     },
     {
       number: '2',
-      title: 'Open YouTube',
-      description: 'Navigate to any YouTube video'
+      title: 'Find signal',
+      description: 'Search a skill or open any YouTube video'
     },
     {
       number: '3',
-      title: 'Click & Ask',
-      description: 'Click the Lurnia icon and ask your question'
+      title: 'Steal the playbook',
+      description: 'Takeaways, timestamps, what to skip. Then ask for the number.'
     }
   ]
 
@@ -87,17 +87,17 @@ export default function ExtensionPageClient() {
 
           {/* Headline */}
           <h1 className={`text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight mb-6 transition-all duration-700 delay-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            Ask questions about
+            Don't trust the
             <br />
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              any YouTube video
+              thumbnail
             </span>
           </h1>
 
           {/* Subtitle */}
           <p className={`text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mb-10 transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            Get instant AI-powered answers with clickable timestamps.
-            Learn faster from educational videos, tutorials, and lectures.
+            YouTube ranks hooks. Lurnia ranks videos people actually learned from, then steals the playbook.
+            Skip the empty-scroll. Ask the video when you need the number.
           </p>
 
           {/* CTA Buttons */}
@@ -179,17 +179,17 @@ export default function ExtensionPageClient() {
                       <div className="font-semibold text-slate-900">Lurnia</div>
                       <div className="text-xs text-green-600 flex items-center gap-1">
                         <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        Ready to answer questions
+                        Ready to steal the playbook
                       </div>
                     </div>
                   </div>
                   <div className="bg-slate-100 rounded-xl p-3 mb-3">
-                    <div className="text-sm text-slate-600">What are the main points of this video?</div>
+                    <div className="text-sm text-slate-600">price a freelance offer</div>
                   </div>
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-3 text-left">
-                    <div className="text-sm text-slate-700 mb-2">The video covers 3 main topics:</div>
-                    <div className="text-sm text-slate-600">1. Introduction at <span className="text-blue-600 font-medium cursor-pointer hover:underline">0:45</span></div>
-                    <div className="text-sm text-slate-600">2. Key concept at <span className="text-blue-600 font-medium cursor-pointer hover:underline">3:22</span></div>
+                    <div className="text-sm text-slate-700 mb-2">Playbook: skip the hook. Do this now:</div>
+                    <div className="text-sm text-slate-600">1. Pricing rule at <span className="text-blue-600 font-medium cursor-pointer hover:underline">2:14</span></div>
+                    <div className="text-sm text-slate-600">2. What to skip at <span className="text-blue-600 font-medium cursor-pointer hover:underline">8:40</span></div>
                   </div>
                 </div>
               </div>
@@ -203,10 +203,10 @@ export default function ExtensionPageClient() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-              Everything you need to learn faster
+              Same product as the site. On YouTube.
             </h2>
             <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-              Turn any YouTube video into an interactive learning experience
+              Find signal, steal the playbook, ask the video. Free: 6 playbooks and 25 questions. Pro is €15.
             </p>
           </div>
 
@@ -232,10 +232,10 @@ export default function ExtensionPageClient() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-              Start learning in seconds
+              Start in seconds
             </h2>
             <p className="text-lg text-slate-600">
-              No account required to get started
+              No account required to search. Sign in when you want more playbooks.
             </p>
           </div>
 
@@ -260,7 +260,7 @@ export default function ExtensionPageClient() {
               className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl font-semibold text-lg shadow-xl shadow-blue-500/25 hover:shadow-2xl transition-all hover:scale-105"
             >
               <Download className="w-5 h-5" />
-              <span>Add to Chrome - It's Free</span>
+              <span>Add to Chrome. It&apos;s free</span>
             </a>
             <p className="text-sm text-slate-500 mt-4">
               Works on Chrome, Edge, Brave, and other Chromium browsers

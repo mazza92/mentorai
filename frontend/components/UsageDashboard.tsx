@@ -12,9 +12,9 @@ interface UsageDashboardProps {
 
 interface UsageData {
   tier: string
-  channelsThisMonth: number
-  channelsLimit: number
-  channelsRemaining: number
+  playbooksThisMonth: number
+  playbooksLimit: number
+  playbooksRemaining: number
   questionsThisMonth: number
   questionsLimit: number
   questionsRemaining: number
@@ -48,16 +48,16 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
       const user = userResponse.data.user
 
       // Fetch channel and question quota
-      const [channelQuota, questionQuota] = await Promise.all([
-        axios.post(`${apiUrl}/api/user/${userId}/check-channel`),
+      const [playbookQuota, questionQuota] = await Promise.all([
+        axios.post(`${apiUrl}/api/user/${userId}/check-playbook`),
         axios.post(`${apiUrl}/api/user/${userId}/check-question`)
       ])
 
       setUsage({
         tier: user.tier || 'free',
-        channelsThisMonth: channelQuota.data.channelsThisMonth,
-        channelsLimit: channelQuota.data.limit,
-        channelsRemaining: channelQuota.data.remaining,
+        playbooksThisMonth: playbookQuota.data.playbooksThisMonth,
+        playbooksLimit: playbookQuota.data.limit,
+        playbooksRemaining: playbookQuota.data.remaining,
         questionsThisMonth: questionQuota.data.questionsThisMonth,
         questionsLimit: questionQuota.data.limit,
         questionsRemaining: questionQuota.data.remaining
@@ -112,7 +112,7 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
     )
   }
 
-  const channelPercentage = getUsagePercentage(usage.channelsThisMonth, usage.channelsLimit)
+  const playbookPercentage = getUsagePercentage(usage.playbooksThisMonth, usage.playbooksLimit)
   const questionPercentage = getUsagePercentage(usage.questionsThisMonth, usage.questionsLimit)
 
   if (compact) {
@@ -133,16 +133,16 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center">
                 <Video className="w-3 h-3 text-slate-500 mr-1" />
-                <span className="text-xs text-slate-600">Channels</span>
+                <span className="text-xs text-slate-600">Playbooks</span>
               </div>
               <span className="text-xs font-semibold text-slate-700">
-                {usage.channelsThisMonth}/{usage.channelsLimit}
+                {usage.playbooksThisMonth}/{usage.playbooksLimit}
               </span>
             </div>
             <div className="w-full bg-slate-200 rounded-full h-1.5">
               <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(channelPercentage)}`}
-                style={{ width: `${channelPercentage}%`, minWidth: channelPercentage > 0 ? '2px' : '0px' }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(playbookPercentage)}`}
+                style={{ width: `${playbookPercentage}%`, minWidth: playbookPercentage > 0 ? '2px' : '0px' }}
               />
             </div>
           </div>
@@ -204,28 +204,28 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
                 <Video className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Channels Imported</h3>
-                <p className="text-xs text-slate-500">Monthly limit</p>
+                <h3 className="font-semibold text-slate-900">Playbooks opened</h3>
+                <p className="text-xs text-slate-500">Unique videos this month</p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-slate-900">
-                {usage.channelsThisMonth}<span className="text-base text-slate-500">/{usage.channelsLimit}</span>
+                {usage.playbooksThisMonth}<span className="text-base text-slate-500">/{usage.playbooksLimit}</span>
               </p>
-              <p className={`text-xs font-medium ${getStatusColor(channelPercentage).split(' ')[0]}`}>
-                {usage.channelsRemaining} remaining
+              <p className={`text-xs font-medium ${getStatusColor(playbookPercentage).split(' ')[0]}`}>
+                {usage.playbooksRemaining} remaining
               </p>
             </div>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-3">
             <div
-              className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(channelPercentage)}`}
-              style={{ width: `${channelPercentage}%`, minWidth: channelPercentage > 0 ? '4px' : '0px' }}
+              className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(playbookPercentage)}`}
+              style={{ width: `${playbookPercentage}%`, minWidth: playbookPercentage > 0 ? '4px' : '0px' }}
             />
           </div>
-          {channelPercentage >= 80 && (
+          {playbookPercentage >= 80 && (
             <p className="text-xs text-amber-600 mt-2">
-              ⚠️ You're running low on channel quota. Consider upgrading to import more channels.
+              Running low on new playbooks. Same video stays free to reopen.
             </p>
           )}
         </div>
@@ -266,14 +266,14 @@ export default function UsageDashboard({ userId, compact = false }: UsageDashboa
       </div>
 
       {/* Upgrade CTA */}
-      {usage.tier === 'free' && (channelPercentage >= 50 || questionPercentage >= 50) && (
+      {usage.tier === 'free' && (playbookPercentage >= 50 || questionPercentage >= 50) && (
         <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
           <div className="flex items-start">
             <TrendingUp className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h4 className="font-semibold text-slate-900 mb-1">Upgrade for More</h4>
               <p className="text-sm text-slate-600 mb-3">
-                Get up to 15 channels and 500 questions per month with Pro plan.
+                Get 60 playbooks and 250 questions per month with Pro. €15.
               </p>
               <Link
                 href="/pricing"

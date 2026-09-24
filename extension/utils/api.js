@@ -5,7 +5,19 @@ const IS_DEV = false;
 const API_BASE = IS_DEV ? 'http://localhost:3001/api' : 'https://mentorai-production.up.railway.app/api';
 const APP_URL = IS_DEV ? 'http://localhost:3000' : 'https://lurnia.app';
 
+const QUESTION_LIMITS = { anonymous: 3, free: 25, pro: 250, premium: 250 };
+const PLAYBOOK_LIMITS = { anonymous: 1, free: 6, pro: 60, premium: 60 };
+
+function fallbackQuestionLimit(tier) {
+  return QUESTION_LIMITS[tier] || QUESTION_LIMITS.free;
+}
+
+function fallbackPlaybookLimit(tier) {
+  return PLAYBOOK_LIMITS[tier] || PLAYBOOK_LIMITS.free;
+}
+
 export const api = {
+  appUrl: APP_URL,
   /**
    * Get the authentication URL for Google OAuth
    * Opens the main app's login page which will redirect back with token
@@ -48,10 +60,41 @@ export const api = {
     }
 
     const data = await response.json();
+    const plan = data.tier || 'free';
     return {
       questions: data.questionsThisMonth || 0,
-      limit: data.limit || 500,
-      plan: data.tier || 'free'
+      limit: data.limit || fallbackQuestionLimit(plan),
+      plan,
+      canAsk: data.canAsk !== false,
+      remaining: typeof data.remaining === 'number' ? data.remaining : Math.max(0, (data.limit || fallbackQuestionLimit(plan)) - (data.questionsThisMonth || 0)),
+      requiresSignup: !!data.requiresSignup
+    };
+  },
+
+  /**
+   * Unique playbooks opened this month (same video does not count twice)
+   */
+  async getPlaybookQuota(userId, videoId = null) {
+    const response = await fetch(`${API_BASE}/user/${userId}/check-playbook`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ videoId })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch playbook quota');
+    }
+
+    const data = await response.json();
+    const plan = data.tier || 'free';
+    return {
+      playbooks: data.playbooksThisMonth || 0,
+      playbookLimit: data.limit || fallbackPlaybookLimit(plan),
+      remaining: data.remaining,
+      canOpen: data.canOpen !== false,
+      plan
     };
   },
 

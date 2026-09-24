@@ -67,15 +67,15 @@ export default function RessourcesPage() {
           <div className="text-center text-white">
             <div className="inline-flex items-center px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full mb-6">
               <Star className="w-4 h-4 mr-2" />
-              <span className="text-sm font-semibold">50+ Guides Gratuits</span>
+              <span className="text-sm font-semibold">Ne te fie pas à la miniature</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-              Ressources IA pour YouTube
+              Playbooks YouTube. Pas le bait.
             </h1>
 
             <p className="text-xl sm:text-2xl text-blue-100 mb-8 max-w-3xl mx-auto">
-              Guides pratiques, comparatifs et astuces pour maîtriser l'IA sur YouTube. Gagnez du temps et apprenez plus efficacement.
+              Guides pour trouver du contenu à forte discussion, extraire ce qui est utilisable, et arrêter de scroller des hooks vides.
             </p>
 
             {/* Search Bar */}
@@ -230,10 +230,10 @@ export default function RessourcesPage() {
       <section className="bg-gradient-to-br from-blue-600 to-purple-600 py-16">
         <div className="container mx-auto px-4 sm:px-6 max-w-4xl text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">
-            Prêt à transformer votre apprentissage YouTube?
+            Arrête de scroller du vide.
           </h2>
           <p className="text-lg sm:text-xl text-blue-100 mb-8">
-            Essayez Lurnia gratuitement et posez vos premières questions à n'importe quelle chaîne YouTube
+            Cherche un résultat. On enterre les hooks. Tu repars avec un playbook.
           </p>
           <Link
             href="/"

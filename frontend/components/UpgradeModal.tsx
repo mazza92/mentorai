@@ -6,7 +6,7 @@ import Link from 'next/link'
 interface UpgradeModalProps {
   isOpen: boolean
   onClose: () => void
-  reason: 'video' | 'question'
+  reason: 'video' | 'question' | 'playbook'
   currentUsage?: {
     used: number
     limit: number
@@ -19,23 +19,25 @@ export default function UpgradeModal({ isOpen, onClose, reason, currentUsage }: 
   const plans = [
     {
       name: 'Pro',
-      price: '€24.99',
+      price: '€15',
       icon: <Crown className="w-5 h-5" />,
       color: 'from-blue-500 to-purple-500',
-      features: reason === 'video'
-        ? ['15 channel imports/month', '500 questions/month', 'On-demand transcripts', 'Priority support', 'Export transcripts', 'Early access to features']
-        : ['500 questions/month', '15 channel imports/month', 'On-demand transcripts', 'Priority support', 'Export transcripts', 'Early access to features'],
+      features: [
+        'Unlimited value search',
+        '60 unique playbooks / month',
+        '250 questions / month',
+        'Export playbooks',
+        'Priority support'
+      ],
       highlighted: true
     }
   ]
 
-  const title = reason === 'video'
-    ? 'Channel Limit Reached'
-    : 'Question Limit Reached'
+  const title = reason === 'question' ? 'Question limit reached' : 'Playbook limit reached'
 
-  const description = reason === 'video'
-    ? `You've imported ${currentUsage?.used || 0}/${currentUsage?.limit || 0} channels this month. Upgrade to import more channels and unlock unlimited learning.`
-    : `You've asked ${currentUsage?.used || 0}/${currentUsage?.limit || 0} questions this month. Upgrade to ask more questions and get deeper insights.`
+  const description = reason === 'question'
+    ? `You've asked ${currentUsage?.used || 0}/${currentUsage?.limit || 0} questions this month. Pro is for running this every workday.`
+    : `You've opened ${currentUsage?.used || 0}/${currentUsage?.limit || 0} unique playbooks this month. Reopening the same video stays free.`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -115,7 +117,7 @@ export default function UpgradeModal({ isOpen, onClose, reason, currentUsage }: 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center">
                 <Zap className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" />
-                <span className="text-xs text-slate-700">More channels</span>
+                <span className="text-xs text-slate-700">More playbooks</span>
               </div>
               <div className="flex items-center">
                 <Crown className="w-4 h-4 text-purple-600 mr-2 flex-shrink-0" />

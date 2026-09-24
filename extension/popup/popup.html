@@ -19,6 +19,7 @@
         <span class="logo-text">Lurnia</span>
       </div>
       <div class="header-actions">
+        <button id="usagePill" class="usage-pill" type="button" title="Usage this month">—</button>
         <button id="settingsBtn" class="icon-btn" title="Settings">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
@@ -42,8 +43,8 @@
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
           </svg>
         </div>
-        <h2>Welcome to Lurnia</h2>
-        <p>Ask questions about any YouTube video</p>
+        <h2>Don't trust the thumbnail</h2>
+        <p>Find high-value YouTube. Steal the playbook. Skip the empty-scroll.</p>
         <button id="loginBtn" class="btn-primary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -61,6 +62,50 @@
 
     <!-- Main View -->
     <div id="mainView" class="view hidden">
+      <div class="mode-tabs">
+        <button id="discoverTab" class="mode-tab active" type="button">Find signal</button>
+        <button id="askTab" class="mode-tab" type="button">Ask</button>
+      </div>
+
+      <div id="discoverView" class="mode-panel">
+        <form id="valueSearchForm" class="value-search-form">
+          <div class="search-field">
+            <svg class="search-field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+              id="valueSearchInput"
+              type="text"
+              placeholder="What do you need done?"
+              autocomplete="off"
+            >
+          </div>
+          <button id="valueSearchBtn" type="submit" class="find-signal-btn" title="Find signal">Find</button>
+        </form>
+        <div class="search-meta">
+          <p class="search-hint">Engagement, not views</p>
+          <label class="shorts-toggle">
+            <input id="includeShorts" type="checkbox">
+            Shorts
+          </label>
+        </div>
+        <div id="searchStarters" class="search-starters">
+          <button type="button" class="starter-chip" data-query="price a freelance offer">price a freelance offer</button>
+          <button type="button" class="starter-chip" data-query="cold email that books">cold email that books</button>
+          <button type="button" class="starter-chip" data-query="SQL for a real job">SQL for a real job</button>
+          <button type="button" class="starter-chip" data-query="validate a SaaS idea">validate a SaaS idea</button>
+          <button type="button" class="starter-chip" data-query="time-block like a solopreneur">time-block like a solopreneur</button>
+        </div>
+        <div id="searchResults" class="search-results">
+          <div class="search-empty">
+            <p class="search-empty-kicker">Don't trust the thumbnail</p>
+            <p>Tap a skill. We rank what people actually learned.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="askView" class="mode-panel hidden">
       <!-- Video Status -->
       <div id="videoStatus" class="video-status">
         <div class="status-icon detecting">
@@ -71,6 +116,9 @@
           </svg>
         </div>
         <span id="statusText">Detecting video...</span>
+        <button id="stealPlaybookBtn" class="playbook-btn hidden" type="button" title="Open the playbook on Lurnia">
+          Steal playbook
+        </button>
         <button id="exportBtn" class="export-btn hidden" title="Export chat as PDF">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -99,8 +147,8 @@
             </svg>
           </div>
           <div class="quota-banner-text">
-            <span id="quotaBannerTitle" class="quota-banner-title">Running low on questions</span>
-            <span id="quotaBannerSubtitle" class="quota-banner-subtitle">2 questions left this month</span>
+            <span id="quotaBannerTitle" class="quota-banner-title">Running low this month</span>
+            <span id="quotaBannerSubtitle" class="quota-banner-subtitle">A few questions left</span>
           </div>
         </div>
         <div class="quota-banner-actions">
@@ -127,8 +175,8 @@
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>
             </div>
-            <h3>Monthly Limit Reached</h3>
-            <p id="limitValueMsg">You've learned from <strong>10 videos</strong> this month!</p>
+            <h3>Monthly limit reached</h3>
+            <p id="limitValueMsg">You've used this month's playbooks and questions.</p>
           </div>
           <div class="limit-modal-options">
             <button id="shareModalBtn" class="limit-option share-option">
@@ -155,9 +203,9 @@
               </div>
               <div class="option-text">
                 <span class="option-title">Upgrade to Pro</span>
-                <span class="option-subtitle">Unlimited questions</span>
+                <span class="option-subtitle">60 playbooks · 250 questions</span>
               </div>
-              <span class="option-badge pro">€24.99/mo</span>
+              <span class="option-badge pro">€15/mo</span>
             </button>
             <button id="connectAccountBtn" class="limit-option connect-option">
               <div class="option-icon">
@@ -182,7 +230,7 @@
       <div id="chatContainer" class="chat-container">
         <div id="messages" class="messages">
           <div class="welcome-message">
-            <p id="welcomeText">Ask any question about this video!</p>
+            <p id="welcomeText">Steal the playbook, then ask for the number.</p>
             <div id="suggestedQuestions" class="suggested-questions">
               <!-- Populated dynamically based on video language -->
             </div>
@@ -195,7 +243,7 @@
         <div class="input-container">
           <textarea
             id="questionInput"
-            placeholder="Ask about this video..."
+            placeholder="The number, the caveat, the next step..."
             rows="1"
           ></textarea>
           <button id="sendBtn" class="send-btn" disabled>
@@ -206,8 +254,9 @@
           </button>
         </div>
         <div id="quotaInfo" class="quota-info">
-          <span id="quotaText">0/500 questions</span>
+          <span id="quotaText">0/25 questions</span>
         </div>
+      </div>
       </div>
     </div>
 
@@ -236,8 +285,12 @@
           <h3>Usage</h3>
           <div class="usage-stats">
             <div class="stat-item">
+              <span class="stat-label">Playbooks</span>
+              <span id="playbooksStat" class="stat-value">0/6</span>
+            </div>
+            <div class="stat-item">
               <span class="stat-label">Questions</span>
-              <span id="questionsStat" class="stat-value">0/500</span>
+              <span id="questionsStat" class="stat-value">0/25</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">Plan</span>
@@ -267,7 +320,7 @@
       </div>
 
       <div class="settings-footer">
-        <span>Lurnia Extension v1.1.0</span>
+        <span>Lurnia Extension v1.4.0</span>
       </div>
     </div>
   </div>

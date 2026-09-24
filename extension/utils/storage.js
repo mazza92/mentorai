@@ -4,7 +4,8 @@ const STORAGE_KEYS = {
   USER: 'lurnia_user',
   TOKEN: 'lurnia_token',
   SETTINGS: 'lurnia_settings',
-  CACHE: 'lurnia_cache'
+  CACHE: 'lurnia_cache',
+  POPUP_STATE: 'lurnia_popup_state'
 };
 
 export const storage = {
@@ -65,6 +66,23 @@ export const storage = {
   async setSettings(settings) {
     return new Promise((resolve) => {
       chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: settings }, resolve);
+    });
+  },
+
+  /**
+   * Get cached data for a video
+   */
+  async getPopupState() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(STORAGE_KEYS.POPUP_STATE, (result) => {
+        resolve(result[STORAGE_KEYS.POPUP_STATE] || null);
+      });
+    });
+  },
+
+  async setPopupState(state) {
+    return new Promise((resolve) => {
+      chrome.storage.local.set({ [STORAGE_KEYS.POPUP_STATE]: state }, resolve);
     });
   },
 

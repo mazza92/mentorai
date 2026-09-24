@@ -3,6 +3,7 @@ const {
   canProcessVideo,
   canImportChannel,
   canAskQuestion,
+  canOpenPlaybook,
 } = require('../config/pricing');
 const { mockUsers } = require('../utils/mockStorage');
 const anonymousSessionService = require('./anonymousSessionService');
@@ -41,7 +42,11 @@ try {
  * @returns {boolean}
  */
 function isAnonymousUser(userId) {
-  return !userId || userId === 'anonymous' || userId.startsWith('anon_') || userId.startsWith('session_');
+  return !userId
+    || userId === 'anonymous'
+    || userId.startsWith('anon_')
+    || userId.startsWith('session_')
+    || userId.startsWith('ext_anon_');
 }
 
 /**
@@ -448,13 +453,116 @@ async function getRemainingQuestions(userId) {
   }
 }
 
+async function checkPlaybookQuota(userId, videoId) {
+  if (isAnonymousUser(userId)) {
+    const result = anonymousSessionService.checkPlaybookQuota(userId, videoId);
+    return {
+      canOpen: result.canOpen,
+      isNew: result.isNew,
+      tier: result.tier,
+      playbooksThisMonth: result.playbooksUsed,
+      limit: result.limit,
+      remaining: result.remaining,
+      requiresSignup: result.requiresSignup
+    };
+  }
+
+  try {
+    if (useMockMode || !firestore) {
+      const user = mockUsers.get(userId) || { tier: 'free', playbookIdsThisMonth: [] };
+      const ids = user.playbookIdsThisMonth || [];
+      const result = canOpenPlaybook(user.tier || 'free', ids.length, videoId, ids);
+      return {
+        canOpen: result.canOpen,
+        isNew: result.isNew,
+        tier: user.tier || 'free',
+        playbooksThisMonth: result.used,
+        limit: result.limit,
+        remaining: result.remaining
+      };
+    }
+
+    const userDoc = await firestore.collection('users').doc(userId).get();
+    const user = userDoc.exists ? userDoc.data() : { tier: 'free', playbookIdsThisMonth: [] };
+    const tier = user.tier || 'free';
+    const ids = user.playbookIdsThisMonth || [];
+    const result = canOpenPlaybook(tier, ids.length, videoId, ids);
+
+    return {
+      canOpen: result.canOpen,
+      isNew: result.isNew,
+      tier,
+      playbooksThisMonth: result.used,
+      limit: result.limit,
+      remaining: result.remaining
+    };
+  } catch (error) {
+    console.error('Error checking playbook quota:', error.message);
+    const result = canOpenPlaybook('free', 0, videoId, []);
+    return {
+      canOpen: true,
+      isNew: true,
+      tier: 'free',
+      playbooksThisMonth: 0,
+      limit: result.limit,
+      remaining: result.remaining
+    };
+  }
+}
+
+async function incrementPlaybookCount(userId, videoId) {
+  if (isAnonymousUser(userId)) {
+    return anonymousSessionService.incrementPlaybookCount(userId, videoId);
+  }
+
+  try {
+    if (useMockMode || !firestore) {
+      let user = mockUsers.get(userId) || { userId, tier: 'free', playbookIdsThisMonth: [] };
+      user.playbookIdsThisMonth = user.playbookIdsThisMonth || [];
+      if (videoId && !user.playbookIdsThisMonth.includes(videoId)) {
+        user.playbookIdsThisMonth.push(videoId);
+      }
+      mockUsers.set(userId, user);
+      return true;
+    }
+
+    const ref = firestore.collection('users').doc(userId);
+    const userDoc = await ref.get();
+    if (!userDoc.exists) {
+      await ref.set({
+        userId,
+        tier: 'free',
+        playbookIdsThisMonth: videoId ? [videoId] : [],
+        questionsThisMonth: 0,
+        createdAt: new Date(),
+        lastResetDate: new Date()
+      });
+      return true;
+    }
+
+    const ids = userDoc.data().playbookIdsThisMonth || [];
+    if (videoId && !ids.includes(videoId)) {
+      await ref.update({
+        playbookIdsThisMonth: [...ids, videoId],
+        updatedAt: new Date()
+      });
+    }
+    return true;
+  } catch (error) {
+    console.error('Error incrementing playbook count:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   checkQuestionQuota,
   checkVideoQuota,
   checkChannelQuota,
+  checkPlaybookQuota,
   incrementQuestionCount,
   incrementVideoCount,
   incrementChannelCount,
+  incrementPlaybookCount,
   getRemainingQuestions,
   isAnonymousUser
 };

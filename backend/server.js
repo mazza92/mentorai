@@ -147,11 +147,17 @@ app.use('/api/triple-index', require('./routes/tripleIndexRoutes')); // Triple-l
 app.use('/api/export', require('./routes/export'));
 app.use('/api/subscriptions', subscriptionsRouter); // Stripe subscriptions (webhook is registered above with raw body)
 app.use('/api/channel', channelLimiter, require('./routes/channel')); // YouTube channel import
+app.use('/api/search', channelLimiter, require('./routes/search')); // Value-ranked YouTube search
+app.use('/api/playbook', qaLimiter, require('./routes/playbook')); // On-demand video playbooks
 app.use('/api/public-insights', require('./routes/publicInsights')); // Public SEO pages (pSEO)
 
-// Test helpers (DEVELOPMENT ONLY - disable in production)
+// Test helpers (DEVELOPMENT ONLY - skip if the file is missing)
 if (process.env.NODE_ENV !== 'production') {
-  app.use('/api/test', require('./routes/test-helpers'));
+  try {
+    app.use('/api/test', require('./routes/test-helpers'));
+  } catch (err) {
+    console.warn('Test helpers not loaded:', err.message);
+  }
 }
 
 app.listen(PORT, () => {

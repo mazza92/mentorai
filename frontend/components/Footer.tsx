@@ -23,7 +23,7 @@ export default function Footer() {
               <span className="text-xl font-bold text-white">Lurnia</span>
             </div>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Transform YouTube channels into searchable knowledge bases with AI-powered Q&A.
+              Don&apos;t trust the thumbnail. We rank what actually made people sharper, then steal the playbook.
             </p>
           </div>
 
@@ -31,6 +31,11 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Product</h3>
             <ul className="space-y-3">
+              <li>
+                <Link href="/learn" className="text-slate-400 hover:text-white transition-colors text-sm">
+                  Ranked topics
+                </Link>
+              </li>
               <li>
                 <Link href="/guides" className="text-slate-400 hover:text-white transition-colors text-sm">
                   {t('header.guides')}

@@ -6,17 +6,16 @@
   let currentVideoId = null;
   let videoElement = null;
 
-  /**
-   * Initialize the content script
-   */
+  function pingReady() {
+    try {
+      chrome.runtime.sendMessage({ type: 'YOUTUBE_READY' }, () => void chrome.runtime.lastError);
+    } catch (_) {}
+  }
+
   function init() {
-    // Detect video on page load
+    pingReady();
     detectVideo();
-
-    // Watch for URL changes (YouTube is a SPA)
     observeUrlChanges();
-
-    // Listen for messages from popup
     chrome.runtime.onMessage.addListener(handleMessage);
   }
 
@@ -42,11 +41,26 @@
         break;
 
       case 'GET_TRANSCRIPT':
-        // Fetch transcript client-side (bypasses server IP blocking)
-        fetchTranscript()
-          .then(result => sendResponse(result))
-          .catch(err => sendResponse({ success: false, error: err.message }));
-        return true; // Keep channel open for async
+        // Prefer the in-page collector (captions + auto-transcript + cache)
+        chrome.runtime.sendMessage(
+          { type: 'COLLECT_VIDEO_DATA', videoId: currentVideoId || new URL(location.href).searchParams.get('v') },
+          (response) => {
+            if (response?.success && (response.data?.timedTranscript || response.data?.transcript)) {
+              sendResponse({
+                success: true,
+                text: response.data.timedTranscript || response.data.transcript,
+                segments: response.data.segments || [],
+                language: response.data.language,
+                charCount: (response.data.timedTranscript || response.data.transcript || '').length
+              });
+              return;
+            }
+            fetchTranscript()
+              .then(result => sendResponse(result))
+              .catch(err => sendResponse({ success: false, error: err.message }));
+          }
+        );
+        return true;
 
       case 'PING':
         sendResponse({ success: true });
@@ -499,10 +513,58 @@
           notifyVideoDetected();
         }
       }
+      mountWatchBar(videoId || currentVideoId);
     } else {
       currentVideoId = null;
       videoElement = null;
+      unmountWatchBar();
     }
+  }
+
+  /**
+   * Compact watch-page actions matching the site: steal playbook, then ask
+   */
+  function mountWatchBar(videoId) {
+    if (!videoId || sessionStorage.getItem('lurnia_watch_bar_hidden') === '1') {
+      unmountWatchBar();
+      return;
+    }
+    if (location.pathname.startsWith('/shorts')) {
+      unmountWatchBar();
+      return;
+    }
+
+    let bar = document.getElementById('lurnia-watch-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'lurnia-watch-bar';
+      bar.className = 'lurnia-watch-bar';
+      bar.innerHTML = `
+        <span class="lurnia-live"><span class="lurnia-live-dot"></span>Ready</span>
+        <button type="button" class="lurnia-watch-playbook" data-action="playbook">Steal playbook</button>
+        <button type="button" class="lurnia-watch-ask" data-action="ask">Ask</button>
+        <button type="button" class="lurnia-watch-close" data-action="close" aria-label="Hide Lurnia">×</button>
+      `;
+      bar.addEventListener('click', (e) => {
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        if (!action) return;
+        const id = bar.dataset.videoId;
+        if (action === 'playbook' && id) {
+          window.open(`https://lurnia.app/v/${id}?ref=extension`, '_blank', 'noopener');
+        } else if (action === 'ask') {
+          chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
+        } else if (action === 'close') {
+          sessionStorage.setItem('lurnia_watch_bar_hidden', '1');
+          unmountWatchBar();
+        }
+      });
+      document.documentElement.appendChild(bar);
+    }
+    bar.dataset.videoId = videoId;
+  }
+
+  function unmountWatchBar() {
+    document.getElementById('lurnia-watch-bar')?.remove();
   }
 
   /**
@@ -671,6 +733,7 @@
     const observer = new MutationObserver(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
+        pingReady();
         detectVideo();
       }
     });
@@ -684,7 +747,10 @@
     window.addEventListener('popstate', detectVideo);
 
     // And yt-navigate-finish for YouTube's internal navigation
-    window.addEventListener('yt-navigate-finish', detectVideo);
+    window.addEventListener('yt-navigate-finish', () => {
+      pingReady();
+      detectVideo();
+    });
   }
 
   // Initialize when DOM is ready

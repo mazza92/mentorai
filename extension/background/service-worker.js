@@ -1,5 +1,8 @@
 // Lurnia Extension - Background Service Worker
 
+import { collectVideoData, getCachedVideoData } from './youtubeCollector.js';
+import { searchValueVideos } from './valueSearch.js';
+
 const API_BASE = 'https://mentorai-production.up.railway.app/api';
 // const API_BASE = 'http://localhost:3001/api'; // Development
 
@@ -38,6 +41,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true; // Keep channel open for async
 
+    case 'COLLECT_VIDEO_DATA':
+      collectVideoData(message.tabId || sender.tab?.id, message.videoId)
+        .then((data) => sendResponse({ success: true, data }))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'GET_CACHED_VIDEO_DATA':
+      getCachedVideoData(message.videoId)
+        .then((data) => sendResponse({ success: true, data }))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'ENSURE_CONTENT_SCRIPT':
+      ensureContentScript(message.tabId)
+        .then(() => sendResponse({ success: true }))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'SEARCH_VALUE_VIDEOS':
+      searchValueVideos(message.query, message.options || {})
+        .then((videos) => sendResponse({ success: true, videos }))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+
     case 'GET_PENDING_ANSWER':
       // Check if there's a pending or completed answer
       getPendingAnswer(message.videoId)
@@ -47,6 +74,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'CLEAR_PENDING_ANSWER':
       chrome.storage.local.remove(`pending_answer_${message.videoId}`);
+      sendResponse({ success: true });
+      break;
+
+    case 'YOUTUBE_READY':
+      syncToolbarBadge(sender.tab).catch(() => {});
+      sendResponse({ success: true });
+      break;
+
+    case 'OPEN_POPUP':
+      chrome.action.openPopup().catch(() => {
+        paintReadyBadge(true, sender.tab?.id);
+      });
       sendResponse({ success: true });
       break;
 
@@ -92,7 +131,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * Process a question in the background
  */
 async function processQuestion(data) {
-  const { videoId, question, videoTitle, channelName, transcript, videoLanguage, userId, chatHistory } = data;
+  const {
+    videoId,
+    question,
+    videoTitle,
+    channelName,
+    transcript,
+    videoLanguage,
+    userId,
+    chatHistory,
+    comments,
+    videoDescription,
+    transcriptSource,
+    tabId
+  } = data;
+
+  let resolvedTranscript = transcript;
+  let resolvedComments = comments || [];
+  let resolvedDescription = videoDescription || '';
+  let resolvedLanguage = videoLanguage;
+  let resolvedSource = transcriptSource || '';
+  let resolvedTitle = videoTitle;
+  let resolvedChannel = channelName;
+
+  if ((!resolvedTranscript || resolvedComments.length === 0) && tabId && videoId) {
+    try {
+      const collected = await collectVideoData(tabId, videoId);
+      if (collected) {
+        resolvedTranscript = resolvedTranscript || collected.timedTranscript || collected.transcript;
+        resolvedComments = resolvedComments.length ? resolvedComments : (collected.comments || []);
+        resolvedDescription = resolvedDescription || collected.description || '';
+        resolvedLanguage = resolvedLanguage || collected.language;
+        resolvedSource = resolvedSource || collected.source;
+        resolvedTitle = resolvedTitle || collected.title;
+        resolvedChannel = resolvedChannel || collected.channel;
+      }
+    } catch (collectErr) {
+      console.warn('[Lurnia] Background collect failed:', collectErr.message);
+    }
+  }
 
   // Mark as processing
   await chrome.storage.local.set({
@@ -110,12 +187,15 @@ async function processQuestion(data) {
       body: JSON.stringify({
         videoId,
         question,
-        videoTitle,
-        channelName,
+        videoTitle: resolvedTitle,
+        channelName: resolvedChannel,
         userId,
-        transcript,
-        videoLanguage,
-        chatHistory: chatHistory || [] // Pass conversation history
+        transcript: resolvedTranscript,
+        videoLanguage: resolvedLanguage,
+        chatHistory: chatHistory || [],
+        comments: resolvedComments,
+        videoDescription: resolvedDescription,
+        transcriptSource: resolvedSource
       })
     });
 
@@ -165,15 +245,120 @@ async function getPendingAnswer(videoId) {
  */
 function handleVideoDetected(videoData, tab) {
   console.log('[Lurnia] Video detected:', videoData.videoId);
+  syncToolbarBadge(tab).catch(() => {});
 
-  // Update badge to show we're ready
-  chrome.action.setBadgeText({ text: '!', tabId: tab.id });
-  chrome.action.setBadgeBackgroundColor({ color: '#3b82f6', tabId: tab.id });
+  // Prefetch transcript + comments while the user is still on the watch page
+  if (tab?.id && videoData.videoId) {
+    collectVideoData(tab.id, videoData.videoId)
+      .then((data) => {
+        const captionCount = data?.segments?.length || 0;
+        const commentCount = data?.comments?.length || 0;
+        console.log('[Lurnia] Prefetch complete:', captionCount, 'segments,', commentCount, 'comments');
+      })
+      .catch((err) => console.warn('[Lurnia] Prefetch failed:', err.message));
+  }
+}
 
-  // Clear badge after a few seconds
-  setTimeout(() => {
-    chrome.action.setBadgeText({ text: '', tabId: tab.id });
-  }, 3000);
+function isYouTubeUrl(url) {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./i, '').toLowerCase();
+    return host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtu.be';
+  } catch (_) {
+    return false;
+  }
+}
+
+function paintReadyBadge(on, tabId) {
+  const text = on ? 'ON' : '';
+  const title = on
+    ? 'Lurnia is ready on YouTube. Click to find signal or steal a playbook'
+    : 'Lurnia';
+  const scoped = tabId ? { tabId } : {};
+  chrome.action.setBadgeText({ text, ...scoped });
+  if (on) {
+    chrome.action.setBadgeBackgroundColor({ color: '#059669', ...scoped });
+    if (chrome.action.setBadgeTextColor) {
+      chrome.action.setBadgeTextColor({ color: '#ffffff', ...scoped });
+    }
+  }
+  chrome.action.setTitle({ title, ...scoped });
+}
+
+async function syncToolbarBadge(tab) {
+  let active = tab;
+  try {
+    if (!active?.url || active.active === false) {
+      const [found] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (found) active = found;
+    }
+  } catch (_) {}
+
+  let url = active?.url || active?.pendingUrl || '';
+  if (!isYouTubeUrl(url)) {
+    try {
+      const [ytTab] = await chrome.tabs.query({
+        active: true,
+        lastFocusedWindow: true,
+        url: [
+          'https://www.youtube.com/*',
+          'https://youtube.com/*',
+          'https://m.youtube.com/*',
+          'https://youtu.be/*'
+        ]
+      });
+      if (ytTab) {
+        active = ytTab;
+        url = ytTab.url || ytTab.pendingUrl || '';
+      }
+    } catch (_) {}
+  }
+
+  const on = isYouTubeUrl(url);
+  paintReadyBadge(on);
+  if (active?.id) paintReadyBadge(on, active.id);
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== 'complete' && !changeInfo.url) return;
+  const on = isYouTubeUrl(tab?.url || '');
+  paintReadyBadge(on, tabId);
+  if (tab?.active) syncToolbarBadge(tab).catch(() => {});
+});
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    await syncToolbarBadge(tab);
+  } catch (_) {}
+});
+
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, windowId });
+    await syncToolbarBadge(tab);
+  } catch (_) {}
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  syncToolbarBadge().catch(() => {});
+});
+
+syncToolbarBadge().catch(() => {});
+
+async function ensureContentScript(tabId) {
+  if (!tabId) throw new Error('Missing tabId');
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+    return true;
+  } catch (_) {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content/youtube-detector.js']
+    });
+    return true;
+  }
 }
 
 /**
@@ -477,9 +662,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
     if (tab.url.includes('youtube.com/watch')) {
       // Ping content script to make sure it's active
-      chrome.tabs.sendMessage(tabId, { type: 'PING' }).catch(() => {
-        // Content script not loaded, might need to inject
-        console.log('[Lurnia] Content script not responding on tab', tabId);
+      ensureContentScript(tabId).catch((err) => {
+        console.log('[Lurnia] Content script inject failed on tab', tabId, err.message);
       });
     }
   }
@@ -489,19 +673,30 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
  * Context menu for quick access (optional feature)
  */
 chrome.runtime.onInstalled.addListener(() => {
-  // Create context menu item
-  chrome.contextMenus.create({
-    id: 'lurnia-ask',
-    title: 'Ask Lurnia about this video',
-    contexts: ['page'],
-    documentUrlPatterns: ['*://*.youtube.com/watch*']
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'lurnia-playbook',
+      title: 'Steal playbook with Lurnia',
+      contexts: ['page'],
+      documentUrlPatterns: ['*://*.youtube.com/watch*']
+    });
+    chrome.contextMenus.create({
+      id: 'lurnia-ask',
+      title: 'Ask this video with Lurnia',
+      contexts: ['page'],
+      documentUrlPatterns: ['*://*.youtube.com/watch*']
+    });
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  const videoId = tab?.url ? new URL(tab.url).searchParams.get('v') : null;
+  if (info.menuItemId === 'lurnia-playbook' && videoId) {
+    chrome.tabs.create({ url: `https://lurnia.app/v/${videoId}?ref=extension` });
+    return;
+  }
   if (info.menuItemId === 'lurnia-ask') {
-    // Open popup
-    chrome.action.openPopup();
+    chrome.action.openPopup().catch(() => {});
   }
 });
 
