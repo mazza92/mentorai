@@ -134,7 +134,7 @@ class PlaybookService {
     try {
       const transcript = await Promise.race([
         youtubeInnertubeService.fetchTranscript(videoId, { skipSlowFallback: true }),
-        new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 4000))
+        new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 12000))
       ]);
       if (transcript?.timedOut) {
         console.warn(`[Playbook] Caption fetch timed out for ${videoId}`);

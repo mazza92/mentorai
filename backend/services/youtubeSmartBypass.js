@@ -45,11 +45,11 @@ class YouTubeSmartBypass {
     // Android client config (backup strategy)
     this.androidClient = {
       clientName: 'ANDROID',
-      clientVersion: '19.09.37',
-      androidSdkVersion: 30,
-      userAgent: 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
+      clientVersion: '20.10.38',
+      androidSdkVersion: 35,
+      userAgent: 'com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip',
       osName: 'Android',
-      osVersion: '11'
+      osVersion: '14'
     };
 
     // TV client (another backup)
@@ -131,19 +131,10 @@ class YouTubeSmartBypass {
           const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
 
           if (track && track.baseUrl) {
-            // Download caption file - request JSON3 format explicitly
-            const captionUrl = track.baseUrl.includes('?')
-              ? `${track.baseUrl}&fmt=json3`
-              : `${track.baseUrl}?fmt=json3`;
-
-            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
-
-            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
-
-            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
-            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
-
-            const transcript = this.parseJSON3Captions(captionResponse.data);
+            const transcript = await this.downloadCaptionTrack(
+              track.baseUrl,
+              `https://www.youtube.com/watch?v=${videoId}`
+            );
 
             console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
             console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
@@ -207,19 +198,10 @@ class YouTubeSmartBypass {
           const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
 
           if (track && track.baseUrl) {
-            // Download caption file - request JSON3 format explicitly
-            const captionUrl = track.baseUrl.includes('?')
-              ? `${track.baseUrl}&fmt=json3`
-              : `${track.baseUrl}?fmt=json3`;
-
-            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
-
-            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
-
-            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
-            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
-
-            const transcript = this.parseJSON3Captions(captionResponse.data);
+            const transcript = await this.downloadCaptionTrack(
+              track.baseUrl,
+              `https://www.youtube.com/watch?v=${videoId}`
+            );
 
             console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
             console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
@@ -367,13 +349,13 @@ class YouTubeSmartBypass {
             const track = tracks.find(t => t.languageCode === 'en') || tracks[0];
 
             if (track && track.baseUrl) {
-              // Download caption file - request JSON3 format explicitly
-              const captionUrl = track.baseUrl.includes('?')
-                ? `${track.baseUrl}&fmt=json3`
-                : `${track.baseUrl}?fmt=json3`;
-
-              const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
-              const transcript = this.parseJSON3Captions(captionResponse.data);
+              const transcript = await this.downloadCaptionTrack(
+                track.baseUrl,
+                `https://www.youtube.com/embed/${videoId}`
+              );
+              if (!this.transcriptHasText(transcript)) {
+                throw new Error('Empty caption data');
+              }
 
               this.strategyStats.embed.success++;
               const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -434,19 +416,10 @@ class YouTubeSmartBypass {
           const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
 
           if (track && track.baseUrl) {
-            // Download caption file - request JSON3 format explicitly
-            const captionUrl = track.baseUrl.includes('?')
-              ? `${track.baseUrl}&fmt=json3`
-              : `${track.baseUrl}?fmt=json3`;
-
-            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
-
-            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
-
-            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
-            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
-
-            const transcript = this.parseJSON3Captions(captionResponse.data);
+            const transcript = await this.downloadCaptionTrack(
+              track.baseUrl,
+              `https://www.youtube.com/watch?v=${videoId}`
+            );
 
             console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
             console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
@@ -525,19 +498,10 @@ class YouTubeSmartBypass {
           const track = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
 
           if (track && track.baseUrl) {
-            // Download caption file - request JSON3 format explicitly
-            const captionUrl = track.baseUrl.includes('?')
-              ? `${track.baseUrl}&fmt=json3`
-              : `${track.baseUrl}?fmt=json3`;
-
-            console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
-
-            const captionResponse = await axios.get(captionUrl, { timeout: 10000 });
-
-            console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
-            console.log(`[SmartBypass] Caption response sample: ${JSON.stringify(captionResponse.data).substring(0, 300)}...`);
-
-            const transcript = this.parseJSON3Captions(captionResponse.data);
+            const transcript = await this.downloadCaptionTrack(
+              track.baseUrl,
+              `https://www.youtube.com/watch?v=${videoId}`
+            );
 
             console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
             console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
@@ -753,6 +717,140 @@ class YouTubeSmartBypass {
     return text.replace(/&[^;]+;/g, entity => entities[entity] || entity);
   }
 
+  walkFind(obj, predicate, acc = []) {
+    if (!obj || typeof obj !== 'object') return acc;
+    if (predicate(obj)) acc.push(obj);
+    const values = Array.isArray(obj) ? obj : Object.values(obj);
+    for (const value of values) {
+      if (value && typeof value === 'object') this.walkFind(value, predicate, acc);
+    }
+    return acc;
+  }
+
+  runsText(runs) {
+    return (runs || []).map((r) => r.text || '').join('');
+  }
+
+  findTranscriptParams(data) {
+    const nodes = this.walkFind(data, (n) => n.getTranscriptEndpoint?.params);
+    if (nodes[0]?.getTranscriptEndpoint?.params) return nodes[0].getTranscriptEndpoint.params;
+    const panels = this.walkFind(data, (n) => {
+      const id = n.engagementPanelSectionListRenderer?.panelIdentifier || n.identifier || '';
+      return typeof id === 'string' && id.toLowerCase().includes('transcript');
+    });
+    for (const panel of panels) {
+      const nested = this.walkFind(panel, (n) => n.getTranscriptEndpoint?.params);
+      if (nested[0]?.getTranscriptEndpoint?.params) return nested[0].getTranscriptEndpoint.params;
+    }
+    return null;
+  }
+
+  parseTranscriptApi(data) {
+    const nodes = this.walkFind(data, (n) => n.transcriptSegmentRenderer);
+    const segments = nodes.map((n) => {
+      const r = n.transcriptSegmentRenderer;
+      const text = this.runsText(r.snippet?.runs) || r.snippet?.simpleText || '';
+      return {
+        text: text.trim(),
+        start: (parseInt(r.startMs || r.startTimeMs || 0, 10) || 0) / 1000,
+        duration: (parseInt(r.durationMs || 0, 10) || 0) / 1000
+      };
+    }).filter((s) => s.text);
+    const text = segments.map((s) => s.text).join(' ').trim();
+    return {
+      text,
+      segments,
+      wordCount: text.split(/\s+/).filter(Boolean).length
+    };
+  }
+
+  async fetchViaGetTranscript(videoId) {
+    const startTime = Date.now();
+    console.log(`[SmartBypass] 📝 Strategy: get_transcript for ${videoId}`);
+    this.strategyStats.get_transcript = this.strategyStats.get_transcript || { success: 0, failures: 0 };
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': this.webClient.userAgent,
+        'X-YouTube-Client-Name': '1',
+        'X-YouTube-Client-Version': this.webClient.clientVersion
+      };
+      const next = await axios.post(
+        'https://www.youtube.com/youtubei/v1/next',
+        { videoId, context: { client: this.webClient } },
+        { headers, timeout: 12000 }
+      );
+      const params = this.findTranscriptParams(next.data);
+      if (!params) throw new Error('No transcript params in next()');
+
+      const transcriptRes = await axios.post(
+        'https://www.youtube.com/youtubei/v1/get_transcript',
+        { context: { client: this.webClient }, params },
+        { headers, timeout: 12000 }
+      );
+      const transcript = this.parseTranscriptApi(transcriptRes.data);
+      if (!this.transcriptHasText(transcript)) throw new Error('Empty get_transcript payload');
+
+      this.strategyStats.get_transcript.success++;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[SmartBypass] ✅ get_transcript worked (${elapsed}s, ${transcript.wordCount} words)`);
+      return { success: true, transcript, strategy: 'get_transcript', fetchTime: elapsed };
+    } catch (error) {
+      this.strategyStats.get_transcript.failures++;
+      console.log(`[SmartBypass] ❌ get_transcript failed: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async fetchViaTimedTextList(videoId) {
+    const startTime = Date.now();
+    console.log(`[SmartBypass] 📋 Strategy: timedtext list for ${videoId}`);
+    this.strategyStats.timedtext_list = this.strategyStats.timedtext_list || { success: 0, failures: 0 };
+    try {
+      const list = await axios.get(`https://www.youtube.com/api/timedtext?type=list&v=${videoId}`, {
+        timeout: 8000,
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          'Referer': `https://www.youtube.com/watch?v=${videoId}`
+        }
+      });
+      const xml = String(list.data || '');
+      const tracks = [];
+      const re = /<track\b([^>]*)\/?>/gi;
+      let match;
+      while ((match = re.exec(xml))) {
+        const attrs = match[1];
+        const get = (name) => {
+          const found = attrs.match(new RegExp(`${name}="([^"]*)"`, 'i'));
+          return found ? found[1] : '';
+        };
+        tracks.push({ lang: get('lang_code') || 'en', kind: get('kind'), name: get('name') });
+      }
+      if (!tracks.length) throw new Error('No timedtext tracks listed');
+      tracks.sort((a, b) => Number(b.kind !== 'asr') - Number(a.kind !== 'asr'));
+      for (const track of tracks.slice(0, 4)) {
+        const url = new URL('https://www.youtube.com/api/timedtext');
+        url.searchParams.set('v', videoId);
+        url.searchParams.set('lang', track.lang);
+        if (track.kind) url.searchParams.set('kind', track.kind);
+        if (track.name) url.searchParams.set('name', track.name);
+        try {
+          const transcript = await this.downloadCaptionTrack(url.toString(), `https://www.youtube.com/watch?v=${videoId}`);
+          if (this.transcriptHasText(transcript)) {
+            this.strategyStats.timedtext_list.success++;
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            return { success: true, transcript, strategy: 'timedtext_list', fetchTime: elapsed };
+          }
+        } catch (_) {}
+      }
+      throw new Error('Listed tracks were empty');
+    } catch (error) {
+      this.strategyStats.timedtext_list.failures++;
+      console.log(`[SmartBypass] ❌ timedtext list failed: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
   /**
    * Main method: Try all strategies in order until one works
    */
@@ -770,12 +868,14 @@ class YouTubeSmartBypass {
     // Strategy order (best to worst based on production success rates)
     // Android: ~10% success, Direct: HTML scraping (very promising), Web: new desktop, others: 0%
     const strategies = [
-      () => this.fetchViaAndroid(videoId),  // BEST: 10.5% success rate
-      () => this.fetchViaDirect(videoId),   // NEW: Direct HTML scraping, bypasses APIs
-      () => this.fetchViaWeb(videoId),      // NEW: Desktop browser, API-based
-      () => this.fetchViaEmbed(videoId),    // Worth trying
-      () => this.fetchViaTV(videoId),       // Backup
-      () => this.fetchViaIOS(videoId)       // LAST: 0% + LOGIN_REQUIRED issues
+      () => this.fetchViaGetTranscript(videoId),
+      () => this.fetchViaAndroid(videoId),
+      () => this.fetchViaTimedTextList(videoId),
+      () => this.fetchViaDirect(videoId),
+      () => this.fetchViaWeb(videoId),
+      () => this.fetchViaEmbed(videoId),
+      () => this.fetchViaTV(videoId),
+      () => this.fetchViaIOS(videoId)
     ];
 
     let lastError = null;
@@ -787,7 +887,7 @@ class YouTubeSmartBypass {
         // Add delay between strategies (but not before first one)
         // Small delay to avoid overwhelming YouTube when trying multiple strategies
         if (i > 0) {
-          const delay = 500 + Math.random() * 500; // 500-1000ms between retries
+          const delay = 120 + Math.random() * 180;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
 

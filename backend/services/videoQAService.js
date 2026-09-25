@@ -160,13 +160,24 @@ class VideoQAService {
         context += `[${timestamp}] ${currentSentence.trim()}\n`;
       }
       context += '\n';
-    } else if (transcript && transcript.text) {
+    } else if (transcript && String(transcript.text || '').trim()) {
       // Fallback: use plain text transcript (may already include [M:SS] timestamps)
       context += 'FULL VIDEO TRANSCRIPT:\n';
       context += 'This is the PRIMARY source of information.\n\n';
       context += `${transcript.text}\n\n`;
     } else {
-      context += 'NOTE: Spoken captions were not available. Answer from title, description, and comments. Do not invent spoken quotes. If the user wants a playbook, still extract the best steps you can from the description and comments. Never tell them to try a different video.\n\n';
+      context += 'SOURCE NOTE (internal, do not mention to the user): No spoken captions. Answer from title, description chapters, and comments. Do not invent spoken quotes or timestamps. Never mention missing captions. Never tell them to try another video.\n\n';
+    }
+
+    if (videoAnalysis && videoAnalysis.description) {
+      const chapters = this.parseDescriptionChapters(videoAnalysis.description);
+      if (chapters.length) {
+        context += 'CHAPTER TIMESTAMPS FROM DESCRIPTION (real times — cite these, do not invent others):\n';
+        chapters.forEach((chapter) => {
+          context += `[${chapter.clock}] ${chapter.title}\n`;
+        });
+        context += '\n';
+      }
     }
 
     if (videoAnalysis && Array.isArray(videoAnalysis.comments) && videoAnalysis.comments.length > 0) {
@@ -881,6 +892,29 @@ class VideoQAService {
   }
 
   /**
+   * Pull timestamped chapters out of a YouTube description.
+   */
+  parseDescriptionChapters(description) {
+    const chapters = [];
+    const re = /^[\s>*•\-]*((?:\d{1,2}:)?\d{1,2}:\d{2})\s+[-–—.]?\s*(.+)$/gm;
+    let match;
+    while ((match = re.exec(description || ''))) {
+      const title = match[2].replace(/\s+/g, ' ').trim();
+      if (title) chapters.push({ clock: match[1], title });
+    }
+    return chapters;
+  }
+
+  /**
+   * Steal-the-playbook / key points questions need numbered actions, not a summary.
+   */
+  isPlaybookQuestion(question) {
+    const q = String(question || '').toLowerCase();
+    return /\b(playbook|takeaways?|actionable|actionnable|key points?|what (can|should) i (skip|do)|steal|next steps?|setup steps?|how (do i|to) (set ?up|install|deploy))\b/i.test(q)
+      || /\b(points?\s+cl[eé]s?|a retenir|à retenir|vole le playbook)\b/i.test(q);
+  }
+
+  /**
    * Detect if the question is asking for a numbered list/enumeration
    */
   isEnumerationQuestion(question) {
@@ -929,8 +963,9 @@ class VideoQAService {
 
     // Detect if this is an enumeration question
     const isEnumeration = this.isEnumerationQuestion(userQuestion);
+    const isPlaybook = this.isPlaybookQuestion(userQuestion);
     const itemCount = this.extractItemCount(userQuestion);
-    console.log('Question type:', isEnumeration ? `Enumeration (${itemCount || 'multiple'} items)` : 'Explanation');
+    console.log('Question type:', isPlaybook ? 'Playbook' : isEnumeration ? `Enumeration (${itemCount || 'multiple'} items)` : 'Explanation');
 
     // Build context from video analysis
     const videoContext = this.buildVideoContext(videoAnalysis, transcript);
@@ -968,23 +1003,39 @@ IMPORTANT - RESPOND IN ENGLISH:
 - Use a friendly, helpful tone
 - Adapt your style to English conventions`;
 
-        const hasSpokenTranscript = !!(transcript && (transcript.text || (transcript.words && transcript.words.length)));
+        const hasSpokenTranscript = !!(transcript && (
+          String(transcript.text || '').trim()
+          || (transcript.words && transcript.words.length)
+        ));
         const noCaptionRule = hasSpokenTranscript ? '' : (isFrench ? `
 IMPORTANT - PAS DE SOUS-TITRES PARLÉS:
-- Tu as encore le titre, la description et les commentaires. Utilise-les.
-- Ne dis jamais que la vidéo n'a pas de captions comme seule réponse.
-- Ne dis jamais d'essayer une autre vidéo.
-- Si on demande un playbook, extraire le meilleur plan possible, en commençant par: "Je n'ai pas les captions parlées. D'après la description et les commentaires :"
+- Tu as le titre, les chapitres de la description, et les commentaires. C'est assez.
+- N'écris JAMAIS que les captions manquent. Pas de préambule. Réponds directement.
+- N'invente pas de citations parlées ni de timestamps hors chapitres/commentaires.
+- Si on demande un playbook ou des points clés: liste d'actions volables, pas un résumé.
 ` : `
 CRITICAL - NO SPOKEN CAPTIONS:
-- You still have the title, description, and comments. Use them.
-- Never say "this video does not have captions" as the whole answer.
-- Never tell the user to try a different video.
-- If they asked for a playbook, give the best takeaways you can from description and comments, and start with: "I don't have spoken captions for this one. From the description and comments:"
+- You have the title, description chapters, and comments. That is enough.
+- NEVER mention missing captions or "from the description". No preamble. Answer directly.
+- Do not invent spoken quotes or timestamps that are not in the chapters or comments.
+- If they asked for a playbook or key points: numbered stealable actions, not a summary.
 `);
 
         // Build format-specific instructions based on question type
-        const formatInstructions = isEnumeration ? `
+        const formatInstructions = isPlaybook ? `
+🚨 PLAYBOOK / KEY POINTS — STEALABLE STEPS ONLY:
+
+The user wants actions they can do today. Not a recap. Not a paragraph.
+
+1. Start with the first action. No intro. No "I don't have captions".
+2. Numbered list of 5-8 steps (or ${itemCount || 'the count they asked for'}).
+3. Each item:
+   N. **Verb-led move** [MM:SS if a chapter/comment has it]
+   What to do. The number, setting, or command if the source has one. Caveat if there is one.
+4. Last line: 🎯 **Next 10 min:** one concrete first click.
+5. Only cite timestamps that appear in chapters or comments. Never invent times.
+6. Forbidden: "the video explains", "from the description", "spoken captions", fluff recap.
+` : isEnumeration ? `
 🚨 ENUMERATION QUESTION DETECTED - CRITICAL NUMBERED LIST FORMATTING:
 
 The user wants a NUMBERED LIST. You MUST number EVERY SINGLE ITEM from 1 to ${itemCount || 'N'}.
@@ -1048,7 +1099,20 @@ The user wants a NUMBERED LIST. You MUST number EVERY SINGLE ITEM from 1 to ${it
    - "Let me break this down..."`;
 
         // Build examples based on question type
-        const exampleResponses = isEnumeration ? `
+        const exampleResponses = isPlaybook ? `
+EXAMPLE PLAYBOOK RESPONSE:
+
+1. **Deploy the one-click VPS template** [0:45]
+   Launch the Hostinger Hermes image from the dashboard. Caveat: finish DNS and SSH keys before you open the agent UI.
+
+2. **Connect the model with an OpenRouter key** [4:10]
+   Paste the key in the web dashboard. Caveat: set a spend cap so cron jobs cannot burn quota overnight.
+
+3. **Link the Telegram bot** [8:22]
+   Create the bot, drop the token in Hermes, then send /start from your own account first.
+
+🎯 **Next 10 min:** open the Hostinger template page and deploy. Do not start with the desktop app.
+` : isEnumeration ? `
 EXAMPLE ENUMERATION RESPONSES:
 
 ${isFrench ? `**Question**: "Donne moi les 10 business à lancer en 2026"
@@ -1159,7 +1223,11 @@ You are an expert teacher sharing knowledge, NOT someone describing a video.
 Be clear, helpful, and conversational.${chatHistoryContext ? (isFrench ? '\n\n⚠️ CONVERSATION EN COURS - NE PAS SALUER:\n- ❌ NE DITES PAS "Bonjour", "Salut", "Hello" ou autre salutation\n- ❌ NE DITES PAS "Bien sûr!", "Certainement!", "Voici..."\n- ✅ Répondez DIRECTEMENT à la question, comme dans une conversation fluide\n- ✅ Continuez naturellement en développant les explications précédentes' : '\n\n⚠️ ONGOING CONVERSATION - DO NOT GREET:\n- ❌ DO NOT say "Hello", "Hi", "Hey" or any greeting\n- ❌ DO NOT say "Sure!", "Of course!", "Here is..."\n- ✅ Answer DIRECTLY, like in a flowing conversation\n- ✅ Continue naturally, building on previous explanations') : ''}`;
 
         // Build prompt instruction based on question type
-        const promptInstruction = isEnumeration
+        const promptInstruction = isPlaybook
+          ? (isFrench
+              ? `Liste numérotée d'actions volables. Chaque ligne: "N. **Action** [MM:SS si connu]: ce qu'il faut faire + le caveat." Interdit: dire que les captions manquent. Termine par "🎯 Prochaines 10 min:" puis "Références: [timestamps]".`
+              : `Numbered stealable actions. Each line: "N. **Action** [MM:SS if known]: what to do + the caveat." Forbidden: mentioning missing captions. End with "🎯 Next 10 min:" then "References: [timestamps]".`)
+          : isEnumeration
           ? (isFrench
               ? `🚨🚨🚨 LISTE NUMÉROTÉE OBLIGATOIRE - RÈGLE ABSOLUE 🚨🚨🚨
 
