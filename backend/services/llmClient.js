@@ -96,7 +96,9 @@ async function generateWithGemini(prompt, { temperature, maxOutputTokens, json, 
         json
       });
       if (name !== (modelName || configuredModel())) {
-        console.warn(`[LLM] Using Gemini model ${name}`);
+        console.warn(`[LLM] Using Gemini model ${name} via v1beta`);
+      } else {
+        console.log(`[LLM] Gemini ${name} via v1beta`);
       }
       return text;
     } catch (error) {

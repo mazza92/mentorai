@@ -1,9 +1,10 @@
 const valueSearchService = require('./valueSearchService');
 const youtubeInnertubeService = require('./youtubeInnertubeService');
+const captionService = require('./captionService');
 const { getFirestore } = require('../config/firestore');
 const { generateText } = require('./llmClient');
 
-const SCHEMA = 'v3';
+const SCHEMA = 'v4';
 
 class PlaybookService {
   constructor() {
@@ -51,8 +52,10 @@ class PlaybookService {
     }
 
     const payload = await this.generate(videoId, lang);
-    this.memory.set(cacheKey, payload);
-    this.persist(cacheKey, payload);
+    if (payload.aiGenerated) {
+      this.memory.set(cacheKey, payload);
+      this.persist(cacheKey, payload);
+    }
     return payload;
   }
 
@@ -92,11 +95,11 @@ class PlaybookService {
       playbook = await this.generateContent(video, transcriptText, comments, lang, segments);
     } catch (err) {
       console.warn('[Playbook] LLM failed, extracting from source material:', err.message);
-      playbook = this.buildFromSources(video, transcriptText, comments, lang);
+      playbook = this.buildFromSources(video, transcriptText, comments, lang, segments);
       aiGenerated = false;
     }
 
-    console.log(`[Playbook] Ready for ${videoId} in ${((Date.now() - started) / 1000).toFixed(1)}s (captions: ${!!transcriptText})`);
+    console.log(`[Playbook] Ready for ${videoId} in ${((Date.now() - started) / 1000).toFixed(1)}s (captions: ${!!transcriptText}, ai: ${aiGenerated})`);
     return {
       video,
       transcriptAvailable: !!transcriptText,
@@ -129,29 +132,35 @@ class PlaybookService {
   }
 
   async fetchCaptionsFast(videoId) {
-    try {
-      const transcript = await Promise.race([
-        youtubeInnertubeService.fetchTranscript(videoId, { skipSlowFallback: true }),
-        new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 8000))
-      ]);
-      if (transcript?.timedOut) {
-        console.warn(`[Playbook] Caption fetch timed out for ${videoId}`);
-      }
-      if (transcript?.success) {
-        const text = String(transcript.text || transcript.transcript?.text || '').trim();
-        if (text) {
+    const sources = [
+      () => youtubeInnertubeService.fetchTranscript(videoId, { skipSlowFallback: true }),
+      () => captionService.fetchYouTubeCaptions(videoId)
+    ];
+    for (const fetch of sources) {
+      try {
+        const transcript = await Promise.race([
+          fetch(),
+          new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 12000))
+        ]);
+        if (transcript?.timedOut) {
+          console.warn(`[Playbook] Caption fetch timed out for ${videoId}`);
+          continue;
+        }
+        const text = String(transcript?.text || transcript?.transcript?.text || '').trim();
+        const segments = transcript?.segments || transcript?.transcript?.segments || [];
+        if (text.split(/\s+/).filter(Boolean).length >= 8) {
           return {
             success: true,
             text,
-            segments: transcript.segments || transcript.transcript?.segments || [],
-            source: transcript.source || transcript.strategy || null
+            segments,
+            source: transcript.source || transcript.strategy || 'captions'
           };
         }
+      } catch (err) {
+        console.warn('[Playbook] Transcript fetch failed:', err.message);
       }
-    } catch (err) {
-      console.warn('[Playbook] Transcript fetch failed:', err.message);
     }
-    return { success: false, text: '', source: null };
+    return { success: false, text: '', source: null, segments: [] };
   }
 
   async generateContent(video, transcriptText, comments, lang, segments = []) {
@@ -175,24 +184,32 @@ class PlaybookService {
       .slice(0, 16)
       .map((c, i) => `${i + 1}. @${c.author}: ${String(c.text || '').replace(/\s+/g, ' ').trim().slice(0, 240)}`)
       .join('\n');
+    const detectedFluff = this.detectFluffMoments(video, segments, chapters, isFr);
+    const fluffBlock = detectedFluff
+      .slice(0, 8)
+      .map((item) => `${item.timestampFormatted || '?'} [${item.kind}] ${item.title}: ${item.recap}`)
+      .join('\n');
 
     const prompt = `You are a senior YouTube editor writing a Lurnia playbook.
 Write in ${isFr ? 'French' : 'English'}. Never use an em dash. Return ONLY valid JSON.
 
 Job:
-- keyTakeaways: 4-6 lessons from the VIDEO (transcript, chapters, description). Never from comments. Title is the lesson. Detail is how to apply it now.
+- keyTakeaways: 4-6 lessons FROM THE VIDEO (transcript, chapters, description). Never from comments. Never copy a comment as a takeaway. Title is the lesson. Detail is the actionable plan: what to do today.
 - playbook: 4-6 ordered actions the viewer can run today. Timestamp if captions or chapters exist.
-- skipFluff: specific filler moments (intro hook, sponsor, ad, affiliate pitch, subscribe ask, recap padding). Each needs a clock time if known, a kind, and a one-line recap of what happens so the viewer can skip without missing a tactic.
-- viewerFeedback: 3-5 comments that teach something: a caveat, a result, a disagreement, or an honest testimony. Never empty praise.
+- skipFluff: specific filler MOMENTS with clock times. kinds: intro, sponsor, ad, affiliate, subscribe, padding, outro. Recap MUST say what happens in that beat (who is advertised, what the ask is, what the tangent is) so the viewer can skip without missing a tactic. Do not write generic lines like "skip the intro".
+- viewerFeedback: 3-5 comments that teach something: a caveat, a result, a disagreement, or an honest testimony. Never empty praise. Never use comments as keyTakeaways.
 - timestamps: 3-6 high-value moments to jump to. Not fluff.
 
-Do not invent timestamps. If there are no captions or chapters, use timestamp 0 and timestampFormatted "".
+Do not invent timestamps. Use CANDIDATE FLUFF MOMENTS and the timed transcript. If there are no captions or chapters, use timestamp 0 and timestampFormatted "".
 
 VIDEO: ${video.title} | ${video.channel} | ${Math.round((video.durationSec || 0) / 60)} min
 Views ${video.views} | Likes ${video.likes} | Comments ${video.comments}
 
 CHAPTERS:
 ${chapterBlock || '[None]'}
+
+CANDIDATE FLUFF MOMENTS (confirm, recap, keep real times):
+${fluffBlock || '[None found automatically. Scan the transcript for sponsors, ads, subscribe asks, and padding.]'}
 
 TRANSCRIPT:
 ${transcript || '[No captions. Use description and chapters only for takeaways. Do not invent timestamps.]'}
@@ -212,7 +229,7 @@ JSON:
   "keyTakeaways": [{ "title": "lesson", "detail": "how to use it now" }],
   "playbook": [{ "step": 1, "action": "imperative", "detail": "how now", "timestamp": 0, "timestampFormatted": "0:00" }],
   "skipFluff": [{ "kind": "sponsor", "timestamp": 0, "timestampFormatted": "M:SS", "title": "what to skip", "recap": "what happens in that moment" }],
-  "viewerFeedback": [{ "author": "name", "quote": "short", "insight": "why it matters" }],
+  "viewerFeedback": [{ "author": "name", "quote": "short", "insight": "why it matters", "kind": "caveat" }],
   "timestamps": [{ "timestamp": 0, "timestampFormatted": "M:SS", "title": "moment", "description": "why jump here" }],
   "suggestedQuestions": ["question"],
   "faqs": [{ "question": "...", "answer": "..." }]
@@ -224,7 +241,7 @@ JSON:
       maxOutputTokens: 4096,
       model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
     });
-    return this.normalizePlaybook(this.parseJson(text), video, comments, lang);
+    return this.normalizePlaybook(this.parseJson(text), video, comments, lang, transcriptText, segments);
   }
 
   parseJson(text) {
@@ -237,44 +254,78 @@ JSON:
     return JSON.parse(jsonText);
   }
 
-  normalizePlaybook(raw, video, comments, lang) {
+  normalizePlaybook(raw, video, comments, lang, transcriptText = '', segments = []) {
     const isFr = lang === 'fr';
-    const skipFluff = (raw.skipFluff || []).map((item) => {
-      if (typeof item === 'string') {
-        return { kind: 'padding', timestamp: 0, timestampFormatted: '', title: item, recap: item };
-      }
+    const chapters = this.parseChapters(video.description || '');
+    const detectedFluff = this.detectFluffMoments(video, segments, chapters, isFr);
+    const skipFluff = this.mergeFluff((raw.skipFluff || []).map((item) => this.normalizeFluffItem(item)), detectedFluff);
+
+    const viewerFeedback = (raw.viewerFeedback || []).map((item) => {
+      const quote = String(item.quote || item.text || '').replace(/\s+/g, ' ').trim().slice(0, 280);
       return {
-        kind: item.kind || 'padding',
-        timestamp: Number(item.timestamp) || 0,
-        timestampFormatted: item.timestampFormatted || (item.timestamp ? this.formatClock(item.timestamp) : ''),
-        title: String(item.title || item.recap || '').slice(0, 120),
-        recap: String(item.recap || item.title || '').slice(0, 280)
+        author: String(item.author || 'Viewer').replace(/^@/, '').slice(0, 40),
+        quote,
+        kind: item.kind || this.classifyComment(quote),
+        insight: String(item.insight || '').replace(/\s+/g, ' ').trim().slice(0, 220)
       };
-    }).filter((item) => item.title || item.recap);
+    }).filter((item) => item.quote.length >= 24 && !this.isPraiseComment(item.quote) && !this.looksLikeTakeawayDump(item.quote));
 
-    const viewerFeedback = (raw.viewerFeedback || []).map((item) => ({
-      author: String(item.author || 'Viewer').replace(/^@/, '').slice(0, 40),
-      quote: String(item.quote || item.text || '').replace(/\s+/g, ' ').trim().slice(0, 280),
-      insight: String(item.insight || '').replace(/\s+/g, ' ').trim().slice(0, 220)
-    })).filter((item) => item.quote.length >= 24 && !this.isPraiseComment(item.quote));
-
+    const commentTexts = (comments || []).map((c) => String(c.text || '').replace(/\s+/g, ' ').trim().toLowerCase());
     const keyTakeaways = (raw.keyTakeaways || [])
       .map((item) => ({
         title: String(item.title || '').replace(/\s+/g, ' ').trim().slice(0, 90),
         detail: String(item.detail || '').replace(/\s+/g, ' ').trim().slice(0, 360)
       }))
-      .filter((item) => item.title && item.detail && item.detail !== item.title && !item.detail.startsWith(item.title));
+      .filter((item) => {
+        if (!item.title || !item.detail || item.detail === item.title) return false;
+        const truncatedTitle = item.title.length >= 80 && !/[.!?]$/.test(item.title);
+        if (truncatedTitle && item.detail.startsWith(item.title.slice(0, 40))) return false;
+        const blob = `${item.title} ${item.detail}`.toLowerCase();
+        return !commentTexts.some((c) => c && c.length >= 40 && (c.startsWith(item.title.toLowerCase().slice(0, 40)) || blob.includes(c.slice(0, 80))));
+      });
 
     return {
       ...raw,
       headline: String(raw.headline || video.title).slice(0, 90),
-      keyTakeaways: keyTakeaways.length ? keyTakeaways : this.contentTakeaways(video, isFr),
+      keyTakeaways: keyTakeaways.length ? keyTakeaways : this.contentTakeaways(video, isFr, transcriptText),
       skipFluff,
       viewerFeedback: viewerFeedback.length ? viewerFeedback : this.commentFeedback(comments, isFr)
     };
   }
 
-  contentTakeaways(video, isFr) {
+  normalizeFluffItem(item) {
+    if (typeof item === 'string') {
+      return { kind: 'padding', timestamp: 0, timestampFormatted: '', title: item, recap: item };
+    }
+    const timestamp = Number(item.timestamp) || 0;
+    return {
+      kind: String(item.kind || 'padding').toLowerCase(),
+      timestamp,
+      timestampFormatted: item.timestampFormatted || (timestamp ? this.formatClock(timestamp) : ''),
+      title: String(item.title || item.recap || '').slice(0, 120),
+      recap: String(item.recap || item.title || '').slice(0, 280)
+    };
+  }
+
+  mergeFluff(llmItems, detected) {
+    const generic = /skip the (motivational )?intro|subscribe asks|sponsor reads and affiliate/i;
+    const usable = (llmItems || []).filter((item) => {
+      if (!item.title && !item.recap) return false;
+      if (generic.test(`${item.title} ${item.recap}`)) return false;
+      return (item.timestamp > 0 || item.timestampFormatted) || (item.recap && item.recap.length >= 40 && item.recap !== item.title);
+    });
+    if (usable.length >= 2) return usable.slice(0, 6);
+    const merged = [...usable];
+    for (const item of detected || []) {
+      const close = merged.some((existing) => Math.abs((existing.timestamp || 0) - (item.timestamp || 0)) < 25 && existing.kind === item.kind);
+      if (!close) merged.push(item);
+    }
+    return merged.slice(0, 6);
+  }
+
+  contentTakeaways(video, isFr, transcriptText = '') {
+    const fromTranscript = this.extractWorkflowTakeaways(transcriptText, isFr);
+    if (fromTranscript.length >= 3) return fromTranscript.slice(0, 6);
     const bullets = this.extractListItems(video.description || '');
     const chapters = this.parseChapters(video.description || '').filter((c) => !this.isFluffChapter(c.title));
     const seeds = bullets.length ? bullets : chapters.map((c) => c.title);
@@ -283,6 +334,7 @@ JSON:
       detail: String(text).slice(0, 280)
     }));
     if (rows.length) return rows;
+    if (fromTranscript.length) return fromTranscript;
     return [{
       title: isFr ? 'Utilisez les chapitres, pas le hook' : 'Use the chapters, not the hook',
       detail: isFr
@@ -291,27 +343,152 @@ JSON:
     }];
   }
 
+  extractWorkflowTakeaways(transcriptText, isFr) {
+    const text = String(transcriptText || '').replace(/\s+/g, ' ').trim();
+    if (text.length < 80) return [];
+    const rows = [];
+    const numbered = [...text.matchAll(/\b(?:the\s+)?(first|second|third|fourth|fifth|sixth|1st|2nd|3rd|4th|5th|6th|\d+)\s+(?:workflow|step|thing|habit|rule|principle)[^.!?]{12,220}/gi)];
+    for (const match of numbered) {
+      const sentence = match[0].replace(/\s+/g, ' ').trim();
+      const after = text.slice((match.index || 0) + match[0].length, (match.index || 0) + match[0].length + 180).replace(/\s+/g, ' ').trim();
+      rows.push({
+        title: sentence.split(/[,:]/)[0].slice(0, 72),
+        detail: `${sentence} ${after}`.replace(/\s+/g, ' ').trim().slice(0, 280)
+      });
+    }
+    if (rows.length >= 3) return rows.slice(0, 6);
+    const actionable = this.splitSentences(text).filter((s) =>
+      /\b(should|workflow|prompt|template|instead|do not|don't|first|then|set up|build|save|ask)\b/i.test(s)
+      && !/subscribe|like this video|comment below|smash that/i.test(s)
+    );
+    return actionable.slice(0, 6).map((sentence) => ({
+      title: sentence.split(/[,:]/)[0].slice(0, 72),
+      detail: isFr ? sentence.slice(0, 280) : sentence.slice(0, 280)
+    }));
+  }
+
   commentFeedback(comments, isFr) {
     return (comments || [])
       .map((c) => {
         const quote = String(c.text || '').replace(/\s+/g, ' ').trim();
+        const kind = this.classifyComment(quote);
         return {
           author: String(c.author || 'Viewer').replace(/^@/, ''),
           quote,
-          insight: this.isActionableComment(quote)
-            ? (isFr ? 'Un viewer pointe une application concrète.' : 'A viewer names a concrete application.')
-            : (isFr ? 'Retour d’usage, pas un like.' : 'Usage note, not a like.')
+          kind,
+          insight: this.feedbackInsight(kind, isFr)
         };
       })
-      .filter((item) => item.quote.length >= 40 && item.quote.length <= 320 && !this.isPraiseComment(item.quote) && !/https?:\/\//i.test(item.quote))
+      .filter((item) => item.quote.length >= 40 && item.quote.length <= 420 && !this.isPraiseComment(item.quote) && !/https?:\/\//i.test(item.quote))
+      .sort((a, b) => Number(this.isActionableComment(b.quote)) - Number(this.isActionableComment(a.quote)))
       .slice(0, 5);
   }
 
-  isFluffChapter(title) {
-    return /intro|outro|sponsor|subscribe|thanks|ad break|self[-\s]?promo/i.test(title || '');
+  classifyComment(text) {
+    const t = String(text || '').toLowerCase();
+    if (/didn'?t work|doesn't work|warning|caveat|instead of|don'?t |problem is|watch out/i.test(t)) return 'caveat';
+    if (/landed|made \$|got (a )?client|increased|worked for me|result|booked/i.test(t)) return 'result';
+    if (/disagree|actually no|wrong|isn't true|overrated/i.test(t)) return 'disagreement';
+    if (/i (tried|built|use|switched|ran)|my (setup|workflow|stack)/i.test(t)) return 'testimony';
+    if (/ever thought|what if|you should|part 2|can you/i.test(t)) return 'request';
+    return 'insight';
   }
 
-  buildFromSources(video, transcriptText, comments, lang) {
+  feedbackInsight(kind, isFr) {
+    const map = isFr
+      ? { caveat: 'Mise en garde d’un viewer.', result: 'Résultat rapporté par un viewer.', disagreement: 'Désaccord utile.', testimony: 'Témoignage d’usage.', request: 'Demande de suite.', insight: 'Retour d’usage, pas un like.' }
+      : { caveat: 'A viewer flags a caveat.', result: 'A viewer reports a result.', disagreement: 'Useful disagreement.', testimony: 'Honest usage testimony.', request: 'A request for a follow-up.', insight: 'Usage note, not a like.' };
+    return map[kind] || map.insight;
+  }
+
+  looksLikeTakeawayDump(text) {
+    return /^(installing |the hard part|i show how|that is when|first time i)/i.test(String(text || '').trim());
+  }
+
+  isFluffChapter(title) {
+    return /intro|outro|sponsor|subscribe|thanks|ad break|self[-\s]?promo| ramble|coffee|let'?s get started/i.test(title || '');
+  }
+
+  detectFluffMoments(video, segments, chapters, isFr) {
+    const duration = Number(video.durationSec) || 0;
+    const items = [];
+    const push = (item) => {
+      if (!item?.title && !item?.recap) return;
+      const close = items.some((existing) => existing.kind === item.kind && Math.abs((existing.timestamp || 0) - (item.timestamp || 0)) < 20);
+      if (!close) items.push(item);
+    };
+
+    for (const chapter of chapters || []) {
+      if (!this.isFluffChapter(chapter.title) && !/sponsor|affiliate|ad |promo/i.test(chapter.title)) continue;
+      push({
+        kind: /sponsor|ad|affiliate/i.test(chapter.title) ? 'sponsor' : /intro/i.test(chapter.title) ? 'intro' : /outro/i.test(chapter.title) ? 'outro' : /subscribe/i.test(chapter.title) ? 'subscribe' : 'padding',
+        timestamp: chapter.timestamp,
+        timestampFormatted: chapter.timestampFormatted,
+        title: chapter.title,
+        recap: isFr
+          ? `Chapitre « ${chapter.title} ». Pas de tactique ici, vous pouvez sauter.`
+          : `This beat is “${chapter.title}”. No tactic here. Skip it.`
+      });
+    }
+
+    const segs = (segments || []).filter((s) => String(s.text || s.transcript || '').trim());
+    const snippet = (from, count) => segs.slice(from, from + count).map((s) => String(s.text || s.transcript).replace(/\s+/g, ' ').trim()).join(' ').slice(0, 180);
+
+    const patterns = [
+      { kind: 'sponsor', re: /this (video|episode) is (sponsored|brought to you)|thanks to (our )?(sponsor|partner)|sponsored by|use (code|promo)|discount code|affiliate link|link in (the )?description/i, title: isFr ? 'Sponsor / affilié' : 'Sponsor or affiliate pitch' },
+      { kind: 'padding', re: /grab (yourself )?a coffee|besides the point|holy moly|anyway.{0,30}(anyway|update)|this (has )?literally never happened/i, title: isFr ? 'Digression' : 'Tangent / padding' },
+      { kind: 'subscribe', re: /like (and subscribe|this video)|smash that|hit the bell|comment (below|workflow)|if you'?re new/i, title: isFr ? 'Appel à s’abonner' : 'Subscribe / like ask' },
+      { kind: 'outro', re: /see you (in the next|there)|thanks for watching|algorithm gods/i, title: isFr ? 'Outro' : 'Outro' }
+    ];
+
+    segs.forEach((seg, index) => {
+      const text = String(seg.text || seg.transcript || '');
+      const start = Math.round(seg.start || (seg.startMs ? seg.startMs / 1000 : 0) || (seg.offset ? seg.offset / 1000 : 0) || 0);
+      const ratio = duration ? start / duration : 0;
+      for (const pattern of patterns) {
+        if (!pattern.re.test(text)) continue;
+        if (pattern.kind === 'subscribe' && duration && ratio < 0.82) continue;
+        if (pattern.kind === 'outro' && duration && ratio < 0.85) continue;
+        push({
+          kind: pattern.kind,
+          timestamp: start,
+          timestampFormatted: this.formatClock(start),
+          title: pattern.title,
+          recap: snippet(index, 5) || text.slice(0, 180)
+        });
+      }
+    });
+
+    if (duration >= 480 && segs.length) {
+      const introText = snippet(0, 10);
+      if (/in this video|i'?m going to (show|walk)|the (hard|easy) part|before we (get|dive)/i.test(introText)) {
+        push({
+          kind: 'intro',
+          timestamp: 0,
+          timestampFormatted: '0:00',
+          title: isFr ? 'Hook / promesse' : 'Opening hook',
+          recap: introText
+        });
+      }
+    }
+
+    const description = String(video.description || '');
+    if (/sponsor|affiliat|use code|promo code/i.test(description) && !items.some((item) => item.kind === 'sponsor')) {
+      push({
+        kind: 'sponsor',
+        timestamp: 0,
+        timestampFormatted: '',
+        title: isFr ? 'Sponsor dans la description' : 'Sponsor mentioned in the description',
+        recap: isFr
+          ? 'La description cite un sponsor ou un lien affilié. Attendez le mid-roll, ce n’est pas la méthode.'
+          : 'The description cites a sponsor or affiliate link. Watch for the mid-roll; it is not the method.'
+      });
+    }
+
+    return items.slice(0, 6);
+  }
+
+  buildFromSources(video, transcriptText, comments, lang, segments = []) {
     const isFr = lang === 'fr';
     const description = video.description || '';
     const chapters = this.parseChapters(description);
@@ -321,7 +498,7 @@ JSON:
       .filter((t) => t.length >= 40 && t.length <= 420 && !/https?:\/\//i.test(t))
       .filter((t) => this.isActionableComment(t));
 
-    const keyTakeaways = this.contentTakeaways(video, isFr);
+    const keyTakeaways = this.contentTakeaways(video, isFr, transcriptText);
     const usefulChapters = chapters.filter((c) => !this.isFluffChapter(c.title));
     const bulletSteps = bullets.map((text) => ({ title: text.slice(0, 90), detail: text, description: text }));
     const defaultSteps = isFr
@@ -337,8 +514,9 @@ JSON:
           { title: 'Run one test now', description: 'Send or ship the smallest version of what they demonstrated.' },
           { title: 'Ignore the pitch', description: 'Park courses, Discords, and affiliate tools until the core move works.' }
         ];
-    const stepSeeds = usefulChapters.length ? usefulChapters : (bulletSteps.length ? bulletSteps : defaultSteps);
-    const playbookSteps = (stepSeeds.length ? stepSeeds : keyTakeaways).slice(0, 6).map((item, i) => {
+    const fromTakeaways = keyTakeaways.map((item) => ({ title: item.title, description: item.detail, detail: item.detail }));
+    const stepSeeds = usefulChapters.length ? usefulChapters : (bulletSteps.length ? bulletSteps : (fromTakeaways.length ? fromTakeaways : defaultSteps));
+    const playbookSteps = stepSeeds.slice(0, 6).map((item, i) => {
       const action = (item.title || item.action || String(item.detail || item).slice(0, 80)).replace(/^[0-9]+[\.\)]\s*/, '');
       return {
         step: i + 1,
@@ -365,7 +543,6 @@ JSON:
       answer: text.slice(0, 280)
     }));
 
-    const fluffChapters = chapters.filter((c) => this.isFluffChapter(c.title));
     const mins = Math.max(1, Math.round((video.durationSec || 0) / 60));
     return {
       headline: video.title.slice(0, 90),
@@ -373,30 +550,12 @@ JSON:
         ? `Playbook ${mins} min pour extraire des actions de « ${video.channel} ».`
         : `${mins}-min playbook: pull the usable moves from ${video.channel} without watching twice.`,
       whyThisNotClickbait: isFr
-        ? 'Les likes et commentaires sont élevés par rapport aux vues. On s’appuie sur la description et les chapitres, pas sur un résumé viral.'
-        : 'Engagement is high relative to views. This draft is built from the description and chapters, not a generic recap.',
+        ? 'Les likes et commentaires sont élevés par rapport aux vues. On s’appuie sur la description, les chapitres et le transcript, pas sur un résumé viral.'
+        : 'Engagement is high relative to views. This draft is built from the description, chapters, and captions, not a generic recap.',
       audience: this.inferAudience(`${video.title} ${description}`),
       keyTakeaways,
       playbook: playbookSteps,
-      skipFluff: fluffChapters.length
-        ? fluffChapters.slice(0, 4).map((c) => ({
-            kind: /sponsor|ad/i.test(c.title) ? 'sponsor' : /intro/i.test(c.title) ? 'intro' : /outro/i.test(c.title) ? 'outro' : 'padding',
-            timestamp: c.timestamp,
-            timestampFormatted: c.timestampFormatted,
-            title: c.title,
-            recap: isFr
-              ? `Passage « ${c.title} ». Pas de tactique ici, vous pouvez sauter.`
-              : `This beat is “${c.title}”. No tactic here. Skip it.`
-          }))
-        : [
-            {
-              kind: 'intro',
-              timestamp: 0,
-              timestampFormatted: '0:00',
-              title: isFr ? 'Intro motivation' : 'Motivational intro',
-              recap: isFr ? 'Hook et story. La méthode commence après.' : 'Hook and story. The method starts after this.'
-            }
-          ],
+      skipFluff: this.detectFluffMoments(video, segments, chapters, isFr),
       viewerFeedback: this.commentFeedback(comments, isFr),
       timestamps: usefulChapters.slice(0, 8),
       suggestedQuestions: suggestedQuestions.slice(0, 3),

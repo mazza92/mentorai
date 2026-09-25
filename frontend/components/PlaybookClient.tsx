@@ -33,7 +33,7 @@ interface PlaybookData {
     keyTakeaways: { title: string; detail: string }[]
     playbook: { step: number; action: string; detail: string; timestamp?: number; timestampFormatted?: string }[]
     skipFluff: Array<{ kind?: string; timestamp?: number; timestampFormatted?: string; title?: string; recap?: string } | string>
-    viewerFeedback?: { author: string; quote: string; insight?: string }[]
+    viewerFeedback?: { author: string; quote: string; insight?: string; kind?: string }[]
     timestamps: { timestamp: number; timestampFormatted: string; title: string; description: string }[]
     suggestedQuestions: string[]
     faqs: { question: string; answer: string }[]
@@ -220,7 +220,7 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
 
               <section className="mt-10">
                 <h2 className="text-2xl font-bold text-slate-900">Key takeaways</h2>
-                <p className="mt-1 text-sm text-slate-500">From the video, not the comment section.</p>
+                <p className="mt-1 text-sm text-slate-500">Lessons from the video, turned into a plan you can run today. Not comments.</p>
                 <div className="mt-4 grid gap-3">
                   {(data.playbook.keyTakeaways || []).map((item, i) => (
                     <div key={i} className="rounded-xl border border-indigo-50 bg-white p-4 shadow-sm shadow-indigo-500/5">
@@ -292,7 +292,7 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
                   <h2 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
                     <AlertTriangle className="h-6 w-6 text-amber-500" /> Skip the fluff
                   </h2>
-                  <p className="mt-1 text-sm text-slate-500">Specific filler beats. Jump past them.</p>
+                  <p className="mt-1 text-sm text-slate-500">Specific filler beats with a recap of what happens so you can skip ads, sponsors, and padding.</p>
                   <ul className="mt-4 space-y-2">
                     {data.playbook.skipFluff.map((item, i) => {
                       const fluff = typeof item === 'string'
@@ -318,7 +318,7 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
                             ) : null}
                             <span className="font-semibold">{fluff.title || fluff.recap}</span>
                           </div>
-                          {fluff.recap && fluff.recap !== fluff.title ? (
+                          {fluff.recap ? (
                             <p className="mt-1 text-amber-900/80">{fluff.recap}</p>
                           ) : null}
                         </li>
@@ -330,12 +330,19 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
 
               {(data.playbook.viewerFeedback || []).length > 0 && (
                 <section className="mt-10">
-                  <h2 className="text-2xl font-bold text-slate-900">From the comments</h2>
-                  <p className="mt-1 text-sm text-slate-500">Sentiment, caveats, and honest testimony. Not the lesson list.</p>
+                  <h2 className="text-2xl font-bold text-slate-900">Viewer feedback</h2>
+                  <p className="mt-1 text-sm text-slate-500">Sentiment, caveats, and honest testimony from comments. Separate from the lesson list.</p>
                   <ul className="mt-4 space-y-3">
                     {(data.playbook.viewerFeedback || []).map((item, i) => (
                       <li key={i} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                        <p className="text-sm font-semibold text-slate-800">@{item.author}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-800">@{item.author}</p>
+                          {item.kind ? (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                              {item.kind}
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="mt-1 text-sm text-slate-700">“{item.quote}”</p>
                         {item.insight ? <p className="mt-2 text-xs text-slate-500">{item.insight}</p> : null}
                       </li>

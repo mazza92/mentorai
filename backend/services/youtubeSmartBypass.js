@@ -303,28 +303,10 @@ class YouTubeSmartBypass {
         throw new Error('No valid caption track found');
       }
 
-      // Download caption file
-      const captionUrl = track.baseUrl.includes('?')
-        ? `${track.baseUrl}&fmt=json3`
-        : `${track.baseUrl}?fmt=json3`;
-
-      console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
-
-      const captionResponse = await axios.get(captionUrl, {
-        headers: {
-          'User-Agent': this.getRandomUserAgent(),
-          'Accept': '*/*',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Referer': watchUrl,
-          'Origin': 'https://www.youtube.com'
-        },
-        timeout: 10000
-      });
-
-      console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
-      console.log(`[SmartBypass] Caption response length: ${JSON.stringify(captionResponse.data).length}`);
-
-      const transcript = this.parseJSON3Captions(captionResponse.data);
+      const transcript = await this.downloadCaptionTrack(track.baseUrl, watchUrl);
+      if (!this.transcriptHasText(transcript)) {
+        throw new Error('Empty caption data');
+      }
 
       console.log(`[SmartBypass] Parsed transcript text length: ${transcript.text.length}`);
       console.log(`[SmartBypass] Parsed segments count: ${transcript.segments.length}`);
@@ -590,6 +572,46 @@ class YouTubeSmartBypass {
   /**
    * Parse JSON3 or XML captions to transcript
    */
+  transcriptHasText(transcript) {
+    const text = String(transcript?.text || '').trim();
+    const words = transcript?.wordCount || text.split(/\s+/).filter(Boolean).length;
+    return text.length >= 20 && words >= 8;
+  }
+
+  async downloadCaptionTrack(baseUrl, referer) {
+    const stripped = String(baseUrl || '').replace(/[?&]fmt=[^&]*/g, '');
+    const variants = [
+      stripped,
+      `${stripped}${stripped.includes('?') ? '&' : '?'}fmt=json3`,
+      `${stripped}${stripped.includes('?') ? '&' : '?'}fmt=srv3`,
+      `${stripped}${stripped.includes('?') ? '&' : '?'}fmt=ttml`
+    ];
+    let lastError = 'Empty caption data';
+    for (const captionUrl of variants) {
+      try {
+        console.log(`[SmartBypass] Caption URL: ${captionUrl.substring(0, 150)}...`);
+        const captionResponse = await axios.get(captionUrl, {
+          headers: {
+            'User-Agent': this.getRandomUserAgent(),
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': referer || 'https://www.youtube.com/',
+            'Origin': 'https://www.youtube.com'
+          },
+          timeout: 10000
+        });
+        console.log(`[SmartBypass] Caption response type: ${typeof captionResponse.data}`);
+        console.log(`[SmartBypass] Caption response length: ${JSON.stringify(captionResponse.data).length}`);
+        const transcript = this.parseJSON3Captions(captionResponse.data);
+        if (this.transcriptHasText(transcript)) return transcript;
+        lastError = 'Empty caption data';
+      } catch (error) {
+        lastError = error.message;
+      }
+    }
+    throw new Error(lastError);
+  }
+
   parseJSON3Captions(data) {
     try {
       console.log(`[SmartBypass] parseJSON3Captions input type: ${typeof data}`);
@@ -653,6 +675,9 @@ class YouTubeSmartBypass {
         textMatches.forEach((match, index) => {
           // Extract text content and decode HTML entities
           let textContent = match.replace(/<(?:text|p)[^>]*>/, '').replace(/<\/(?:text|p)>/, '');
+          const startAttr = match.match(/\b(?:start|t)(?:Ms)?=["']?([\d.]+)/i);
+          const startValue = startAttr ? Number(startAttr[1]) : index;
+          const start = startValue > 1000 ? Math.floor(startValue / 1000) : Math.floor(startValue);
 
           // YouTube uses nested <s> tags for individual words/segments
           // Example: <p><s>word1</s><s>word2</s></p>
@@ -675,8 +700,8 @@ class YouTubeSmartBypass {
           if (decodedText.trim()) {
             segments.push({
               text: decodedText.trim(),
-              start: index, // Approximate timing
-              offset: index * 1000,
+              start,
+              offset: start * 1000,
               duration: 0
             });
 
@@ -704,11 +729,7 @@ class YouTubeSmartBypass {
 
     } catch (error) {
       console.error('[SmartBypass] Caption parsing failed:', error.message);
-      return {
-        text: '',
-        segments: [],
-        wordCount: 0
-      };
+      throw error;
     }
   }
 
