@@ -2,7 +2,7 @@
 
 // Toggle between production and development
 const IS_DEV = false;
-const API_BASE = IS_DEV ? 'http://localhost:3001/api' : 'https://mentorai-production.up.railway.app/api';
+const API_BASE = IS_DEV ? 'http://localhost:3001/api' : 'https://lurnia.app/api';
 const APP_URL = IS_DEV ? 'http://localhost:3000' : 'https://lurnia.app';
 
 const QUESTION_LIMITS = { anonymous: 3, free: 25, pro: 250, premium: 250 };

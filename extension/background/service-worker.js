@@ -3,7 +3,7 @@
 import { collectVideoData, getCachedVideoData } from './youtubeCollector.js';
 import { searchValueVideos } from './valueSearch.js';
 
-const API_BASE = 'https://mentorai-production.up.railway.app/api';
+const API_BASE = 'https://lurnia.app/api';
 // const API_BASE = 'http://localhost:3001/api'; // Development
 
 /**

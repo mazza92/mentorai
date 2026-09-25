@@ -39,7 +39,7 @@ Q&A still runs when captions are off, using comments + description. True 100% sp
 
 ```
 extension/
-├── manifest.json          # MV3, v1.4.0
+├── manifest.json          # MV3, v1.4.2
 ├── popup/                 # Find signal + Ask popup
 ├── content/               # Watch-page overlay + detector
 ├── background/            # Service worker, value search, collector
@@ -55,7 +55,7 @@ Toggle in `utils/api.js`:
 const IS_DEV = false; // true for localhost:3001 / :3000
 ```
 
-Production API: `https://mentorai-production.up.railway.app/api`
+Production API: `https://lurnia.app/api`
 
 Endpoints used:
 

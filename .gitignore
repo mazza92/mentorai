@@ -78,3 +78,4 @@ nul
 # Store screenshots dev files
 extension/store-screenshots/*.html
 extension/store-screenshots/*.md
+.vercel

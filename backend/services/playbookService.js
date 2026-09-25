@@ -181,7 +181,7 @@ Rules: 4 takeaways, 4 playbook steps, 3 timestamps if captions else [], 2 skipFl
       json: true,
       temperature: 0.3,
       maxOutputTokens: 1800,
-      model: 'gemini-2.0-flash'
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
     });
     return this.parseJson(text);
   }

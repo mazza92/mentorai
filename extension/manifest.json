@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lurnia - High-Value YouTube Search",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Don't trust the thumbnail. Rank YouTube by real engagement, steal the playbook, skip the empty-scroll. Not affiliated with YouTube.",
   "permissions": [
     "storage",
@@ -15,8 +15,7 @@
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://youtube.com/*",
-    "https://lurnia.app/*",
-    "https://mentorai-production.up.railway.app/*"
+    "https://lurnia.app/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",

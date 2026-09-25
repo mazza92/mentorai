@@ -50,6 +50,20 @@ const nextConfig = {
       },
     ]
   },
+  async rewrites() {
+    const backend = (process.env.NEXT_PUBLIC_API_URL || 'https://mentorai-production.up.railway.app')
+      .trim()
+      .replace(/\/$/, '')
+    const backendOrigin = backend.replace(/\/api$/i, '')
+    return {
+      afterFiles: [
+        {
+          source: '/api/:path*',
+          destination: `${backendOrigin}/api/:path*`
+        }
+      ]
+    }
+  },
 }
 
 module.exports = nextConfig
