@@ -178,9 +178,9 @@ export const TOPICS: Topic[] = [
     description:
       "What is BMAD? Don't trust the YouTube title. Ranked videos, steps, and what to skip.",
     definition:
-      'BMAD is an AI coding workflow people search as "bmad method" or "c\'est quoi BMAD": split work into agent-style roles, write the spec before the code, then implement. Viral videos call it the ultimate system and skip the loop. We rank the videos with real questions in the comments, then extract the steps you can run now.',
+      'BMAD is an AI coding workflow: split work into agent-style roles, write the spec before the code, then implement. Viral videos call it the ultimate system and skip the loop. We rank the videos with real questions in the comments, then extract the steps you can run now.',
     howWeRank:
-      'Entity query first (BMAD, not generic AI coding), then comment rate over views. Definitional FAQs sit on this page so Google and ChatGPT can cite a straight answer.',
+      'We keep videos that actually walk through BMAD, then score comment rate and likes vs views. "Ultimate system" thumbnails with dead comments go down.',
     faqs: [
       { q: 'What is the BMAD method?', a: 'A structured AI coding setup: break the job into roles, specify before you generate, then implement. Use a high-discussion playbook, not a 40-minute recap.' },
       { q: 'Is BMAD just vibe coding?', a: 'No. The point is more spec and less blind generation. If a video never shows the spec step, skip it.' }
@@ -198,9 +198,9 @@ export const TOPICS: Topic[] = [
     description:
       'C’est quoi BMAD ? Ne te fie pas à la miniature. Vidéos classées par vraie discussion, étapes, ce qu’il faut zapper.',
     definition:
-      'La méthode BMAD est un workflow de code avec l’IA: découper le travail en rôles, écrire la spec avant le code, puis implémenter. Les gens cherchent "c’est quoi BMAD" et "bmad method" parce que les miniatures crient "système ultime" et zappent la boucle. On classe les vidéos où les commentaires posent de vraies questions, puis on en sort un playbook à exécuter maintenant.',
+      'La méthode BMAD est un workflow de code avec l’IA: découper le travail en rôles, écrire la spec avant le code, puis implémenter. Les miniatures crient "système ultime" et zappent la boucle. On classe les vidéos où les commentaires posent de vraies questions, puis on en sort un playbook à exécuter maintenant.',
     howWeRank:
-      'Requête entité (BMAD), puis taux de commentaires et de likes, pas le brut de vues. Cette page existe pour les requêtes définitionnelles déjà vues dans Google Search Console.',
+      'On garde les vidéos qui montrent vraiment BMAD, puis on score commentaires et likes vs vues. Les miniatures "système ultime" avec thread mort descendent.',
     faqs: [
       { q: 'C’est quoi la méthode BMAD ?', a: 'Un setup de coding IA structuré: rôles, spec, puis code. Prends le playbook d’une vidéo à forte discussion, pas le récap viral.' },
       { q: 'BMAD vs vibe coding ?', a: 'BMAD pousse la spec. Si la vidéo ne montre jamais la spec, c’est du bait.' }
@@ -218,9 +218,9 @@ export const TOPICS: Topic[] = [
     description:
       "Don't trust the thumbnail. What actually changed between Qwen and Claude Code, from videos people discussed.",
     definition:
-      'Qwen vs Claude Code is a model-and-tooling comparison: when Qwen is enough, when Claude Code still wins, and what to switch. Search Console already shows "différence entre qwen et claude" with zero clicks on dumped YouTube titles. This hub answers the comparison, then lists engagement-ranked videos and playbooks.',
+      'Qwen vs Claude Code is a model-and-tooling comparison: when Qwen is enough, when Claude Code still wins, and what to switch. Viral titles pick a winner and skip the job. We rank the comparisons people actually argued about, then extract when to switch.',
     howWeRank:
-      'Comparison query, then comment rate. We want arguments in the comments, not a thumbnail that says "I quit Claude".',
+      'We keep head-to-head videos, then score comment rate. Arguments in the comments beat a thumbnail that says "I quit Claude".',
     faqs: [
       { q: 'What is the difference between Qwen and Claude Code?', a: 'Qwen is often cheaper and fast for local or open workflows. Claude Code still leads on hard repo tasks for many people. Watch a high-discussion comparison, skip the rage-quit intro.' },
       { q: 'Should I switch?', a: 'Switch for a job type, not a thumbnail. Open the playbook for the caveat, then try one task now.' }
@@ -237,9 +237,9 @@ export const TOPICS: Topic[] = [
     description:
       "Don't trust the thumbnail. How people actually brief Cursor: context, PRD, what to skip. Ranked by discussion.",
     definition:
-      'Context engineering in Cursor means feeding the model the right files, rules, and PRD so it ships instead of hallucinating. GSC shows the exact YouTube title as a query with 0% CTR. This page answers the intent, then ranks videos by engagement instead of reprinting the clickbait title.',
+      'Context engineering in Cursor means feeding the model the right files, rules, and PRD so it ships instead of hallucinating. YouTube sells "how the 1% build". Useful videos show the context setup. We rank those by discussion, then extract the steps.',
     howWeRank:
-      'Match the skill (context, PRD, rules), bury the "how the 1% live" storytelling, keep long-form with dense comments.',
+      'We keep videos that show context, PRD, and rules. "How the 1% live" storytelling with dead comments goes down.',
     faqs: [
       { q: 'What is Cursor context engineering?', a: 'Putting specs, rules, and the right files in context before you generate. Not a personality video about the 1%.' },
       { q: 'Where do I start now?', a: 'Open the top-ranked playbook, copy the context setup, skip the origin story.' }
@@ -256,9 +256,9 @@ export const TOPICS: Topic[] = [
     description:
       "Don't trust the thumbnail. Tempo Labs videos ranked by real discussion: what ships, timestamps, what to skip.",
     definition:
-      'Tempo Labs is a vibe-coding / AI app-building tool. Search dumps the full YouTube title into Google and nobody clicks, because the SERP looks like a video, not an answer. This hub says what Tempo Labs is for, ranks the tutorials people actually talked about, and links playbooks.',
+      'Tempo Labs is a vibe-coding / AI app-building tool. Most videos sell an "ultimate package" and never ship. This hub says what Tempo Labs is for, ranks the tutorials people actually talked about, and links playbooks.',
     howWeRank:
-      'Brand + tutorial intent, then comment rate. "Ultimate package" thumbnails with dead comments go down.',
+      'We keep Tempo Labs tutorials with real questions in the comments. "Ultimate package" thumbnails with dead threads go down.',
     faqs: [
       { q: 'What is Tempo Labs?', a: 'An AI app-building environment people use for fast UI and vibe coding. Use a high-discussion tutorial, not the 8-word hook.' },
       { q: 'Is vibe coding enough?', a: 'Only if you still specify the outcome. Pair with a playbook: steps now, fluff skipped.' }
@@ -277,7 +277,7 @@ export const TOPICS: Topic[] = [
     definition:
       'Claude Code plus MCP plus Cursor is a setup: the CLI or IDE agent, Model Context Protocol servers, and Cursor as the editor. Most tutorials pad 40 minutes of install theater. We rank the ones people asked follow-ups on, then extract the sequence you can run now.',
     howWeRank:
-      'Setup intent, long-form depth, comment rate. Sponsor-heavy recaps with dead comments drop.',
+      'We keep setup videos with enough length to finish the install, then score comment rate. Sponsor-heavy recaps with dead comments drop.',
     faqs: [
       { q: 'How do I set up Claude Code with MCP and Cursor?', a: 'Install, connect MCP servers you actually need, then one real task. Steal the order from a high-discussion playbook.' },
       { q: 'What should I skip?', a: 'The life story, the five unused MCP servers, and the "watch me click" padding.' }
@@ -294,9 +294,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. Avis franc sur Linkuma, tuto backlinks, et ce qu’il faut zapper. Vidéos classées par discussion.',
     definition:
-      'Linkuma est une plateforme de netlinking / backlinks low cost. Dans Google Search Console, "linkuma tutoriel" fait plus de 3 000 impressions sur une page au titre YouTube brut, avec 0% de clics. Cette page répond à l’intention avis + tuto, classe les vidéos par engagement réel, et ouvre un playbook.',
+      'Linkuma est une plateforme de netlinking / backlinks low cost. Les avis YouTube sont souvent du bait "deviens 1er sur Google". Ici: un avis franc, les tutos classés par vraie discussion, et un playbook.',
     howWeRank:
-      'Intention "avis / tuto / backlinks pas chers", puis taux de commentaires. On enterre le bait "deviens 1er sur Google".',
+      'On garde les avis et tutos Linkuma, puis on score le taux de commentaires. On enterre le bait "deviens 1er sur Google".',
     faqs: [
       { q: 'Linkuma, c’est quoi ?', a: 'Un réseau de backlinks / articles pour le netlinking, souvent visé "pas cher". Lis un avis à forte discussion, pas la miniature.' },
       { q: 'Linkuma vaut-il le coup ?', a: 'Ça dépend du site, du budget, et du risque. Le playbook doit donner le caveat, pas un hype de 40 minutes.' }
@@ -313,9 +313,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. ETF et actions IA éligibles PEA 2026, classés par vraie discussion, avec caveats.',
     definition:
-      'Les ETF IA éligibles PEA sont des trackers d’intelligence artificielle que tu peux loger dans un PEA français. Les requêtes "meilleurs ETF IA éligibles PEA 2026" et "meilleures actions IA" impressionnent déjà, sans clic, parce que le titre SERP est un titre YouTube. Ici: la question, les caveats, puis les vidéos à forte discussion.',
+      'Les ETF IA éligibles PEA sont des trackers d’intelligence artificielle que tu peux loger dans un PEA français. Les miniatures vendent "deviens riche avec l’IA". Ici: la question, les caveats, puis les vidéos à forte discussion.',
     howWeRank:
-      'Requête finance précise, format long, commentaires denses. On descend les miniatures "deviens riche avec l’IA".',
+      'On garde les vidéos finance précises, assez longues, avec des commentaires denses. On descend les miniatures "deviens riche avec l’IA".',
     faqs: [
       { q: 'Quels ETF IA sont éligibles au PEA ?', a: 'La liste bouge. Prends une vidéo à forte discussion qui cite les tickers et les limites, puis vérifie chez ton courtier maintenant.' },
       { q: 'C’est un conseil en investissement ?', a: 'Non. C’est un classement de contenus. Les playbooks extraient chiffres et caveats, pas une promesse de rendement.' }
@@ -334,7 +334,7 @@ export const TOPICS: Topic[] = [
     definition:
       'Le dropshipping 2.0, c’est une boutique Shopify (souvent avec IA) où le pitch YouTube promet "boutique en 24h". Les vues sont énormes, les commentaires utiles sont rares. On classe par engagement réel, puis on extrait offre, stack, et ce qu’il faut zapper, à exécuter maintenant si ça tient encore.',
     howWeRank:
-      'Intention boutique / Shopify / IA, puis likes et commentaires vs vues. Les "deviens millionnaire" avec thread mort descendent.',
+      'On garde boutique / Shopify / IA, puis likes et commentaires vs vues. Les "deviens millionnaire" avec thread mort descendent.',
     faqs: [
       { q: 'Le dropshipping 2.0 marche encore ?', a: 'Parfois, avec une offre nette et du paid/organic réel. Les playbooks à forte discussion le montrent. Les miniatures, non.' },
       { q: 'Shopify + IA, par où commencer ?', a: 'Une offre, une page, un test. Ouvre le résultat #1 classé, saute l’intro lifestyle.' }
@@ -353,7 +353,7 @@ export const TOPICS: Topic[] = [
     definition:
       'Créer et vendre des agents IA, c’est packager un workflow (support, prospection, ops) et le vendre, pas juste démo ChatGPT. YouTube vend "agent en 10 min". Les commentaires utiles parlent stack, clients, prix. On classe là-dessus, puis on sort les étapes à lancer maintenant.',
     howWeRank:
-      'Intention création + vente, format long, taux de commentaires. On enterre les démos sans offre.',
+      'On garde création + vente, format long, taux de commentaires. On enterre les démos sans offre.',
     faqs: [
       { q: 'Comment vendre un agent IA ?', a: 'Une offre pour un job précis, une démo, un prix. Vole la séquence d’une vidéo à forte discussion.' },
       { q: 'Par où commencer maintenant ?', a: 'Un use case, un outil, un premier client. Skip le tour de 12 autohubs.' }
@@ -370,9 +370,9 @@ export const TOPICS: Topic[] = [
     description:
       "Don't trust the thumbnail. Three ways to earn with Claude Code: actions, caveats, timestamps. Not a 40-minute recap.",
     definition:
-      'Earning with Claude Code means shipping a small paid app, a freelance workflow, or an internal tool people will pay for. Not a thumbnail that screams "$10k/month". GSC already shows the dumped YouTube title with almost no clicks. This hub answers what actually sold, then ranks videos by discussion and hands you a playbook.',
+      'Earning with Claude Code means shipping a small paid app, a freelance workflow, or an internal tool people will pay for. Not a thumbnail that screams "$10k/month". We answer what actually sold, rank videos by discussion, and hand you a playbook.',
     howWeRank:
-      'Monetization intent, then comment rate. We want people arguing about what they charged, not a lifestyle intro.',
+      'We keep videos about selling a finished job, then score comment rate. People arguing about what they charged beat a lifestyle intro.',
     faqs: [
       { q: 'Can you actually earn money with Claude Code?', a: 'Yes if you sell a finished job: an app, a workflow, a client deliverable. Playbooks from high-discussion videos beat "I quit my job" recaps.' },
       { q: 'What should I skip?', a: 'The revenue flex, the 20-minute setup tour, and any promise without a price or an offer.' }
@@ -391,7 +391,7 @@ export const TOPICS: Topic[] = [
     definition:
       'La Fabrique à idiots est un documentaire Micode sur la bêtise en ligne, les algorithmes, et ce que ça fabrique. Les gens cherchent "résumé" parce que la vidéo est longue et le titre Google est un dump YouTube. Ici: les thèses, les caveats, les timestamps, puis les vidéos à forte discussion. Pas un recap mou.',
     howWeRank:
-      'Requête entité (Micode / Fabrique à idiots), format long, commentaires denses. On descend les extraits clickbait.',
+      'On cherche Micode / La Fabrique à idiots, format long, commentaires denses. On descend les extraits clickbait.',
     faqs: [
       { q: 'C’est quoi La Fabrique à idiots ?', a: 'Un documentaire Micode sur comment le web récompense la bêtise. Prends le playbook: thèses, preuves, ce qu’il faut zapper.' },
       { q: 'Pourquoi un hub plutôt que la vidéo brute ?', a: 'Parce que le SERP recolle le titre YouTube et personne ne clique. On répond d’abord, puis on classe.' }
@@ -408,9 +408,9 @@ export const TOPICS: Topic[] = [
     description:
       "Don't trust the thumbnail. What A2A actually is, how agents talk, the demo worth watching, what to skip.",
     definition:
-      'Google A2A (Agent-to-Agent) is a protocol so AI agents can talk to each other across tools. Search dumps "protocol explained tutorial demo how it works" into Google with almost no clicks. This hub defines A2A in plain language, then ranks the tutorials people actually asked about.',
+      'Google A2A (Agent-to-Agent) is a protocol so AI agents can talk to each other across tools. Keynote recaps pad 40 minutes and skip the handshake. This hub defines A2A in plain language, then ranks the tutorials people actually asked about.',
     howWeRank:
-      'Entity + tutorial intent, then comment rate. Keynote recaps with dead comments drop.',
+      'We keep tutorials that show a real agent handshake, then score comment rate. Keynote recaps with dead comments drop.',
     faqs: [
       { q: 'What is the Google A2A protocol?', a: 'A way for AI agents to request work from other agents, not just call an API. Steal the sequence from a high-discussion tutorial.' },
       { q: 'Do I need A2A today?', a: 'Only if you are wiring multiple agents. If a video never shows a real handshake, skip it.' }
@@ -428,9 +428,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. C’est quoi A2A, comment les agents se parlent, le tuto utile, ce qu’il faut zapper.',
     definition:
-      'Le protocole A2A de Google, c’est un standard pour que des agents IA se parlent entre outils. Dans GSC, "tutoriel protocole a2a" impressionne déjà, avec 0% de clics, parce que le SERP recopie un titre YouTube. Cette page répond, puis classe les tutos par vraie discussion.',
+      'Le protocole A2A de Google, c’est un standard pour que des agents IA se parlent entre outils. Les recaps keynote recopient le titre et zappent l’échange. Cette page dit c’est quoi, puis classe les tutos par vraie discussion.',
     howWeRank:
-      'Requête entité + tuto, puis taux de commentaires. Les recaps keynote sans questions descendent.',
+      'On garde les tutos qui montrent l’échange entre agents, puis le taux de commentaires. Les recaps keynote sans questions descendent.',
     faqs: [
       { q: 'C’est quoi le protocole A2A ?', a: 'Un handshake entre agents IA. Prends un tuto à forte discussion, pas le keynote de 40 minutes.' },
       { q: 'J’en ai besoin maintenant ?', a: 'Seulement si tu branches plusieurs agents. Si la vidéo ne montre jamais l’échange, zapper.' }
@@ -450,7 +450,7 @@ export const TOPICS: Topic[] = [
     definition:
       'GitHub Spec Kit is a spec-first workflow for AI coding: write the contract, then let the model implement. Viral titles say it "finally fixed AI coding". Useful videos show the files, the loop, and where it still fails. We rank those by discussion, then extract the sequence.',
     howWeRank:
-      'Brand + method intent, then comment rate. Pair it with BMAD: more spec, less vibe.',
+      'We keep Spec Kit videos that show the files and the loop, then score comment rate. Pair it with BMAD: more spec, less vibe.',
     faqs: [
       { q: 'What is GitHub Spec Kit?', a: 'A spec-first kit so the model implements a contract instead of guessing. Open a high-discussion playbook, skip the "finally fixed" hook.' },
       { q: 'Is this the same as BMAD?', a: 'Same family: specify before you generate. Spec Kit is a GitHub-shaped kit. BMAD is the role split. Use both hubs, do not mash the titles.' }
@@ -467,9 +467,9 @@ export const TOPICS: Topic[] = [
     description:
       "Don't trust the thumbnail. Claude's agentic browser: what it can click, the limits, timestamps, what to skip.",
     definition:
-      'Claude’s agentic browser is Anthropic letting Claude use a computer: click, type, browse, complete a task. Search already shows "claude browser", "agent browser claude", "claude ai browser" with almost no clicks on dumped titles. This hub says what it is, what it is not, then ranks tutorials by real questions in the comments.',
+      'Claude’s agentic browser is Anthropic letting Claude use a computer: click, type, browse, complete a task. Viral titles skip the limits. This hub says what it is, what it is not, then ranks tutorials by real questions in the comments.',
     howWeRank:
-      'Setup and demo intent, then comment rate. We bury "it will replace your job" thumbnails with dead threads.',
+      'We keep setup and demo videos, then score comment rate. "It will replace your job" thumbnails with dead threads go down.',
     faqs: [
       { q: 'What is the Claude agentic browser?', a: 'Claude controlling a browser to finish a task, not a new Chrome skin. Steal the first real task from a high-discussion playbook.' },
       { q: 'Is it safe to let it click around?', a: 'Treat it like an intern with your mouse. The playbook should show the caveat, not just the wow demo.' }
@@ -486,9 +486,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. Avis franc sur Haloscan, tuto, caveats, et ce qu’il faut zapper. Vidéos classées par discussion.',
     definition:
-      'Haloscan est un outil SEO (souvent visé SERP / questions / data). Dans GSC, "haloscan avis", "code promo haloscan" et le titre YouTube brut impressionnent, avec 0% de clics. Cette page répond avis + tuto, classe les vidéos par engagement, et ouvre un playbook. Le code promo n’est pas le produit.',
+      'Haloscan est un outil SEO (souvent visé SERP / questions / data). Les miniatures poussent le code promo. Cette page répond avis + tuto, classe les vidéos par engagement, et ouvre un playbook. Le code promo n’est pas le produit.',
     howWeRank:
-      'Intention avis / tuto, puis taux de commentaires. On descend les miniatures "code promo" sans test réel.',
+      'On garde les avis et tutos, puis le taux de commentaires. On descend les miniatures "code promo" sans test réel.',
     faqs: [
       { q: 'Haloscan, c’est quoi ?', a: 'Un outil SEO autour des questions et de la SERP. Lis un avis à forte discussion, pas le titre sponsor.' },
       { q: 'Le code promo vaut-il le tuto ?', a: 'Non. Le playbook doit montrer ce que tu fais dans l’outil. Le code promo est un P.S., pas le sujet.' }
@@ -505,9 +505,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. Formation IA Yassine Sdiri: ce qu’elle couvre, les caveats, les vidéos à forte discussion.',
     definition:
-      'Yassine Sdiri vend une formation / communauté IA. Les requêtes "yassine sdiri formation" impressionnent déjà, sans clic, parce que Google affiche un titre YouTube. Ici: c’est quoi l’offre, pour qui, ce que les commentaires contestent, puis les vidéos classées par vraie discussion. Pas un recap hype.',
+      'Yassine Sdiri vend une formation / communauté IA. Les titres YouTube vendent "deviens expert". Ici: c’est quoi l’offre, pour qui, ce que les commentaires contestent, puis les vidéos classées par vraie discussion. Pas un recap hype.',
     howWeRank:
-      'Requête entité + avis, puis commentaires denses. On enterre les "deviens expert IA" sans programme.',
+      'On garde les avis sur l’offre, avec des commentaires denses. On enterre les "deviens expert IA" sans programme.',
     faqs: [
       { q: 'La formation Yassine Sdiri vaut-elle le coup ?', a: 'Ça dépend de ton niveau et du programme actuel. Prends un avis à forte discussion, pas la miniature.' },
       { q: 'Par où commencer si je ne m’inscris pas ?', a: 'Un use case, un outil, un premier client. Le hub agents IA + le playbook classé #1 suffisent souvent.' }
@@ -524,9 +524,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. Boutique Shopify / dropshipping Yomi Denzel: méthode, caveats, ce qu’il faut zapper.',
     definition:
-      'Yomi Denzel est cherché avec "boutique", "Shopify", "dropshipping". Ce n’est pas la même page que le hub dropshipping 2.0 générique: ici l’entité, l’offre, et ce que les commentaires contestent. GSC montre déjà ces requêtes sur des titres YouTube à 0% de clics. On répond, puis on classe.',
+      'Yomi Denzel est cherché avec "boutique", "Shopify", "dropshipping". Ce n’est pas la même page que le hub dropshipping 2.0 générique: ici l’entité, l’offre, et ce que les commentaires contestent. On répond, puis on classe par vraie discussion.',
     howWeRank:
-      'Requête entité + Shopify, puis likes et commentaires vs vues. Les "deviens millionnaire" avec thread mort descendent.',
+      'On garde Shopify / dropshipping, puis likes et commentaires vs vues. Les "deviens millionnaire" avec thread mort descendent.',
     faqs: [
       { q: 'La méthode Yomi Denzel marche encore ?', a: 'Parfois, avec une offre nette et du paid réel. Les playbooks à forte discussion le montrent. Les miniatures, non.' },
       { q: 'Shopify ou une autre stack ?', a: 'Shopify est le default du pitch. Ouvre le résultat #1 classé, saute l’intro lifestyle, vérifie les frais.' }
@@ -543,9 +543,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. C’est quoi OpenClaw, à quoi ça sert, ce que les commentaires contestent, ce qu’il faut zapper.',
     definition:
-      'OpenClaw est un truc IA dont tout le monde parle et que personne n’explique clairement, d’où la requête. Le titre YouTube dumpé dans Google ne convertit pas. Cette page dit ce que c’est, ce que ça n’est pas, puis classe les vidéos par vraie discussion et sort un playbook.',
+      'OpenClaw est un truc IA dont tout le monde parle et que personne n’explique clairement. Le pitch YouTube est plus fort que la spec. Cette page dit ce que c’est, ce que ça n’est pas, puis classe les vidéos par vraie discussion et sort un playbook.',
     howWeRank:
-      'Requête définitionnelle, puis taux de commentaires. On descend les "personne n’en parle" qui parlent trop.',
+      'On garde les vidéos qui expliquent vraiment l’outil, puis le taux de commentaires. On descend les "personne n’en parle" qui parlent trop.',
     faqs: [
       { q: 'C’est quoi OpenClaw ?', a: 'Un projet / outil IA dont le pitch YouTube est plus fort que la spec. Lis un playbook à forte discussion, pas le hook.' },
       { q: 'Je dois m’y mettre maintenant ?', a: 'Seulement si le playbook montre un job précis. Sinon, BMAD + un vrai agent suffisent.' }
@@ -564,7 +564,7 @@ export const TOPICS: Topic[] = [
     definition:
       'Claude Code vs Cursor vs Codex is a tooling comparison: CLI agent, IDE agent, OpenAI’s coding stack. Thumbnails pick a winner for the algorithm. Useful videos show a task, a miss, and when to switch. We rank those by argument-in-the-comments, then extract the playbook.',
     howWeRank:
-      'Comparison query, then comment rate. "I quit X" intros with dead comments drop. Qwen vs Claude stays on its own hub.',
+      'We keep comparisons that show a real task, then score comment rate. "I quit X" intros with dead comments drop. Qwen vs Claude stays on its own hub.',
     faqs: [
       { q: 'Claude Code or Cursor?', a: 'Cursor for in-editor loops. Claude Code for long agent runs. Steal the split from a high-discussion comparison, not a rage-quit title.' },
       { q: 'Where does Codex fit?', a: 'When the job is OpenAI-shaped. The playbook should say the caveat. If a video never shows a failed task, skip it.' }
@@ -583,7 +583,7 @@ export const TOPICS: Topic[] = [
     definition:
       '« La méthode infaillible pour tout apprendre » est un titre YouTube, pas une pédagogie. L’intention réelle: une boucle (but, source, pratique, rappel) que tu peux lancer maintenant. On classe les vidéos où les commentaires parlent d’application, puis on extrait le playbook. SQL, ChatGPT, et le time blocking restent des hubs à part.',
     howWeRank:
-      'Intention apprendre + IA, format long, taux de commentaires. On descend les "cerveau illimité" avec thread mort.',
+      'On garde apprendre + IA, format long, taux de commentaires. On descend les "cerveau illimité" avec thread mort.',
     faqs: [
       { q: 'Quelle méthode pour tout apprendre avec l’IA ?', a: 'Un but, une source dense, de la pratique, un rappel. Vole la boucle d’une vidéo à forte discussion.' },
       { q: 'Je commence par quelle compétence ?', a: 'Celle qui paie un job précis. SQL, une offre freelance, ou ChatGPT appliqué. Pas un tour de 12 apps.' }
@@ -600,9 +600,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. Formation ChatGPT utile: prompts qui servent, limites, timestamps, ce qu’il faut zapper.',
     definition:
-      'Une formation ChatGPT qui sert, c’est un usage (écrire, analyser, vendre), pas "comment utiliser ChatGPT en 2025" en titre YouTube. Cette requête impressionne déjà à 0% de clics. On répond: par où commencer, ce qui est du fluff, puis les vidéos classées par discussion réelle.',
+      'Une formation ChatGPT qui sert, c’est un usage (écrire, analyser, vendre), pas "comment utiliser ChatGPT en 2025" en titre YouTube. On répond: par où commencer, ce qui est du fluff, puis les vidéos classées par discussion réelle.',
     howWeRank:
-      'Intention formation + usage, puis commentaires. Les "ChatGPT va tout changer" sans exercice descendent.',
+      'On garde formation + usage, puis les commentaires. Les "ChatGPT va tout changer" sans exercice descendent.',
     faqs: [
       { q: 'Par où commencer une formation ChatGPT ?', a: 'Un job (email, offre, analyse), 10 exemples, une limite. Playbook à forte discussion, pas le tour de l’interface.' },
       { q: 'C’est suffisant pour vendre de l’IA ?', a: 'Non. Couple avec le hub agents IA / formation Yassine si tu vends. ChatGPT seul n’est pas une offre.' }
@@ -619,9 +619,9 @@ export const TOPICS: Topic[] = [
     description:
       'Ne te fie pas à la miniature. Tuto Figma: prototyper un one-page, timestamps, ce qu’il faut zapper.',
     definition:
-      'Prototyper dans Figma, c’est relier des frames pour tester un one-page avant de coder. GSC montre déjà "prototypage figma" et le tuto YouTube dumpé, avec peu de clics. Cette page dit la boucle (wire, prototype, share), classe les tutos par discussion, et ouvre un playbook à exécuter maintenant.',
+      'Prototyper dans Figma, c’est relier des frames pour tester un one-page avant de coder. Les tutos "from zero" durent deux heures. Cette page dit la boucle (wire, prototype, share), classe les tutos par discussion, et ouvre un playbook à exécuter maintenant.',
     howWeRank:
-      'Intention tuto + one-page, format long utile, taux de commentaires. On descend les "Figma from zero" de 2 heures.',
+      'On garde les tutos one-page assez longs pour finir le proto, puis le taux de commentaires. On descend les "Figma from zero" de 2 heures.',
     faqs: [
       { q: 'Comment prototyper un site dans Figma ?', a: 'Frames, liaisons, preview, un vrai user test. Vole l’ordre d’un tuto à forte discussion.' },
       { q: 'Figma ou je code direct ?', a: 'Prototype si tu valides un flow. Code si le layout est déjà évident. Le playbook doit le dire, pas le thumbnail.' }
