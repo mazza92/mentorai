@@ -3,15 +3,21 @@ const youtubeInnertubeService = require('./youtubeInnertubeService');
 const { getFirestore } = require('../config/firestore');
 const { generateText } = require('./llmClient');
 
+const SCHEMA = 'v3';
+
 class PlaybookService {
   constructor() {
     this.memory = new Map();
     this.inflight = new Map();
   }
 
+  cacheId(videoId, lang) {
+    return `${videoId}_${lang}_${SCHEMA}`;
+  }
+
   async getOrGenerate(videoId, { language = 'en' } = {}) {
     const lang = language === 'fr' ? 'fr' : 'en';
-    const cacheKey = `${videoId}_${lang}`;
+    const cacheKey = this.cacheId(videoId, lang);
 
     if (this.memory.has(cacheKey)) {
       return this.memory.get(cacheKey);
@@ -67,12 +73,13 @@ class PlaybookService {
     const started = Date.now();
     const [video, comments, transcript] = await Promise.all([
       this.loadVideo(videoId),
-      valueSearchService.fetchTopComments(videoId, 12).catch(() => []),
+      valueSearchService.fetchTopComments(videoId, 24).catch(() => []),
       this.fetchCaptionsFast(videoId)
     ]);
 
-    const transcriptText = transcript?.text || '';
+    const transcriptText = String(transcript?.text || '').trim();
     const transcriptSource = transcript?.source || null;
+    const segments = Array.isArray(transcript?.segments) ? transcript.segments : [];
     if (!transcriptText && !comments.length && !video.description) {
       const err = new Error('Not enough source material to build a playbook');
       err.code = 'NO_SOURCE';
@@ -82,7 +89,7 @@ class PlaybookService {
     let playbook;
     let aiGenerated = true;
     try {
-      playbook = await this.generateContent(video, transcriptText, comments, lang);
+      playbook = await this.generateContent(video, transcriptText, comments, lang, segments);
     } catch (err) {
       console.warn('[Playbook] LLM failed, extracting from source material:', err.message);
       playbook = this.buildFromSources(video, transcriptText, comments, lang);
@@ -125,40 +132,75 @@ class PlaybookService {
     try {
       const transcript = await Promise.race([
         youtubeInnertubeService.fetchTranscript(videoId, { skipSlowFallback: true }),
-        new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 6000))
+        new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 8000))
       ]);
       if (transcript?.timedOut) {
         console.warn(`[Playbook] Caption fetch timed out for ${videoId}`);
       }
-      if (transcript?.success && transcript.text) return transcript;
+      if (transcript?.success) {
+        const text = String(transcript.text || transcript.transcript?.text || '').trim();
+        if (text) {
+          return {
+            success: true,
+            text,
+            segments: transcript.segments || transcript.transcript?.segments || [],
+            source: transcript.source || transcript.strategy || null
+          };
+        }
+      }
     } catch (err) {
       console.warn('[Playbook] Transcript fetch failed:', err.message);
     }
     return { success: false, text: '', source: null };
   }
 
-  async generateContent(video, transcriptText, comments, lang) {
+  async generateContent(video, transcriptText, comments, lang, segments = []) {
     const isFr = lang === 'fr';
-    const transcript = (transcriptText || '').slice(0, 6000);
+    const chapters = this.parseChapters(video.description || '');
+    const chapterBlock = chapters
+      .slice(0, 16)
+      .map((c) => `${c.timestampFormatted} ${c.title}`)
+      .join('\n');
+    const timed = (segments || [])
+      .filter((s) => String(s.text || s.transcript || '').trim())
+      .slice(0, 90)
+      .map((s) => {
+        const sec = Math.round(s.start || (s.startMs ? s.startMs / 1000 : 0) || s.offset || 0);
+        return `[${this.formatClock(sec)}] ${String(s.text || s.transcript).replace(/\s+/g, ' ').trim()}`;
+      })
+      .join('\n')
+      .slice(0, 7000);
+    const transcript = timed || (transcriptText || '').slice(0, 7000);
     const commentBlock = comments
-      .slice(0, 8)
-      .map((c, i) => `${i + 1}. @${c.author}: ${String(c.text || '').slice(0, 280)}`)
+      .slice(0, 16)
+      .map((c, i) => `${i + 1}. @${c.author}: ${String(c.text || '').replace(/\s+/g, ' ').trim().slice(0, 240)}`)
       .join('\n');
 
-    const prompt = `Extract actionable value from this YouTube video. Ignore hype and sponsors.
-Write in ${isFr ? 'French' : 'English'}. Never use an em dash. Actions must be runnable now.
-Return ONLY valid JSON.
+    const prompt = `You are a senior YouTube editor writing a Lurnia playbook.
+Write in ${isFr ? 'French' : 'English'}. Never use an em dash. Return ONLY valid JSON.
+
+Job:
+- keyTakeaways: 4-6 lessons from the VIDEO (transcript, chapters, description). Never from comments. Title is the lesson. Detail is how to apply it now.
+- playbook: 4-6 ordered actions the viewer can run today. Timestamp if captions or chapters exist.
+- skipFluff: specific filler moments (intro hook, sponsor, ad, affiliate pitch, subscribe ask, recap padding). Each needs a clock time if known, a kind, and a one-line recap of what happens so the viewer can skip without missing a tactic.
+- viewerFeedback: 3-5 comments that teach something: a caveat, a result, a disagreement, or an honest testimony. Never empty praise.
+- timestamps: 3-6 high-value moments to jump to. Not fluff.
+
+Do not invent timestamps. If there are no captions or chapters, use timestamp 0 and timestampFormatted "".
 
 VIDEO: ${video.title} | ${video.channel} | ${Math.round((video.durationSec || 0) / 60)} min
 Views ${video.views} | Likes ${video.likes} | Comments ${video.comments}
 
-TRANSCRIPT (may be empty):
-${transcript || '[No captions. Use description and comments only. Do not invent timestamps.]'}
+CHAPTERS:
+${chapterBlock || '[None]'}
+
+TRANSCRIPT:
+${transcript || '[No captions. Use description and chapters only for takeaways. Do not invent timestamps.]'}
 
 DESCRIPTION:
-${(video.description || '').slice(0, 1500)}
+${(video.description || '').slice(0, 1800)}
 
-TOP COMMENTS:
+COMMENTS (for viewerFeedback only, never for keyTakeaways):
 ${commentBlock || '[None]'}
 
 JSON:
@@ -167,32 +209,106 @@ JSON:
   "oneLiner": "who + outcome, max 160 chars",
   "whyThisNotClickbait": "2 sentences",
   "audience": "freelancers | founders | students | mixed",
-  "keyTakeaways": [{ "title": "short", "detail": "specific" }],
+  "keyTakeaways": [{ "title": "lesson", "detail": "how to use it now" }],
   "playbook": [{ "step": 1, "action": "imperative", "detail": "how now", "timestamp": 0, "timestampFormatted": "0:00" }],
-  "skipFluff": ["item"],
-  "timestamps": [{ "timestamp": 0, "timestampFormatted": "M:SS", "title": "moment", "description": "why" }],
+  "skipFluff": [{ "kind": "sponsor", "timestamp": 0, "timestampFormatted": "M:SS", "title": "what to skip", "recap": "what happens in that moment" }],
+  "viewerFeedback": [{ "author": "name", "quote": "short", "insight": "why it matters" }],
+  "timestamps": [{ "timestamp": 0, "timestampFormatted": "M:SS", "title": "moment", "description": "why jump here" }],
   "suggestedQuestions": ["question"],
   "faqs": [{ "question": "...", "answer": "..." }]
-}
-
-Rules: 4 takeaways, 4 playbook steps, 3 timestamps if captions else [], 2 skipFluff, 3 questions, 3 faqs. Concrete only.`;
+}`;
 
     const text = await generateText(prompt, {
       json: true,
-      temperature: 0.3,
-      maxOutputTokens: 1800,
+      temperature: 0.25,
+      maxOutputTokens: 4096,
       model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
     });
-    return this.parseJson(text);
+    return this.normalizePlaybook(this.parseJson(text), video, comments, lang);
   }
 
   parseJson(text) {
-    let jsonText = text;
-    const fenced = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
+    let jsonText = String(text || '');
+    const fenced = jsonText.match(/```json\s*([\s\S]*?)\s*```/) || jsonText.match(/```\s*([\s\S]*?)\s*```/);
     if (fenced) jsonText = fenced[1];
-    const objectMatch = jsonText.match(/\{[\s\S]*\}/);
-    if (objectMatch) jsonText = objectMatch[0];
+    const start = jsonText.indexOf('{');
+    const end = jsonText.lastIndexOf('}');
+    if (start >= 0 && end > start) jsonText = jsonText.slice(start, end + 1);
     return JSON.parse(jsonText);
+  }
+
+  normalizePlaybook(raw, video, comments, lang) {
+    const isFr = lang === 'fr';
+    const skipFluff = (raw.skipFluff || []).map((item) => {
+      if (typeof item === 'string') {
+        return { kind: 'padding', timestamp: 0, timestampFormatted: '', title: item, recap: item };
+      }
+      return {
+        kind: item.kind || 'padding',
+        timestamp: Number(item.timestamp) || 0,
+        timestampFormatted: item.timestampFormatted || (item.timestamp ? this.formatClock(item.timestamp) : ''),
+        title: String(item.title || item.recap || '').slice(0, 120),
+        recap: String(item.recap || item.title || '').slice(0, 280)
+      };
+    }).filter((item) => item.title || item.recap);
+
+    const viewerFeedback = (raw.viewerFeedback || []).map((item) => ({
+      author: String(item.author || 'Viewer').replace(/^@/, '').slice(0, 40),
+      quote: String(item.quote || item.text || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+      insight: String(item.insight || '').replace(/\s+/g, ' ').trim().slice(0, 220)
+    })).filter((item) => item.quote.length >= 24 && !this.isPraiseComment(item.quote));
+
+    const keyTakeaways = (raw.keyTakeaways || [])
+      .map((item) => ({
+        title: String(item.title || '').replace(/\s+/g, ' ').trim().slice(0, 90),
+        detail: String(item.detail || '').replace(/\s+/g, ' ').trim().slice(0, 360)
+      }))
+      .filter((item) => item.title && item.detail && item.detail !== item.title && !item.detail.startsWith(item.title));
+
+    return {
+      ...raw,
+      headline: String(raw.headline || video.title).slice(0, 90),
+      keyTakeaways: keyTakeaways.length ? keyTakeaways : this.contentTakeaways(video, isFr),
+      skipFluff,
+      viewerFeedback: viewerFeedback.length ? viewerFeedback : this.commentFeedback(comments, isFr)
+    };
+  }
+
+  contentTakeaways(video, isFr) {
+    const bullets = this.extractListItems(video.description || '');
+    const chapters = this.parseChapters(video.description || '').filter((c) => !this.isFluffChapter(c.title));
+    const seeds = bullets.length ? bullets : chapters.map((c) => c.title);
+    const rows = seeds.slice(0, 5).map((text) => ({
+      title: String(text).split(/[.!?:]/)[0].slice(0, 72),
+      detail: String(text).slice(0, 280)
+    }));
+    if (rows.length) return rows;
+    return [{
+      title: isFr ? 'Utilisez les chapitres, pas le hook' : 'Use the chapters, not the hook',
+      detail: isFr
+        ? 'Sautez l’intro. Notez les étapes concrètes dans la description, puis faites la plus petite version aujourd’hui.'
+        : 'Skip the intro. Copy the concrete steps from the description, then run the smallest version today.'
+    }];
+  }
+
+  commentFeedback(comments, isFr) {
+    return (comments || [])
+      .map((c) => {
+        const quote = String(c.text || '').replace(/\s+/g, ' ').trim();
+        return {
+          author: String(c.author || 'Viewer').replace(/^@/, ''),
+          quote,
+          insight: this.isActionableComment(quote)
+            ? (isFr ? 'Un viewer pointe une application concrète.' : 'A viewer names a concrete application.')
+            : (isFr ? 'Retour d’usage, pas un like.' : 'Usage note, not a like.')
+        };
+      })
+      .filter((item) => item.quote.length >= 40 && item.quote.length <= 320 && !this.isPraiseComment(item.quote) && !/https?:\/\//i.test(item.quote))
+      .slice(0, 5);
+  }
+
+  isFluffChapter(title) {
+    return /intro|outro|sponsor|subscribe|thanks|ad break|self[-\s]?promo/i.test(title || '');
   }
 
   buildFromSources(video, transcriptText, comments, lang) {
@@ -205,33 +321,8 @@ Rules: 4 takeaways, 4 playbook steps, 3 timestamps if captions else [], 2 skipFl
       .filter((t) => t.length >= 40 && t.length <= 420 && !/https?:\/\//i.test(t))
       .filter((t) => this.isActionableComment(t));
 
-    const fallbackComments = (comments || [])
-      .map((c) => String(c.text || '').replace(/\s+/g, ' ').trim())
-      .filter((t) => t.length >= 50 && !this.isPraiseComment(t) && !/https?:\/\//i.test(t));
-
-    const takeawaySeeds = [
-      ...bullets.slice(0, 5),
-      ...this.splitSentences(description).slice(0, 4),
-      ...insightComments.slice(0, 3),
-      ...fallbackComments.slice(0, 2)
-    ].filter((t, i, arr) => t && arr.indexOf(t) === i).slice(0, 6);
-
-    const keyTakeaways = (takeawaySeeds.length ? takeawaySeeds : this.splitSentences(description).slice(0, 4))
-      .map((text) => {
-        const title = text.split(/[.!?:]/)[0].slice(0, 72) || video.title.slice(0, 72);
-        return { title, detail: text.slice(0, 280) };
-      });
-
-    while (keyTakeaways.length < 3) {
-      keyTakeaways.push({
-        title: isFr ? 'Regardez le moment clé' : 'Watch for the specific tactic',
-        detail: isFr
-          ? 'Les chapitres et commentaires ci-dessous pointent vers les parties concrètes, pas le storytelling.'
-          : 'Use the chapters and comments below to jump to the concrete parts instead of the story.'
-      });
-    }
-
-    const usefulChapters = chapters.filter((c) => !/intro|outro|sponsor|subscribe|thanks/i.test(c.title));
+    const keyTakeaways = this.contentTakeaways(video, isFr);
+    const usefulChapters = chapters.filter((c) => !this.isFluffChapter(c.title));
     const bulletSteps = bullets.map((text) => ({ title: text.slice(0, 90), detail: text, description: text }));
     const defaultSteps = isFr
       ? [
@@ -274,6 +365,7 @@ Rules: 4 takeaways, 4 playbook steps, 3 timestamps if captions else [], 2 skipFl
       answer: text.slice(0, 280)
     }));
 
+    const fluffChapters = chapters.filter((c) => this.isFluffChapter(c.title));
     const mins = Math.max(1, Math.round((video.durationSec || 0) / 60));
     return {
       headline: video.title.slice(0, 90),
@@ -281,20 +373,32 @@ Rules: 4 takeaways, 4 playbook steps, 3 timestamps if captions else [], 2 skipFl
         ? `Playbook ${mins} min pour extraire des actions de « ${video.channel} ».`
         : `${mins}-min playbook: pull the usable moves from ${video.channel} without watching twice.`,
       whyThisNotClickbait: isFr
-        ? `Les likes et commentaires sont élevés par rapport aux vues. On s’appuie sur la description, les chapitres et les retours viewers plutôt que sur un résumé viral.`
-        : `Engagement is high relative to views. This draft is built from the description, chapters, and viewer comments, not a generic recap.`,
+        ? 'Les likes et commentaires sont élevés par rapport aux vues. On s’appuie sur la description et les chapitres, pas sur un résumé viral.'
+        : 'Engagement is high relative to views. This draft is built from the description and chapters, not a generic recap.',
       audience: this.inferAudience(`${video.title} ${description}`),
       keyTakeaways,
       playbook: playbookSteps,
-      skipFluff: [
-        isFr ? 'Ignorez l’intro motivation et les appels à s’abonner.' : 'Skip the motivational intro and subscribe asks.',
-        isFr ? 'Ignorez les passages sponsor / outils affiliés.' : 'Skip sponsor reads and affiliate tool pitches.',
-        ...chapters.filter((c) => /intro|sponsor|outro/i.test(c.title)).map((c) =>
-          (isFr
-            ? `Vous pouvez passer « ${c.title} » (${c.timestampFormatted}).`
-            : `You can skip “${c.title}” (${c.timestampFormatted}).`))
-      ].slice(0, 4),
-      timestamps: chapters.slice(0, 8),
+      skipFluff: fluffChapters.length
+        ? fluffChapters.slice(0, 4).map((c) => ({
+            kind: /sponsor|ad/i.test(c.title) ? 'sponsor' : /intro/i.test(c.title) ? 'intro' : /outro/i.test(c.title) ? 'outro' : 'padding',
+            timestamp: c.timestamp,
+            timestampFormatted: c.timestampFormatted,
+            title: c.title,
+            recap: isFr
+              ? `Passage « ${c.title} ». Pas de tactique ici, vous pouvez sauter.`
+              : `This beat is “${c.title}”. No tactic here. Skip it.`
+          }))
+        : [
+            {
+              kind: 'intro',
+              timestamp: 0,
+              timestampFormatted: '0:00',
+              title: isFr ? 'Intro motivation' : 'Motivational intro',
+              recap: isFr ? 'Hook et story. La méthode commence après.' : 'Hook and story. The method starts after this.'
+            }
+          ],
+      viewerFeedback: this.commentFeedback(comments, isFr),
+      timestamps: usefulChapters.slice(0, 8),
       suggestedQuestions: suggestedQuestions.slice(0, 3),
       faqs
     };
@@ -310,13 +414,13 @@ Rules: 4 takeaways, 4 playbook steps, 3 timestamps if captions else [], 2 skipFl
 
   isPraiseComment(text) {
     const t = String(text || '').toLowerCase();
-    return /love this|well done|god bless|may god|amazing|grateful|best youtube|thank you|thanks sis|great video|so helpful/.test(t)
-      && !this.isActionableComment(t);
+    return /^(wow|nice|love this|well done|amazing|great video|so helpful|god bless|thank you|thanks)[\s!.]*$/i.test(t.trim())
+      || (/love this|well done|god bless|amazing|grateful|best youtube|thank you|great video|so helpful/.test(t) && !this.isActionableComment(t));
   }
 
   isActionableComment(text) {
     const t = String(text || '').toLowerCase();
-    return /how (do|to|should)|step|tip|template|script|subject line|client|cold email|outreach|rate|hour|first |instead|don't|try this|what if/.test(t);
+    return /how (do|to|should)|step|tip|template|script|subject line|client|cold email|outreach|rate|hour|first |instead|don't|try this|what if|worked|didn't work|warning|caveat/.test(t);
   }
 
   parseChapters(description) {

@@ -773,6 +773,12 @@ class YouTubeSmartBypass {
         const result = await strategy();
 
         if (result.success) {
+          const text = String(result.transcript?.text || '').trim();
+          const words = result.transcript?.wordCount || text.split(/\s+/).filter(Boolean).length;
+          if (!text || words < 8) {
+            console.log(`[SmartBypass] ${result.strategy} returned empty captions, trying next`);
+            continue;
+          }
           const finalResult = {
             success: true,
             videoId,

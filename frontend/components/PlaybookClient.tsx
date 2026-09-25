@@ -32,7 +32,8 @@ interface PlaybookData {
     audience: string
     keyTakeaways: { title: string; detail: string }[]
     playbook: { step: number; action: string; detail: string; timestamp?: number; timestampFormatted?: string }[]
-    skipFluff: string[]
+    skipFluff: Array<{ kind?: string; timestamp?: number; timestampFormatted?: string; title?: string; recap?: string } | string>
+    viewerFeedback?: { author: string; quote: string; insight?: string }[]
     timestamps: { timestamp: number; timestampFormatted: string; title: string; description: string }[]
     suggestedQuestions: string[]
     faqs: { question: string; answer: string }[]
@@ -185,7 +186,7 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
 
               {data.aiGenerated === false && (
                 <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  Draft from the video description, chapters, and comments. Add a valid Gemini key in <code className="font-mono">backend/.env</code> for a full AI playbook.
+                  Draft from the video description and chapters. Captions were unavailable for a full AI pass.
                 </p>
               )}
 
@@ -196,7 +197,7 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
                 <span className="inline-flex items-center gap-1"><MessageSquare className="h-4 w-4" />{formatCompact(data.video.comments)}</span>
                 <span className="inline-flex items-center gap-1"><ThumbsUp className="h-4 w-4" />{formatCompact(data.video.likes)}</span>
                 {!data.transcriptAvailable && (
-                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">Built from comments</span>
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">No captions</span>
                 )}
               </div>
 
@@ -219,6 +220,7 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
 
               <section className="mt-10">
                 <h2 className="text-2xl font-bold text-slate-900">Key takeaways</h2>
+                <p className="mt-1 text-sm text-slate-500">From the video, not the comment section.</p>
                 <div className="mt-4 grid gap-3">
                   {(data.playbook.keyTakeaways || []).map((item, i) => (
                     <div key={i} className="rounded-xl border border-indigo-50 bg-white p-4 shadow-sm shadow-indigo-500/5">
@@ -290,10 +292,52 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
                   <h2 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
                     <AlertTriangle className="h-6 w-6 text-amber-500" /> Skip the fluff
                   </h2>
+                  <p className="mt-1 text-sm text-slate-500">Specific filler beats. Jump past them.</p>
                   <ul className="mt-4 space-y-2">
-                    {data.playbook.skipFluff.map((item, i) => (
-                      <li key={i} className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                        {item}
+                    {data.playbook.skipFluff.map((item, i) => {
+                      const fluff = typeof item === 'string'
+                        ? { title: item, recap: '', timestamp: 0, timestampFormatted: '', kind: '' }
+                        : item
+                      return (
+                        <li key={i} className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {fluff.kind ? (
+                              <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                {fluff.kind}
+                              </span>
+                            ) : null}
+                            {typeof fluff.timestamp === 'number' && fluff.timestampFormatted ? (
+                              <a
+                                href={`https://youtube.com/watch?v=${data.video.videoId}&t=${fluff.timestamp}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded bg-amber-700 px-2 py-0.5 font-mono text-xs text-white"
+                              >
+                                {fluff.timestampFormatted}
+                              </a>
+                            ) : null}
+                            <span className="font-semibold">{fluff.title || fluff.recap}</span>
+                          </div>
+                          {fluff.recap && fluff.recap !== fluff.title ? (
+                            <p className="mt-1 text-amber-900/80">{fluff.recap}</p>
+                          ) : null}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              )}
+
+              {(data.playbook.viewerFeedback || []).length > 0 && (
+                <section className="mt-10">
+                  <h2 className="text-2xl font-bold text-slate-900">From the comments</h2>
+                  <p className="mt-1 text-sm text-slate-500">Sentiment, caveats, and honest testimony. Not the lesson list.</p>
+                  <ul className="mt-4 space-y-3">
+                    {data.playbook.viewerFeedback.map((item, i) => (
+                      <li key={i} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                        <p className="text-sm font-semibold text-slate-800">@{item.author}</p>
+                        <p className="mt-1 text-sm text-slate-700">“{item.quote}”</p>
+                        {item.insight ? <p className="mt-2 text-xs text-slate-500">{item.insight}</p> : null}
                       </li>
                     ))}
                   </ul>

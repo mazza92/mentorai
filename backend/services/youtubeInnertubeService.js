@@ -55,7 +55,7 @@ class YouTubeInnertubeService {
         console.log(`[Innertube] Trying smart bypass (mobile/embed APIs)...`);
         result = await smartBypass.fetchTranscript(videoId);
 
-        if (result.success) {
+        if (result.success && String(result.text || result.transcript?.text || '').trim()) {
           console.log(`[Innertube] ✓ Smart bypass succeeded with ${result.strategy} strategy`);
           this.cache.set(videoId, result);
           return result;
