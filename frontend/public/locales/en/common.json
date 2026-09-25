@@ -87,7 +87,12 @@
     "settings": "Settings",
     "conversations": "Conversations",
     "new_conversation": "New conversation",
-    "upgrade_to_pro": "Upgrade to Pro"
+    "upgrade_to_pro": "Upgrade to Pro",
+    "how_it_works": "How it works",
+    "topics": "Topics",
+    "playbooks": "Playbooks",
+    "account": "Account",
+    "sign_in": "Sign in"
   },
 
   "qa": {

@@ -762,9 +762,7 @@ const QnAPanel = ({
         }, [] as Array<{question: string, answer: string}>)
 
       // Get current language from i18n
-      const currentLanguage = typeof window !== 'undefined' 
-        ? (localStorage.getItem('wandermind_language') || navigator.language.split('-')[0] || 'en')
-        : 'en';
+      const currentLanguage = 'en';
 
       const response = await axios.post(`${apiUrl}/api/qa`, {
         projectId,
@@ -1525,9 +1523,7 @@ const QnAPanel = ({
   // Generate contextual prompts from metadata if available (NotebookLM-style)
   const generateContextualPrompts = () => {
     // Get user's language preference
-    const userLanguage: 'en' | 'fr' = (typeof window !== 'undefined'
-      ? (localStorage.getItem('wandermind_language') || 'en')
-      : 'en') as 'en' | 'fr'
+    const userLanguage: 'en' | 'fr' = 'en'
 
     // Try to get title from multiple sources
     const title = metadata?.title || project?.title || project?.fileName || project?.originalFileName || ''
@@ -2274,9 +2270,7 @@ export default function WanderMindViewer({ projectId, userId, onNewConversation,
           console.log('TOC not generated, attempting to generate...')
           try {
             // Get user's language preference
-            const userLanguage = typeof window !== 'undefined'
-              ? (localStorage.getItem('wandermind_language') || 'en')
-              : 'en'
+            const userLanguage = 'en'
             const generateResponse = await axios.post(`${apiUrl}/api/topics/`, {
               projectId,
               language: userLanguage

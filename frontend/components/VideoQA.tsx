@@ -83,9 +83,7 @@ export default function VideoQA({ projectId, userId }: VideoQAProps) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         // Get current language from i18n
-        const currentLanguage = typeof window !== 'undefined'
-          ? (localStorage.getItem('wandermind_language') || navigator.language.split('-')[0] || 'en')
-          : 'en'
+        const currentLanguage = 'en'
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 

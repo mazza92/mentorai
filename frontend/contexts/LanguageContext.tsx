@@ -17,9 +17,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<string>('en')
 
   useEffect(() => {
-    // Set initial language from i18n
-    setLanguageState(i18n.language)
-  }, [i18n.language])
+    i18n.changeLanguage('en')
+    localStorage.setItem('wandermind_language', 'en')
+    setLanguageState('en')
+  }, [i18n])
 
   const setLanguage = (lang: string) => {
     i18n.changeLanguage(lang)

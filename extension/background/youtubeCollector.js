@@ -285,7 +285,6 @@ async function collectInPage(videoId) {
 
   const collectCaptionUrls = (playerResponse) => {
     const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-    const video = playerResponse?.videoDetails?.videoId || videoId;
     const candidates = [];
     const seen = new Set();
 
@@ -309,21 +308,7 @@ async function collectInPage(videoId) {
     });
 
     for (const track of ranked) {
-      try {
-        const parsed = new URL(track.baseUrl, 'https://www.youtube.com');
-        const lang = parsed.searchParams.get('lang') || track.languageCode || 'en';
-        const kind = parsed.searchParams.get('kind') || track.kind || '';
-        const name = parsed.searchParams.get('name') || '';
-        const normalized = new URL('https://www.youtube.com/api/timedtext');
-        normalized.searchParams.set('v', video);
-        normalized.searchParams.set('lang', lang);
-        if (kind) normalized.searchParams.set('kind', kind);
-        if (name) normalized.searchParams.set('name', name);
-        push(normalized.toString(), lang, kind);
-      } catch (_) {}
-      if (track.baseUrl && !String(track.baseUrl).includes('ip=0.0.0.0')) {
-        push(track.baseUrl, track.languageCode, track.kind);
-      }
+      if (track.baseUrl) push(track.baseUrl, track.languageCode, track.kind);
     }
     return candidates;
   };
@@ -572,9 +557,19 @@ async function collectInPage(videoId) {
     result.channel = player?.videoDetails?.author || '';
     result.description = player?.videoDetails?.shortDescription || '';
 
-    let captionHit = await tryCaptionCandidates(await listTimedTextTracks());
+    let captionHit = await tryCaptionCandidates(collectCaptionUrls(player));
+
     if (!captionHit) {
-      captionHit = await tryCaptionCandidates(collectCaptionUrls(player));
+      try {
+        const params = findTranscriptParams(window.ytInitialData);
+        if (params) {
+          const transcriptData = await innertube('get_transcript', { params });
+          const segments = extractTranscriptSegments(transcriptData);
+          if (segments.length) {
+            captionHit = { segments, language: 'auto', source: 'get_transcript' };
+          }
+        }
+      } catch (_) {}
     }
 
     const playerClients = [

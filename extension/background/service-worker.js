@@ -35,11 +35,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true; // Keep channel open for async response
 
     case 'ASK_QUESTION':
-      // Process question in background (survives popup close)
-      processQuestion(message.data)
-        .then(result => sendResponse({ success: true, ...result }))
-        .catch(error => sendResponse({ success: false, error: error.message }));
-      return true; // Keep channel open for async
+      // Ack immediately so the popup can close. Work continues in the worker.
+      sendResponse({ success: true, accepted: true });
+      keepAliveUntil(processQuestion(message.data)).catch((error) => {
+        console.error('[Lurnia] ASK_QUESTION failed:', error);
+      });
+      break;
 
     case 'COLLECT_VIDEO_DATA':
       collectVideoData(message.tabId || sender.tab?.id, message.videoId)
@@ -127,6 +128,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+const ASK_KEEPALIVE_ALARM = 'ask-keepalive';
+const ASK_JOB_TTL_MS = 4 * 60 * 1000;
+const askInflight = new Set();
+
+function pendingKey(videoId) {
+  return `pending_answer_${videoId}`;
+}
+
+function keepAliveUntil(promise) {
+  const ping = () => {
+    try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {}
+  };
+  ping();
+  const timer = setInterval(ping, 15000);
+  chrome.alarms.create(ASK_KEEPALIVE_ALARM, { delayInMinutes: 0.4, periodInMinutes: 1 });
+  return Promise.resolve(promise).finally(() => {
+    clearInterval(timer);
+    chrome.alarms.clear(ASK_KEEPALIVE_ALARM);
+  });
+}
+
+async function writePending(videoId, data) {
+  await chrome.storage.local.set({ [pendingKey(videoId)]: data });
+  const pending = { ...data };
+  delete pending.payload;
+  try {
+    chrome.runtime.sendMessage({ type: 'ANSWER_READY', videoId, pending }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch (_) {}
+}
+
 /**
  * Process a question in the background
  */
@@ -144,43 +177,45 @@ async function processQuestion(data) {
     videoDescription,
     transcriptSource,
     tabId
-  } = data;
+  } = data || {};
 
-  let resolvedTranscript = transcript;
-  let resolvedComments = comments || [];
-  let resolvedDescription = videoDescription || '';
-  let resolvedLanguage = videoLanguage;
-  let resolvedSource = transcriptSource || '';
-  let resolvedTitle = videoTitle;
-  let resolvedChannel = channelName;
+  if (!videoId || !question) return;
+  if (askInflight.has(videoId)) return;
+  askInflight.add(videoId);
 
-  if ((!resolvedTranscript || resolvedComments.length === 0) && tabId && videoId) {
-    try {
-      const collected = await collectVideoData(tabId, videoId);
-      if (collected) {
-        resolvedTranscript = resolvedTranscript || collected.timedTranscript || collected.transcript;
-        resolvedComments = resolvedComments.length ? resolvedComments : (collected.comments || []);
-        resolvedDescription = resolvedDescription || collected.description || '';
-        resolvedLanguage = resolvedLanguage || collected.language;
-        resolvedSource = resolvedSource || collected.source;
-        resolvedTitle = resolvedTitle || collected.title;
-        resolvedChannel = resolvedChannel || collected.channel;
-      }
-    } catch (collectErr) {
-      console.warn('[Lurnia] Background collect failed:', collectErr.message);
-    }
-  }
-
-  // Mark as processing
-  await chrome.storage.local.set({
-    [`pending_answer_${videoId}`]: {
-      status: 'processing',
-      question,
-      startedAt: Date.now()
-    }
+  await writePending(videoId, {
+    status: 'processing',
+    question,
+    startedAt: Date.now(),
+    payload: data
   });
 
   try {
+    let resolvedTranscript = transcript;
+    let resolvedComments = comments || [];
+    let resolvedDescription = videoDescription || '';
+    let resolvedLanguage = videoLanguage;
+    let resolvedSource = transcriptSource || '';
+    let resolvedTitle = videoTitle;
+    let resolvedChannel = channelName;
+
+    if ((!resolvedTranscript || resolvedComments.length === 0) && tabId && videoId) {
+      try {
+        const collected = await collectVideoData(tabId, videoId);
+        if (collected) {
+          resolvedTranscript = resolvedTranscript || collected.timedTranscript || collected.transcript;
+          resolvedComments = resolvedComments.length ? resolvedComments : (collected.comments || []);
+          resolvedDescription = resolvedDescription || collected.description || '';
+          resolvedLanguage = resolvedLanguage || collected.language;
+          resolvedSource = resolvedSource || collected.source;
+          resolvedTitle = resolvedTitle || collected.title;
+          resolvedChannel = resolvedChannel || collected.channel;
+        }
+      } catch (collectErr) {
+        console.warn('[Lurnia] Background collect failed:', collectErr.message);
+      }
+    }
+
     const response = await fetch(`${API_BASE}/qa/video-direct`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -206,29 +241,47 @@ async function processQuestion(data) {
 
     const result = await response.json();
 
-    // Save completed answer
-    await chrome.storage.local.set({
-      [`pending_answer_${videoId}`]: {
-        status: 'completed',
-        question,
-        answer: result.answer,
-        citations: result.citations || [],
-        completedAt: Date.now()
-      }
+    await writePending(videoId, {
+      status: 'completed',
+      question,
+      answer: result.answer,
+      citations: result.citations || [],
+      completedAt: Date.now()
     });
 
     return result;
   } catch (error) {
-    // Save error state
-    await chrome.storage.local.set({
-      [`pending_answer_${videoId}`]: {
-        status: 'error',
-        question,
-        error: error.message,
-        failedAt: Date.now()
-      }
+    await writePending(videoId, {
+      status: 'error',
+      question,
+      error: error.message,
+      failedAt: Date.now()
     });
     throw error;
+  } finally {
+    askInflight.delete(videoId);
+  }
+}
+
+async function resumePendingAskJobs() {
+  const all = await chrome.storage.local.get(null);
+  const now = Date.now();
+  for (const [key, value] of Object.entries(all)) {
+    if (!key.startsWith('pending_answer_') || value?.status !== 'processing') continue;
+    const videoId = key.replace('pending_answer_', '');
+    if (askInflight.has(videoId)) continue;
+    if (!value.payload || now - (value.startedAt || 0) > ASK_JOB_TTL_MS) {
+      await writePending(videoId, {
+        status: 'error',
+        question: value.question,
+        error: 'Generation stopped. Ask again.',
+        failedAt: now
+      });
+      continue;
+    }
+    keepAliveUntil(processQuestion(value.payload)).catch((error) => {
+      console.error('[Lurnia] Resume ASK failed:', error);
+    });
   }
 }
 
@@ -714,7 +767,13 @@ chrome.commands?.onCommand.addListener((command) => {
  */
 chrome.alarms.create('token-refresh', { periodInMinutes: 30 });
 
+resumePendingAskJobs().catch(() => {});
+
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === ASK_KEEPALIVE_ALARM) {
+    resumePendingAskJobs().catch(() => {});
+    return;
+  }
   if (alarm.name === 'token-refresh') {
     // Check and refresh token if needed
     try {

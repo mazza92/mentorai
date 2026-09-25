@@ -117,7 +117,7 @@ export default function PlaybookClient({ videoId, query = '' }: { videoId: strin
       setError(null)
       setQuotaError(null)
       try {
-        const lang = typeof navigator !== 'undefined' && navigator.language.startsWith('fr') ? 'fr' : 'en'
+        const lang = 'en'
         const { data: payload } = await axios.get(
           `${getApiUrl()}/api/playbook/${videoId}?lang=${lang}&userId=${encodeURIComponent(userId)}`,
           { timeout: 120000 }

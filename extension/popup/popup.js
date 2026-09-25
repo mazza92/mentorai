@@ -4,6 +4,13 @@ import { api } from '../utils/api.js';
 import { storage } from '../utils/storage.js';
 import { estimateContentMix, mixSummary } from '../utils/contentMix.js';
 
+const SCAN_EYE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+  <circle cx="12" cy="12" r="3"/>
+</svg>`;
+
+let scanHideTimer = 0;
+
 // DOM Elements
 const loginView = document.getElementById('loginView');
 const mainView = document.getElementById('mainView');
@@ -63,6 +70,10 @@ let chatHistory = []; // Track chat messages for persistence
 let lastSearchVideos = [];
 let currentMode = 'discover';
 const POPUP_STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ASK_JOB_TTL_MS = 4 * 60 * 1000;
+let askLoadingId = '';
+let askWatchTimer = 0;
+let appliedAskStamp = '';
 
 // Language-specific UI strings and prompt starters
 const PROMPT_STARTERS = {
@@ -417,6 +428,7 @@ function renderSearchResults(videos, { persist = true } = {}) {
         <div class="value-score ${scoreClass}" aria-label="Value score ${score}">${score}</div>
         <div class="value-thumb-wrap">
           <img class="value-thumb" src="${escapeHtml(video.thumbnail || '')}" alt="">
+          <button type="button" class="value-scan-eye" data-scan="${escapeHtml(video.videoId)}" title="Preview mix" aria-label="Preview content mix">${SCAN_EYE_SVG}</button>
           <span class="value-duration">${formatClock(video.durationSec)}</span>
         </div>
         <div class="value-meta">
@@ -426,13 +438,6 @@ function renderSearchResults(videos, { persist = true } = {}) {
             <div class="value-reasons">${reasons}</div>
             ${metricsHtml}
             <button type="button" class="value-ask" data-ask="${escapeHtml(video.videoId)}">Ask</button>
-            <button type="button" class="value-overflow" data-scan="${escapeHtml(video.videoId)}" title="Quick scan" aria-label="Quick scan">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <circle cx="12" cy="5" r="2"></circle>
-                <circle cx="12" cy="12" r="2"></circle>
-                <circle cx="12" cy="19" r="2"></circle>
-              </svg>
-            </button>
           </div>
         </div>
       </article>
@@ -441,7 +446,7 @@ function renderSearchResults(videos, { persist = true } = {}) {
 
   searchResults.querySelectorAll('.value-card').forEach((card) => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.value-ask') || e.target.closest('.value-overflow')) return;
+      if (e.target.closest('.value-ask') || e.target.closest('[data-scan]')) return;
       openPlaybook(card.dataset.videoId);
     });
   });
@@ -451,11 +456,12 @@ function renderSearchResults(videos, { persist = true } = {}) {
       openYouTubeVideo(btn.dataset.ask, true);
     });
   });
-  searchResults.querySelectorAll('.value-overflow').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
+  searchResults.querySelectorAll('[data-scan]').forEach((el) => {
+    el.addEventListener('click', (e) => {
       e.stopPropagation();
-      const video = lastSearchVideos.find((item) => item.videoId === btn.dataset.scan);
-      showScanOverlay(video || { videoId: btn.dataset.scan, title: 'This video' });
+      const videoId = el.dataset.scan;
+      const video = lastSearchVideos.find((item) => item.videoId === videoId);
+      showScanOverlay(video || { videoId, title: 'This video' });
     });
   });
   if (persist) persistPopupState();
@@ -469,6 +475,7 @@ function showScanOverlay(video) {
   const legend = document.getElementById('scanLegend');
   if (!overlay || !bar || !legend) return;
 
+  window.clearTimeout(scanHideTimer);
   scanVideoId = video.videoId || '';
   const mix = estimateContentMix(video);
   document.getElementById('scanTitle').textContent = video.title || 'Content mix';
@@ -478,9 +485,15 @@ function showScanOverlay(video) {
     ? `Read from ${mix.chapterCount} chapters in the description.`
     : 'Estimated from title, length, and description. Free. No playbook used.';
 
-  bar.innerHTML = mix.segments.map((seg) =>
-    `<span class="scan-slice" data-pct="${seg.pct}" style="background:${seg.color}" title="${seg.label} ${seg.pct}%"></span>`
-  ).join('');
+  bar.classList.remove('is-in');
+  bar.innerHTML = mix.segments.map((seg) => {
+    const tight = seg.pct < 14 ? ' is-tight' : '';
+    const tiny = seg.pct < 8 ? ' is-tiny' : '';
+    return `<span class="scan-slice${tight}${tiny}" style="width:${seg.pct}%;background:${seg.color}" title="${seg.label} ${seg.pct}%">
+      <span class="scan-slice-icon">${seg.icon}</span>
+      <span class="scan-slice-pct">${seg.pct}%</span>
+    </span>`;
+  }).join('');
   legend.innerHTML = mix.segments.map((seg) => `
     <li>
       <span class="scan-dot" style="background:${seg.color}22">${seg.icon}</span>
@@ -489,19 +502,22 @@ function showScanOverlay(video) {
     </li>
   `).join('');
 
-  overlay.classList.remove('hidden');
+  overlay.classList.remove('hidden', 'is-open');
+  document.body.appendChild(overlay);
   requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      bar.querySelectorAll('.scan-slice').forEach((slice) => {
-        slice.style.width = `${slice.dataset.pct}%`;
-      });
-    });
+    overlay.classList.add('is-open');
+    requestAnimationFrame(() => bar.classList.add('is-in'));
   });
 }
 
 function hideScanOverlay() {
-  document.getElementById('scanOverlay')?.classList.add('hidden');
+  const overlay = document.getElementById('scanOverlay');
+  const bar = document.getElementById('scanBar');
+  overlay?.classList.remove('is-open');
+  bar?.classList.remove('is-in');
   scanVideoId = '';
+  window.clearTimeout(scanHideTimer);
+  scanHideTimer = window.setTimeout(() => overlay?.classList.add('hidden'), 320);
 }
 
 async function openPlaybook(videoId) {
@@ -613,6 +629,18 @@ function setupEventListeners() {
       if (message.type === 'VIDEO_DETECTED') {
         handleVideoDetected(message.data);
       }
+      if (message.type === 'ANSWER_READY') {
+        applyAskResult(message.videoId, message.pending);
+      }
+    });
+  }
+  if (chrome?.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      const videoId = currentVideo?.videoId;
+      if (!videoId) return;
+      const change = changes[`pending_answer_${videoId}`];
+      if (change?.newValue) applyAskResult(videoId, change.newValue);
     });
   }
 }
@@ -898,79 +926,126 @@ async function handleVideoDetected(data, tabId) {
 /**
  * Check if there's a pending answer from a previous popup session
  */
-async function checkPendingAnswer(videoId) {
-  try {
-    const pending = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: 'GET_PENDING_ANSWER', videoId }, resolve);
+function fetchPendingAnswer(videoId) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'GET_PENDING_ANSWER', videoId }, (result) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      resolve(result?.status ? result : null);
     });
+  });
+}
 
+function stopAskWatcher() {
+  if (askWatchTimer) {
+    clearInterval(askWatchTimer);
+    askWatchTimer = 0;
+  }
+}
+
+function setAskBusy(busy) {
+  isProcessing = busy;
+  handleInputChange();
+}
+
+function startAskWatcher(videoId) {
+  stopAskWatcher();
+  if (!videoId) return;
+  setAskBusy(true);
+  askWatchTimer = setInterval(async () => {
+    const pending = await fetchPendingAnswer(videoId);
     if (!pending) return;
+    applyAskResult(videoId, pending);
+  }, 800);
+}
 
-    console.log('[Popup] Found pending answer status:', pending.status);
+function applyAskResult(videoId, pending) {
+  if (!pending || !videoId) return;
+  if (currentVideo?.videoId && videoId !== currentVideo.videoId) return;
 
-    // Check if this question is already in chat history (avoid duplicates)
-    const questionAlreadyInHistory = chatHistory.some(msg =>
+  const stamp = String(pending.completedAt || pending.failedAt || pending.startedAt || '');
+  if (pending.status !== 'processing' && stamp && stamp === appliedAskStamp) return;
+
+  if (pending.status === 'processing') {
+    const age = Date.now() - (pending.startedAt || 0);
+    if (age > ASK_JOB_TTL_MS) {
+      applyAskResult(videoId, {
+        status: 'error',
+        question: pending.question,
+        error: 'Generation stopped. Ask again.',
+        failedAt: Date.now()
+      });
+      return;
+    }
+    const questionAlreadyInHistory = chatHistory.some((msg) =>
       msg.type === 'user' && msg.content === pending.question
     );
-
-    if (pending.status === 'processing') {
-      // Still processing - show loading and wait
-      const timeSinceStart = Date.now() - pending.startedAt;
-      if (timeSinceStart < 60000) { // Less than 1 minute old
-        // Only add question if not already shown
-        if (!questionAlreadyInHistory) {
-          restoreMessage(pending.question, 'user');
-          chatHistory.push({ content: pending.question, type: 'user', timestamps: [] });
-        }
-        const loadingId = addLoadingMessage();
-
-        // Poll for completion
-        const checkInterval = setInterval(async () => {
-          const updated = await new Promise((resolve) => {
-            chrome.runtime.sendMessage({ type: 'GET_PENDING_ANSWER', videoId }, resolve);
-          });
-
-          if (updated && updated.status === 'completed') {
-            clearInterval(checkInterval);
-            removeMessage(loadingId);
-            const timestamps = extractTimestamps(updated.answer);
-            addMessage(updated.answer, 'assistant', timestamps);
-            chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
-          } else if (updated && updated.status === 'error') {
-            clearInterval(checkInterval);
-            removeMessage(loadingId);
-            addMessage(updated.error || 'Failed to get answer', 'assistant');
-            chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
-          }
-        }, 1000);
-      } else {
-        // Too old, clear it
-        chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
-      }
-    } else if (pending.status === 'completed') {
-      // Completed while popup was closed - check if not already in chat history
-      const answerAlreadyShown = chatHistory.some(msg =>
-        msg.type === 'assistant' && msg.content === pending.answer
-      );
-
-      if (!answerAlreadyShown) {
-        // Only add question if not already shown
-        if (!questionAlreadyInHistory) {
-          addMessage(pending.question, 'user');
-        }
-        const timestamps = extractTimestamps(pending.answer);
-        addMessage(pending.answer, 'assistant', timestamps);
-      }
-      chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
-    } else if (pending.status === 'error') {
-      // Show error if recent and not already shown
-      const timeSinceFail = Date.now() - pending.failedAt;
-      if (timeSinceFail < 30000 && !questionAlreadyInHistory) {
-        addMessage(pending.question, 'user');
-        addMessage(pending.error || 'Failed to get answer. Please try again.', 'assistant');
-      }
-      chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+    if (!questionAlreadyInHistory && pending.question) {
+      restoreMessage(pending.question, 'user');
+      chatHistory.push({ content: pending.question, type: 'user', timestamps: [] });
+      saveChatHistory(videoId);
     }
+    if (!document.querySelector('.message.assistant.loading')) {
+      askLoadingId = addLoadingMessage();
+    }
+    setAskBusy(true);
+    if (!askWatchTimer) startAskWatcher(videoId);
+    return;
+  }
+
+  appliedAskStamp = stamp;
+  stopAskWatcher();
+  if (askLoadingId) removeMessage(askLoadingId);
+  document.querySelectorAll('.message.assistant.loading').forEach((el) => el.remove());
+  askLoadingId = '';
+  setAskBusy(false);
+
+  if (pending.status === 'completed' && pending.answer) {
+    const answerAlreadyShown = chatHistory.some((msg) =>
+      msg.type === 'assistant' && msg.content === pending.answer
+    );
+    if (!answerAlreadyShown) {
+      const questionAlreadyInHistory = chatHistory.some((msg) =>
+        msg.type === 'user' && msg.content === pending.question
+      );
+      if (!questionAlreadyInHistory && pending.question) {
+        addMessage(pending.question, 'user');
+      }
+      addMessage(pending.answer, 'assistant', extractTimestamps(pending.answer));
+    }
+    chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+    loadUserQuota().catch(() => {});
+    return;
+  }
+
+  if (pending.status === 'error') {
+    const errorMsg = pending.error || 'Failed to get answer. Please try again.';
+    const alreadyShown = chatHistory.some((msg) =>
+      msg.type === 'assistant' && msg.content === errorMsg
+    );
+    if (!alreadyShown) {
+      const hitLimit = /limit reached|sign up for more|403|upgrade/i.test(errorMsg);
+      if (hitLimit) {
+        loadUserQuota().then(() => {
+          showLimitModal(currentUser?.quota?.questions || 0, currentUser?.quota?.playbooks || 0, {
+            reason: 'questions',
+            requiresSignup: currentUser?.isAnonymous || /sign up/i.test(errorMsg)
+          });
+        }).catch(() => {});
+      }
+      addMessage(errorMsg, 'assistant');
+    }
+    chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId });
+  }
+}
+
+async function checkPendingAnswer(videoId) {
+  try {
+    const pending = await fetchPendingAnswer(videoId);
+    if (!pending) return;
+    applyAskResult(videoId, pending);
   } catch (error) {
     console.error('[Popup] Error checking pending answer:', error);
   }
@@ -1033,168 +1108,59 @@ async function handleSendQuestion() {
     return;
   }
 
-  isProcessing = true;
-  sendBtn.disabled = true;
-
-  // Clear welcome message if present
   const welcomeMsg = messages.querySelector('.welcome-message');
-  if (welcomeMsg) {
-    welcomeMsg.remove();
-  }
+  if (welcomeMsg) welcomeMsg.remove();
 
-  // Add user message
   addMessage(question, 'user');
+  await saveChatHistory(currentVideo.videoId);
   questionInput.value = '';
   handleInputChange();
+  askLoadingId = addLoadingMessage();
+  setAskBusy(true);
+  persistPopupState();
 
-  // Add loading message
-  const loadingId = addLoadingMessage();
-
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    let videoData = currentVideo;
-    let transcript = currentVideo.timedTranscript || currentVideo.transcript || null;
-    let videoLanguage = currentVideo.language || null;
-    let comments = currentVideo.comments || [];
-    let videoDescription = currentVideo.description || '';
-
-    if ((!transcript || comments.length === 0) && tab?.id) {
-      console.log('[Popup] Collecting captions + comments from watch page...');
-      const collected = await new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          console.log('[Popup] Video data collect timeout (45s)');
-          resolve(null);
-        }, 45000);
-
-        chrome.runtime.sendMessage(
-          { type: 'COLLECT_VIDEO_DATA', tabId: tab.id, videoId: currentVideo.videoId },
-          (response) => {
-            clearTimeout(timeout);
-            if (chrome.runtime.lastError) {
-              console.log('[Popup] Collect error:', chrome.runtime.lastError.message);
-              resolve(null);
-              return;
-            }
-            resolve(response?.success ? response.data : null);
-          }
-        );
+  const backendChatHistory = [];
+  for (let i = 0; i < chatHistory.length - 1; i++) {
+    if (chatHistory[i].type === 'user' && chatHistory[i + 1]?.type === 'assistant') {
+      backendChatHistory.push({
+        question: chatHistory[i].content,
+        answer: chatHistory[i + 1].content
       });
-
-      if (collected) {
-        videoData = { ...currentVideo, ...collected };
-        currentVideo = videoData;
-        transcript = collected.timedTranscript || collected.transcript || transcript;
-        videoLanguage = collected.language || videoLanguage;
-        comments = collected.comments?.length ? collected.comments : comments;
-        videoDescription = collected.description || videoDescription;
-        applyVideoDataStatus(collected);
-        if (videoLanguage) updateSuggestedQuestions(videoLanguage);
-      }
+      i++;
     }
-
-    if (!transcript && tab?.id) {
-      const fromPage = await new Promise((resolve) => {
-        chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSCRIPT' }, (response) => {
-          if (chrome.runtime.lastError) {
-            resolve(null);
-            return;
-          }
-          resolve(response);
-        });
-      });
-      if (fromPage?.success && (fromPage.text || fromPage.timedTranscript)) {
-        transcript = fromPage.timedTranscript || fromPage.text;
-        videoLanguage = fromPage.language || videoLanguage;
-        currentVideo = { ...currentVideo, transcript, timedTranscript: transcript, language: videoLanguage };
-        applyVideoDataStatus(currentVideo);
-      }
-    }
-
-    console.log(
-      '[Popup] Sending to backend - transcript:',
-      transcript ? transcript.length + ' chars' : 'none',
-      ', comments:', comments.length,
-      ', lang:', videoLanguage || 'none'
-    );
-
-    // Convert chatHistory to backend format (pairs of {question, answer})
-    const backendChatHistory = [];
-    for (let i = 0; i < chatHistory.length - 1; i++) {
-      if (chatHistory[i].type === 'user' && chatHistory[i + 1]?.type === 'assistant') {
-        backendChatHistory.push({
-          question: chatHistory[i].content,
-          answer: chatHistory[i + 1].content
-        });
-        i++; // Skip the answer since we paired it
-      }
-    }
-
-    // Use background service worker to process (survives popup close)
-    const response = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        type: 'ASK_QUESTION',
-        data: {
-          videoId: currentVideo.videoId,
-          question,
-          videoTitle: currentVideo.title,
-          channelName: currentVideo.channel,
-          transcript,
-          videoLanguage,
-          userId: currentUser.id,
-          chatHistory: backendChatHistory,
-          comments,
-          videoDescription,
-          transcriptSource: currentVideo.source || '',
-          tabId: tab?.id
-        }
-      }, (result) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else if (result && result.success) {
-          resolve(result);
-        } else {
-          reject(new Error(result?.error || 'Failed to get answer'));
-        }
-      });
-    });
-
-    // Remove loading message
-    removeMessage(loadingId);
-
-    // Extract timestamps from response
-    const timestamps = extractTimestamps(response.answer);
-
-    // Add assistant response
-    addMessage(response.answer, 'assistant', timestamps);
-
-    // Clear pending answer since we displayed it
-    chrome.runtime.sendMessage({ type: 'CLEAR_PENDING_ANSWER', videoId: currentVideo.videoId });
-
-    // Update quota
-    await loadUserQuota();
-
-  } catch (error) {
-    console.error('Question error:', error);
-    removeMessage(loadingId);
-
-    const errorMsg = error.message || 'Something went wrong. Please try again.';
-    const hitLimit = /limit reached|sign up for more|403|upgrade/i.test(errorMsg);
-    if (hitLimit) {
-      await loadUserQuota();
-      showLimitModal(currentUser.quota?.questions || 0, currentUser.quota?.playbooks || 0, {
-        reason: 'questions',
-        requiresSignup: currentUser.isAnonymous || /sign up/i.test(errorMsg)
-      });
-      addMessage(currentUser.isAnonymous
-        ? 'Guest limit reached. Sign in for 6 playbooks and 25 questions.'
-        : 'Monthly limit reached. Upgrade to Pro for 60 playbooks and 250 questions.', 'assistant');
-    } else {
-      addMessage(errorMsg, 'assistant');
-    }
-  } finally {
-    isProcessing = false;
-    handleInputChange();
   }
+
+  const videoId = currentVideo.videoId;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  chrome.runtime.sendMessage({
+    type: 'ASK_QUESTION',
+    data: {
+      videoId,
+      question,
+      videoTitle: currentVideo.title,
+      channelName: currentVideo.channel,
+      transcript: currentVideo.timedTranscript || currentVideo.transcript || null,
+      videoLanguage: currentVideo.language || null,
+      userId: currentUser.id,
+      chatHistory: backendChatHistory,
+      comments: currentVideo.comments || [],
+      videoDescription: currentVideo.description || '',
+      transcriptSource: currentVideo.source || '',
+      tabId: tab?.id
+    }
+  }, () => {
+    if (chrome.runtime.lastError) {
+      applyAskResult(videoId, {
+        status: 'error',
+        question,
+        error: chrome.runtime.lastError.message,
+        failedAt: Date.now()
+      });
+      return;
+    }
+    startAskWatcher(videoId);
+  });
 }
 
 /**
