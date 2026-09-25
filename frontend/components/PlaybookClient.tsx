@@ -333,7 +333,7 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
                   <h2 className="text-2xl font-bold text-slate-900">From the comments</h2>
                   <p className="mt-1 text-sm text-slate-500">Sentiment, caveats, and honest testimony. Not the lesson list.</p>
                   <ul className="mt-4 space-y-3">
-                    {data.playbook.viewerFeedback.map((item, i) => (
+                    {(data.playbook.viewerFeedback || []).map((item, i) => (
                       <li key={i} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                         <p className="text-sm font-semibold text-slate-800">@{item.author}</p>
                         <p className="mt-1 text-sm text-slate-700">“{item.quote}”</p>
