@@ -471,7 +471,9 @@ async function openPlaybook(videoId) {
     }
   }
 
-  const url = `${api.appUrl}/v/${videoId}?ref=extension`;
+  const query = (valueSearchInput?.value || '').trim();
+  fetch(`${api.appUrl}/api/playbook/${videoId}/warm`).catch(() => {});
+  const url = `${api.appUrl}/v/${videoId}?ref=extension${query ? `&q=${encodeURIComponent(query)}` : ''}`;
   if (chrome?.tabs?.create) chrome.tabs.create({ url });
   else window.open(url, '_blank', 'noopener');
 }

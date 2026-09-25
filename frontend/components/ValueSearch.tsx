@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { Search, Loader2, MessageSquare, ThumbsUp, Clock, ArrowRight } from 'lucide-react'
 import { getApiUrl } from '@/lib/apiUrl'
+import { saveLastSearch } from '@/lib/lastSearch'
 
 export interface RankedVideo {
   videoId: string
@@ -83,6 +84,7 @@ export default function ValueSearch({
         limit: 12
       })
       setVideos(data.videos || [])
+      saveLastSearch(q, data.videos || [])
       if (!data.videos?.length) setError('No strong matches. Try a sharper skill or outcome.')
     } catch (err: any) {
       setVideos([])
@@ -162,7 +164,12 @@ export default function ValueSearch({
             <li key={video.videoId}>
               <button
                 type="button"
-                onClick={() => router.push(`/v/${video.videoId}`)}
+                onClick={() => {
+                  saveLastSearch(query, videos)
+                  axios.get(`${getApiUrl()}/api/playbook/${video.videoId}/warm`, { timeout: 4000 }).catch(() => {})
+                  const q = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''
+                  router.push(`/v/${video.videoId}${q}`)
+                }}
                 className="flex w-full gap-4 p-4 text-left transition hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-violet-50/80 sm:gap-5 sm:p-5"
               >
                 <div className="flex w-12 shrink-0 flex-col items-center justify-center">

@@ -1,10 +1,9 @@
 const valueSearchService = require('./valueSearchService');
 const youtubeInnertubeService = require('./youtubeInnertubeService');
-const captionService = require('./captionService');
 const { getFirestore } = require('../config/firestore');
 const { generateText } = require('./llmClient');
 
-const SCHEMA = 'v4';
+const SCHEMA = 'v5';
 
 class PlaybookService {
   constructor() {
@@ -76,7 +75,7 @@ class PlaybookService {
     const started = Date.now();
     const [video, comments, transcript] = await Promise.all([
       this.loadVideo(videoId),
-      valueSearchService.fetchTopComments(videoId, 24).catch(() => []),
+      valueSearchService.fetchTopComments(videoId, 40).catch(() => []),
       this.fetchCaptionsFast(videoId)
     ]);
 
@@ -132,33 +131,27 @@ class PlaybookService {
   }
 
   async fetchCaptionsFast(videoId) {
-    const sources = [
-      () => youtubeInnertubeService.fetchTranscript(videoId, { skipSlowFallback: true }),
-      () => captionService.fetchYouTubeCaptions(videoId)
-    ];
-    for (const fetch of sources) {
-      try {
-        const transcript = await Promise.race([
-          fetch(),
-          new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 12000))
-        ]);
-        if (transcript?.timedOut) {
-          console.warn(`[Playbook] Caption fetch timed out for ${videoId}`);
-          continue;
-        }
-        const text = String(transcript?.text || transcript?.transcript?.text || '').trim();
-        const segments = transcript?.segments || transcript?.transcript?.segments || [];
-        if (text.split(/\s+/).filter(Boolean).length >= 8) {
-          return {
-            success: true,
-            text,
-            segments,
-            source: transcript.source || transcript.strategy || 'captions'
-          };
-        }
-      } catch (err) {
-        console.warn('[Playbook] Transcript fetch failed:', err.message);
+    try {
+      const transcript = await Promise.race([
+        youtubeInnertubeService.fetchTranscript(videoId, { skipSlowFallback: true }),
+        new Promise((resolve) => setTimeout(() => resolve({ success: false, timedOut: true }), 4000))
+      ]);
+      if (transcript?.timedOut) {
+        console.warn(`[Playbook] Caption fetch timed out for ${videoId}`);
+        return { success: false, text: '', source: null, segments: [] };
       }
+      const text = String(transcript?.text || transcript?.transcript?.text || '').trim();
+      const segments = transcript?.segments || transcript?.transcript?.segments || [];
+      if (text.split(/\s+/).filter(Boolean).length >= 8) {
+        return {
+          success: true,
+          text,
+          segments,
+          source: transcript.source || transcript.strategy || 'captions'
+        };
+      }
+    } catch (err) {
+      console.warn('[Playbook] Transcript fetch failed:', err.message);
     }
     return { success: false, text: '', source: null, segments: [] };
   }
@@ -197,7 +190,7 @@ Job:
 - keyTakeaways: 4-6 lessons FROM THE VIDEO (transcript, chapters, description). Never from comments. Never copy a comment as a takeaway. Title is the lesson. Detail is the actionable plan: what to do today.
 - playbook: 4-6 ordered actions the viewer can run today. Timestamp if captions or chapters exist.
 - skipFluff: specific filler MOMENTS with clock times. kinds: intro, sponsor, ad, affiliate, subscribe, padding, outro. Recap MUST say what happens in that beat (who is advertised, what the ask is, what the tangent is) so the viewer can skip without missing a tactic. Do not write generic lines like "skip the intro".
-- viewerFeedback: 3-5 comments that teach something: a caveat, a result, a disagreement, or an honest testimony. Never empty praise. Never use comments as keyTakeaways.
+- viewerFeedback: 4-6 VALUABLE comments, good or bad. Prefer: extra tips, "this is a scam / hype / missing X", didn't work, real results, disagreement. Include unfiltered callouts. Never empty praise ("great video", "thanks", "subbed"). kind must be one of: tip, scam, caveat, result, disagreement, testimony, question. Never use comments as keyTakeaways.
 - timestamps: 3-6 high-value moments to jump to. Not fluff.
 
 Do not invent timestamps. Use CANDIDATE FLUFF MOMENTS and the timed transcript. If there are no captions or chapters, use timestamp 0 and timestampFormatted "".
@@ -231,7 +224,7 @@ JSON:
   "keyTakeaways": [{ "title": "lesson", "detail": "how to use it now" }],
   "playbook": [{ "step": 1, "action": "imperative", "detail": "how now", "timestamp": 0, "timestampFormatted": "0:00" }],
   "skipFluff": [{ "kind": "sponsor", "timestamp": 0, "timestampFormatted": "M:SS", "title": "what to skip", "recap": "what happens in that moment" }],
-  "viewerFeedback": [{ "author": "name", "quote": "short", "insight": "why it matters", "kind": "caveat" }],
+  "viewerFeedback": [{ "author": "name", "quote": "short", "insight": "why this comment is useful", "kind": "tip" }],
   "timestamps": [{ "timestamp": 0, "timestampFormatted": "M:SS", "title": "moment", "description": "why jump here" }],
   "suggestedQuestions": ["question"],
   "faqs": [{ "question": "...", "answer": "..." }]
@@ -326,13 +319,14 @@ JSON:
 
     const viewerFeedback = (raw.viewerFeedback || []).map((item) => {
       const quote = String(item.quote || item.text || '').replace(/\s+/g, ' ').trim().slice(0, 280);
+      const kind = this.normalizeFeedbackKind(item.kind, quote);
       return {
-        author: String(item.author || 'Viewer').replace(/^@/, '').slice(0, 40),
+        author: this.cleanAuthor(item.author),
         quote,
-        kind: item.kind || this.classifyComment(quote),
-        insight: String(item.insight || '').replace(/\s+/g, ' ').trim().slice(0, 220)
+        kind,
+        insight: String(item.insight || this.feedbackInsight(kind, isFr)).replace(/\s+/g, ' ').trim().slice(0, 220)
       };
-    }).filter((item) => item.quote.length >= 24 && !this.isPraiseComment(item.quote) && !this.looksLikeTakeawayDump(item.quote));
+    }).filter((item) => this.isValuableFeedback(item));
 
     const commentTexts = (comments || []).map((c) => String(c.text || '').replace(/\s+/g, ' ').trim().toLowerCase());
     const keyTakeaways = (raw.keyTakeaways || [])
@@ -445,32 +439,83 @@ JSON:
         const quote = String(c.text || '').replace(/\s+/g, ' ').trim();
         const kind = this.classifyComment(quote);
         return {
-          author: String(c.author || 'Viewer').replace(/^@/, ''),
+          author: this.cleanAuthor(c.author),
           quote,
           kind,
           insight: this.feedbackInsight(kind, isFr)
         };
       })
-      .filter((item) => item.quote.length >= 40 && item.quote.length <= 420 && !this.isPraiseComment(item.quote) && !/https?:\/\//i.test(item.quote))
-      .filter((item) => this.isActionableComment(item.quote) || ['caveat', 'result', 'disagreement', 'testimony', 'request'].includes(item.kind))
-      .sort((a, b) => Number(this.isActionableComment(b.quote)) - Number(this.isActionableComment(a.quote)))
-      .slice(0, 5);
+      .filter((item) => this.isValuableFeedback(item) && item.quote.length <= 420 && !/https?:\/\//i.test(item.quote))
+      .sort((a, b) => this.feedbackRank(b.kind) - this.feedbackRank(a.kind))
+      .slice(0, 6);
+  }
+
+  cleanAuthor(name) {
+    return String(name || 'Viewer').replace(/^@+/, '').replace(/\s+/g, ' ').trim().slice(0, 40) || 'Viewer';
+  }
+
+  normalizeFeedbackKind(kind, quote) {
+    const k = String(kind || '').toLowerCase().trim();
+    if (['scam', 'fraud', 'fake', 'grift', 'clickbait', 'hype'].includes(k) || this.isScamComment(quote)) return 'scam';
+    if (['tip', 'hack', 'addon', 'extra'].includes(k)) return 'tip';
+    if (['caveat', 'warning', 'miss', 'missing'].includes(k)) return 'caveat';
+    if (['result', 'win', 'worked'].includes(k)) return 'result';
+    if (['disagreement', 'pushback', 'disagree'].includes(k)) return 'disagreement';
+    if (['testimony', 'used', 'review'].includes(k)) return 'testimony';
+    if (['question', 'request', 'ask'].includes(k)) return 'question';
+    return this.classifyComment(quote);
+  }
+
+  isValuableFeedback(item) {
+    const quote = String(item?.quote || '').trim();
+    if (quote.length < 24 || this.looksLikeTakeawayDump(quote)) return false;
+    if (['scam', 'caveat', 'tip', 'result', 'disagreement'].includes(item.kind)) return true;
+    if (this.isPraiseComment(quote)) return false;
+    return ['testimony', 'question'].includes(item.kind) || this.isActionableComment(quote);
+  }
+
+  feedbackRank(kind) {
+    return { scam: 6, caveat: 5, tip: 4, result: 4, disagreement: 3, testimony: 2, question: 1, insight: 0 }[kind] || 0;
   }
 
   classifyComment(text) {
     const t = String(text || '').toLowerCase();
-    if (/didn'?t work|doesn't work|warning|caveat|instead of|don'?t |problem is|watch out/i.test(t)) return 'caveat';
-    if (/landed|made \$|got (a )?client|increased|worked for me|result|booked/i.test(t)) return 'result';
-    if (/disagree|actually no|wrong|isn't true|overrated/i.test(t)) return 'disagreement';
+    if (this.isScamComment(t)) return 'scam';
+    if (/didn'?t work|doesn'?t work|missing|watch out|warning|overhyped|failed|problem is|caveat/i.test(t)) return 'caveat';
+    if (/pro tip|tip:|you should also|add this|instead|copy-?paste|missing is the prompt|workbook/i.test(t)) return 'tip';
+    if (/landed|made \$|got (a )?client|increased|worked for me|booked|this worked/i.test(t)) return 'result';
+    if (/disagree|actually no|wrong|overrated|isn'?t true/i.test(t)) return 'disagreement';
     if (/i (tried|built|use|switched|ran)|my (setup|workflow|stack)/i.test(t)) return 'testimony';
-    if (/ever thought|what if|you should|part 2|can you/i.test(t)) return 'request';
+    if (/\?/.test(t) && t.length < 220) return 'question';
     return 'insight';
+  }
+
+  isScamComment(text) {
+    return /scam|fraud|fake|grift|rip-?off|don'?t buy|do not buy|clickbait|waste of (time|money)|snake oil|overhyped/i.test(String(text || ''));
   }
 
   feedbackInsight(kind, isFr) {
     const map = isFr
-      ? { caveat: 'Mise en garde d’un viewer.', result: 'Résultat rapporté par un viewer.', disagreement: 'Désaccord utile.', testimony: 'Témoignage d’usage.', request: 'Demande de suite.', insight: 'Retour d’usage, pas un like.' }
-      : { caveat: 'A viewer flags a caveat.', result: 'A viewer reports a result.', disagreement: 'Useful disagreement.', testimony: 'Honest usage testimony.', request: 'A request for a follow-up.', insight: 'Usage note, not a like.' };
+      ? {
+          scam: 'Un viewer parle de hype ou d’arnaque. À vérifier avant de suivre.',
+          caveat: 'Mise en garde: quelque chose manque ou n’a pas marché.',
+          tip: 'Un viewer ajoute une astuce que la vidéo ne dit pas assez fort.',
+          result: 'Résultat rapporté après avoir testé.',
+          disagreement: 'Désaccord utile, pas un like.',
+          testimony: 'Témoignage d’usage.',
+          question: 'Question de praticien.',
+          insight: 'Retour d’usage, pas un like.'
+        }
+      : {
+          scam: 'A viewer flags hype or a possible scam. Check before you follow along.',
+          caveat: 'A caveat: something missing, or it did not work.',
+          tip: 'A viewer adds a tip the video underplays.',
+          result: 'Someone ran it and reported a result.',
+          disagreement: 'Useful pushback, not a like.',
+          testimony: 'Honest usage note.',
+          question: 'A practitioner question.',
+          insight: 'Usage note, not a like.'
+        };
     return map[kind] || map.insight;
   }
 
@@ -673,14 +718,15 @@ JSON:
 
   isPraiseComment(text) {
     const t = String(text || '').toLowerCase();
-    if (/ever thought|what if|you should|instead|didn't work|caveat|worked for me|i (tried|built|use)/i.test(t)) return false;
-    return /^(wow|nice|love this|well done|amazing|great video|so helpful|god bless|thank you|thanks)[\s!.]*$/i.test(t.trim())
-      || /you did great|keep em coming|subscribing and binging|most helpful .* videos? i'?ve ever seen|thanks for (sharing|putting)|love this video|great video thanks/i.test(t);
+    if (this.isScamComment(t) || /missing|didn'?t work|prompt|kanban|instead|scam|tip:/i.test(t)) return false;
+    const generic = /great (project|video|job|work)|brilliant|knock my socks|incredibly well|super dynamic|keep em coming|you did great|thanks for (sharing|putting)|love this|subbed|subscribing and binging/i.test(t);
+    const shortPraise = /^(wow|nice|love this|well done|amazing|great video|so helpful|god bless|thank you|thanks)[\s!.]*$/i.test(t.trim());
+    return shortPraise || (generic && t.length < 180 && !this.isActionableComment(t));
   }
 
   isActionableComment(text) {
     const t = String(text || '').toLowerCase();
-    return /how (do|to|should)|step|tip|template|script|subject line|client|cold email|outreach|rate|hour|first (step|thing|action)|instead|don't|try this|what if|worked|didn't work|warning|caveat|ever thought/.test(t);
+    return /how (do|to|should)|step|tip|template|script|subject line|client|cold email|outreach|rate|hour|first (step|thing|action)|instead|don't|try this|what if|worked|didn't work|warning|caveat|ever thought|missing|scam|prompt/.test(t);
   }
 
   parseChapters(description) {

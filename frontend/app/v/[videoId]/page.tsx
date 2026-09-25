@@ -41,6 +41,13 @@ export async function generateMetadata({ params }: { params: { videoId: string }
   }
 }
 
-export default function VideoPlaybookPage({ params }: { params: { videoId: string } }) {
-  return <PlaybookClient videoId={params.videoId} />
+export default function VideoPlaybookPage({
+  params,
+  searchParams
+}: {
+  params: { videoId: string }
+  searchParams?: { q?: string }
+}) {
+  const query = typeof searchParams?.q === 'string' ? searchParams.q : ''
+  return <PlaybookClient videoId={params.videoId} query={query} />
 }

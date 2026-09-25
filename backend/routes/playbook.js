@@ -3,10 +3,30 @@ const router = express.Router();
 const playbookService = require('../services/playbookService');
 const userService = require('../services/userService');
 
+function validVideoId(videoId) {
+  return videoId && /^[a-zA-Z0-9_-]{6,20}$/.test(videoId);
+}
+
+router.get('/:videoId/warm', async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    if (!validVideoId(videoId)) {
+      return res.status(400).json({ error: 'Invalid video id' });
+    }
+    const language = req.query.lang === 'fr' ? 'fr' : 'en';
+    playbookService.getOrGenerate(videoId, { language }).catch((err) => {
+      console.warn('[Playbook] Warm failed:', err.message);
+    });
+    res.status(202).json({ success: true, warming: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
-    if (!videoId || !/^[a-zA-Z0-9_-]{6,20}$/.test(videoId)) {
+    if (!validVideoId(videoId)) {
       return res.status(400).json({ error: 'Invalid video id' });
     }
 

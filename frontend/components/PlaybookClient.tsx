@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import SearchHeader from '@/components/SearchHeader'
 import Footer from '@/components/Footer'
 import PlaybookChat from '@/components/PlaybookChat'
+import { loadLastSearch, type LastSearchVideo } from '@/lib/lastSearch'
 
 interface PlaybookData {
   aiGenerated?: boolean
@@ -40,6 +41,23 @@ interface PlaybookData {
   }
 }
 
+const LOAD_STEPS = [
+  'Opening the video',
+  'Reading comments, not the thumbnail',
+  'Writing takeaways you can run today'
+]
+
+const FEEDBACK_BADGES: Record<string, { emoji: string; label: string; className: string }> = {
+  scam: { emoji: '🚩', label: 'Scam watch', className: 'bg-red-100 text-red-800' },
+  caveat: { emoji: '⚠️', label: 'Caveat', className: 'bg-orange-100 text-orange-900' },
+  tip: { emoji: '💡', label: 'Extra tip', className: 'bg-amber-100 text-amber-900' },
+  result: { emoji: '✅', label: 'Result', className: 'bg-emerald-100 text-emerald-800' },
+  disagreement: { emoji: '🗯️', label: 'Pushback', className: 'bg-violet-100 text-violet-800' },
+  testimony: { emoji: '🗣️', label: 'Used it', className: 'bg-sky-100 text-sky-800' },
+  question: { emoji: '❓', label: 'Ask', className: 'bg-slate-100 text-slate-700' },
+  insight: { emoji: '💬', label: 'Take', className: 'bg-slate-100 text-slate-700' }
+}
+
 function formatCompact(n: number) {
   if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`
   if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`
@@ -53,12 +71,24 @@ function formatClock(sec: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export default function PlaybookClient({ videoId }: { videoId: string }) {
+function FeedbackBadge({ kind }: { kind?: string }) {
+  const badge = FEEDBACK_BADGES[kind || ''] || FEEDBACK_BADGES.insight
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+      <span aria-hidden="true">{badge.emoji}</span>
+      {badge.label}
+    </span>
+  )
+}
+
+export default function PlaybookClient({ videoId, query = '' }: { videoId: string; query?: string }) {
   const { user } = useAuth()
   const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadStep, setLoadStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<PlaybookData | null>(null)
+  const [related, setRelated] = useState<{ query: string; videos: LastSearchVideo[] }>({ query: '', videos: [] })
 
   const [quotaError, setQuotaError] = useState<{
     signup: boolean
@@ -70,6 +100,14 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
   useEffect(() => {
     setUserId(user?.id || getSessionId())
   }, [user])
+
+  useEffect(() => {
+    if (!loading) return
+    const id = window.setInterval(() => {
+      setLoadStep((step) => (step + 1) % LOAD_STEPS.length)
+    }, 2800)
+    return () => window.clearInterval(id)
+  }, [loading])
 
   useEffect(() => {
     if (!userId) return
@@ -107,6 +145,71 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
     return () => { cancelled = true }
   }, [videoId, userId])
 
+  useEffect(() => {
+    let cancelled = false
+    const fromSession = loadLastSearch(videoId)
+    if (fromSession?.videos.length) {
+      setRelated(fromSession)
+      return
+    }
+    const q = String(query || '').trim()
+    if (q.length < 2) return
+    axios
+      .get(`${getApiUrl()}/api/search/value`, { params: { q, limit: 12 }, timeout: 20000 })
+      .then(({ data: payload }) => {
+        if (cancelled) return
+        const videos = Array.isArray(payload?.videos) ? payload.videos : []
+        setRelated({
+          query: q,
+          videos: videos.filter((v: LastSearchVideo) => v.videoId && v.videoId !== videoId)
+        })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [videoId, query])
+
+  const displayTitle = data?.playbook.headline || data?.video.title
+  const relatedBlock = related.videos.length > 0 && (
+    <section className="mt-12">
+      <h2 className="text-2xl font-bold text-slate-900">Related</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        {related.query
+          ? `High-signal results for “${related.query}”. Same ranking as the extension.`
+          : 'Other high-signal videos from your last search.'}
+      </p>
+      <ul className="mt-4 divide-y divide-indigo-50 overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+        {related.videos.slice(0, 8).map((video, index) => (
+          <li key={video.videoId}>
+            <Link
+              href={`/v/${video.videoId}${related.query ? `?q=${encodeURIComponent(related.query)}` : ''}`}
+              className="flex gap-4 p-4 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-violet-50/80"
+            >
+              <div className="flex w-10 shrink-0 flex-col items-center justify-center">
+                <span className="text-lg font-bold bg-gradient-to-br from-blue-600 to-violet-600 bg-clip-text text-transparent">{video.valueScore}</span>
+                <span className="text-[10px] uppercase tracking-wide text-violet-400">#{index + 1}</span>
+              </div>
+              <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                <img src={video.thumbnail} alt="" className="h-full w-full object-cover" />
+                {video.durationSec ? (
+                  <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] text-white">{formatClock(video.durationSec)}</span>
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-2 font-semibold text-slate-900">{video.title}</p>
+                <p className="mt-0.5 text-sm text-slate-500">{video.channel}</p>
+                <p className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
+                  <span>{formatCompact(video.views)} views</span>
+                  <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />{formatCompact(video.comments)}</span>
+                  <span className="inline-flex items-center gap-1"><ThumbsUp className="h-3 w-3" />{formatCompact(video.likes)}</span>
+                </p>
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white">
       <SearchHeader />
@@ -117,21 +220,36 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
 
         {loading && (
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="overflow-hidden rounded-2xl border border-indigo-100 bg-white p-8 shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-500">
-                <Loader2 className="h-6 w-6 animate-spin text-white" />
+            <div>
+              <p className="text-sm font-medium text-violet-700">Building your playbook</p>
+              <h1 className="mt-2 text-3xl font-extrabold leading-tight text-slate-900 sm:text-4xl">
+                {displayTitle || 'Steal the playbook'}
+              </h1>
+              <p className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+                {LOAD_STEPS[loadStep]}
+              </p>
+              <div className="relative mt-6 overflow-hidden rounded-2xl bg-black shadow-xl">
+                <div className="aspect-video">
+                  <iframe
+                    className="h-full w-full"
+                    src={`https://www.youtube.com/embed/${videoId}`}
+                    title={displayTitle || 'YouTube video'}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
               </div>
-              <p className="mt-4 text-center font-semibold text-slate-900">Building your playbook</p>
-              <p className="mt-1 text-center text-sm text-slate-500">Pulling captions, comments, and turning them into actions you can use now.</p>
               <div className="mt-8 space-y-3">
                 <div className="h-4 w-2/3 rounded-full bg-indigo-50" />
-                <div className="h-24 rounded-2xl bg-gradient-to-r from-blue-50 to-violet-50" />
                 <div className="h-16 rounded-xl bg-slate-50" />
                 <div className="h-16 rounded-xl bg-slate-50" />
               </div>
+              {relatedBlock}
             </div>
             <div className="hidden rounded-2xl border border-indigo-100 bg-white p-4 lg:block">
-              <div className="h-4 w-28 rounded-full bg-violet-100" />
+              <p className="text-sm font-semibold text-slate-800">Ask this video</p>
+              <p className="mt-1 text-xs text-slate-500">Ready as soon as the playbook lands.</p>
               <div className="mt-4 space-y-2">
                 <div className="h-10 rounded-xl bg-indigo-50" />
                 <div className="h-10 rounded-xl bg-indigo-50" />
@@ -331,19 +449,24 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
               {(data.playbook.viewerFeedback || []).length > 0 && (
                 <section className="mt-10">
                   <h2 className="text-2xl font-bold text-slate-900">Viewer feedback</h2>
-                  <p className="mt-1 text-sm text-slate-500">Sentiment, caveats, and honest testimony from comments. Separate from the lesson list.</p>
+                  <p className="mt-1 text-sm text-slate-500">Unfiltered comments: extra tips, caveats, results, and scam/hype callouts.</p>
                   <ul className="mt-4 space-y-3">
                     {(data.playbook.viewerFeedback || []).map((item, i) => (
-                      <li key={i} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                      <li
+                        key={i}
+                        className={`rounded-xl border bg-white p-4 shadow-sm ${
+                          item.kind === 'scam'
+                            ? 'border-red-200 bg-red-50/40'
+                            : item.kind === 'caveat'
+                              ? 'border-orange-100'
+                              : 'border-slate-100'
+                        }`}
+                      >
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-800">@{item.author}</p>
-                          {item.kind ? (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                              {item.kind}
-                            </span>
-                          ) : null}
+                          <p className="text-sm font-semibold text-slate-800">{item.author}</p>
+                          <FeedbackBadge kind={item.kind} />
                         </div>
-                        <p className="mt-1 text-sm text-slate-700">“{item.quote}”</p>
+                        <p className="mt-2 text-sm leading-relaxed text-slate-800">“{item.quote}”</p>
                         {item.insight ? <p className="mt-2 text-xs text-slate-500">{item.insight}</p> : null}
                       </li>
                     ))}
@@ -378,6 +501,8 @@ export default function PlaybookClient({ videoId }: { videoId: string }) {
             </aside>
           </div>
         )}
+
+        {!loading && !quotaError && relatedBlock}
       </main>
       <Footer />
     </div>
