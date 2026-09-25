@@ -182,7 +182,7 @@ class PlaybookService {
     const transcript = timed || (transcriptText || '').slice(0, 7000);
     const commentBlock = comments
       .slice(0, 16)
-      .map((c, i) => `${i + 1}. @${c.author}: ${String(c.text || '').replace(/\s+/g, ' ').trim().slice(0, 240)}`)
+      .map((c, i) => `${i + 1}. @${c.author}: ${String(c.text || '').replace(/\s+/g, ' ').trim().slice(0, 140)}`)
       .join('\n');
     const detectedFluff = this.detectFluffMoments(video, segments, chapters, isFr);
     const fluffBlock = detectedFluff
@@ -220,6 +220,8 @@ ${(video.description || '').slice(0, 1800)}
 COMMENTS (for viewerFeedback only, never for keyTakeaways):
 ${commentBlock || '[None]'}
 
+Escape quotes inside strings. No trailing commas. Keep every array to 6 items max.
+
 JSON:
 {
   "headline": "max 90 chars",
@@ -237,21 +239,83 @@ JSON:
 
     const text = await generateText(prompt, {
       json: true,
-      temperature: 0.25,
-      maxOutputTokens: 4096,
+      temperature: 0.2,
+      maxOutputTokens: 8192,
       model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
     });
-    return this.normalizePlaybook(this.parseJson(text), video, comments, lang, transcriptText, segments);
+    try {
+      return this.normalizePlaybook(this.parseJson(text), video, comments, lang, transcriptText, segments);
+    } catch (parseErr) {
+      console.warn('[Playbook] JSON parse retry:', parseErr.message);
+      const retry = await generateText(`${prompt}\n\nReturn MINIFIED JSON only. Escape quotes. No trailing commas. Max 5 items per array.`, {
+        json: true,
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+      });
+      return this.normalizePlaybook(this.parseJson(retry), video, comments, lang, transcriptText, segments);
+    }
   }
 
   parseJson(text) {
-    let jsonText = String(text || '');
+    let jsonText = String(text || '').trim();
     const fenced = jsonText.match(/```json\s*([\s\S]*?)\s*```/) || jsonText.match(/```\s*([\s\S]*?)\s*```/);
     if (fenced) jsonText = fenced[1];
     const start = jsonText.indexOf('{');
     const end = jsonText.lastIndexOf('}');
     if (start >= 0 && end > start) jsonText = jsonText.slice(start, end + 1);
-    return JSON.parse(jsonText);
+    jsonText = jsonText.replace(/,\s*([}\]])/g, '$1');
+    try {
+      return JSON.parse(jsonText);
+    } catch (err) {
+      try {
+        return JSON.parse(this.closeTruncatedJson(jsonText));
+      } catch (err2) {
+        throw new Error(`Playbook JSON parse failed: ${err.message}`);
+      }
+    }
+  }
+
+  closeTruncatedJson(text) {
+    let s = String(text || '');
+    let inString = false;
+    let escape = false;
+    for (const ch of s) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') inString = !inString;
+    }
+    if (inString) s += '"';
+    const stack = [];
+    inString = false;
+    escape = false;
+    for (const ch of s) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (ch === '{' || ch === '[') stack.push(ch);
+      if (ch === '}' || ch === ']') stack.pop();
+    }
+    while (stack.length) {
+      s += stack.pop() === '{' ? '}' : ']';
+    }
+    return s.replace(/,\s*([}\]])/g, '$1');
   }
 
   normalizePlaybook(raw, video, comments, lang, transcriptText = '', segments = []) {
@@ -329,10 +393,18 @@ JSON:
     const bullets = this.extractListItems(video.description || '');
     const chapters = this.parseChapters(video.description || '').filter((c) => !this.isFluffChapter(c.title));
     const seeds = bullets.length ? bullets : chapters.map((c) => c.title);
-    const rows = seeds.slice(0, 5).map((text) => ({
-      title: String(text).split(/[.!?:]/)[0].slice(0, 72),
-      detail: String(text).slice(0, 280)
-    }));
+    const rows = seeds.slice(0, 5).map((text, i) => {
+      const title = String(text).split(/[.!?:]/)[0].slice(0, 72);
+      const rest = String(text).slice(0, 280);
+      const chapter = chapters[i];
+      const jump = chapter?.timestampFormatted ? ` Jump to ${chapter.timestampFormatted}.` : '';
+      return {
+        title,
+        detail: rest === title
+          ? `${title}.${jump} Copy the exact prompt or steps in this section, then run the smallest version today.`
+          : rest
+      };
+    });
     if (rows.length) return rows;
     if (fromTranscript.length) return fromTranscript;
     return [{
@@ -380,6 +452,7 @@ JSON:
         };
       })
       .filter((item) => item.quote.length >= 40 && item.quote.length <= 420 && !this.isPraiseComment(item.quote) && !/https?:\/\//i.test(item.quote))
+      .filter((item) => this.isActionableComment(item.quote) || ['caveat', 'result', 'disagreement', 'testimony', 'request'].includes(item.kind))
       .sort((a, b) => Number(this.isActionableComment(b.quote)) - Number(this.isActionableComment(a.quote)))
       .slice(0, 5);
   }
@@ -406,7 +479,7 @@ JSON:
   }
 
   isFluffChapter(title) {
-    return /intro|outro|sponsor|subscribe|thanks|ad break|self[-\s]?promo| ramble|coffee|let'?s get started/i.test(title || '');
+    return /intro|outro|sponsor|subscribe|thanks|ad break|self[-\s]?promo| ramble|coffee|let'?s get started|wrap.?up|recap/i.test(title || '');
   }
 
   detectFluffMoments(video, segments, chapters, isFr) {
@@ -418,10 +491,37 @@ JSON:
       if (!close) items.push(item);
     };
 
-    for (const chapter of chapters || []) {
-      if (!this.isFluffChapter(chapter.title) && !/sponsor|affiliate|ad |promo/i.test(chapter.title)) continue;
+    const chapterList = chapters || [];
+    const firstChapter = chapterList[0];
+    if (firstChapter && firstChapter.timestamp <= 45 && duration >= 480) {
       push({
-        kind: /sponsor|ad|affiliate/i.test(chapter.title) ? 'sponsor' : /intro/i.test(chapter.title) ? 'intro' : /outro/i.test(chapter.title) ? 'outro' : /subscribe/i.test(chapter.title) ? 'subscribe' : 'padding',
+        kind: 'intro',
+        timestamp: firstChapter.timestamp,
+        timestampFormatted: firstChapter.timestampFormatted || '0:00',
+        title: isFr ? 'Hook d’ouverture' : 'Opening hook',
+        recap: isFr
+          ? `Ouverture « ${firstChapter.title} ». La première tactique commence après.`
+          : `Opening beat: “${firstChapter.title}”. Jump past the pitch to the first workflow.`
+      });
+    }
+
+    const lastChapter = chapterList[chapterList.length - 1];
+    if (lastChapter && duration && lastChapter.timestamp / duration >= 0.88) {
+      push({
+        kind: 'outro',
+        timestamp: lastChapter.timestamp,
+        timestampFormatted: lastChapter.timestampFormatted,
+        title: lastChapter.title,
+        recap: isFr
+          ? `Fin « ${lastChapter.title} ». CTA et wrap, pas de nouvelle méthode.`
+          : `Wrap: “${lastChapter.title}”. CTA and recap, not a new tactic.`
+      });
+    }
+
+    for (const chapter of chapterList) {
+      if (!this.isFluffChapter(chapter.title) && !/sponsor|affiliate|ad |promo|subscribe/i.test(chapter.title)) continue;
+      push({
+        kind: /sponsor|ad|affiliate/i.test(chapter.title) ? 'sponsor' : /intro/i.test(chapter.title) ? 'intro' : /outro|wrap/i.test(chapter.title) ? 'outro' : /subscribe/i.test(chapter.title) ? 'subscribe' : 'padding',
         timestamp: chapter.timestamp,
         timestampFormatted: chapter.timestampFormatted,
         title: chapter.title,
@@ -573,13 +673,14 @@ JSON:
 
   isPraiseComment(text) {
     const t = String(text || '').toLowerCase();
+    if (/ever thought|what if|you should|instead|didn't work|caveat|worked for me|i (tried|built|use)/i.test(t)) return false;
     return /^(wow|nice|love this|well done|amazing|great video|so helpful|god bless|thank you|thanks)[\s!.]*$/i.test(t.trim())
-      || (/love this|well done|god bless|amazing|grateful|best youtube|thank you|great video|so helpful/.test(t) && !this.isActionableComment(t));
+      || /you did great|keep em coming|subscribing and binging|most helpful .* videos? i'?ve ever seen|thanks for (sharing|putting)|love this video|great video thanks/i.test(t);
   }
 
   isActionableComment(text) {
     const t = String(text || '').toLowerCase();
-    return /how (do|to|should)|step|tip|template|script|subject line|client|cold email|outreach|rate|hour|first |instead|don't|try this|what if|worked|didn't work|warning|caveat/.test(t);
+    return /how (do|to|should)|step|tip|template|script|subject line|client|cold email|outreach|rate|hour|first (step|thing|action)|instead|don't|try this|what if|worked|didn't work|warning|caveat|ever thought/.test(t);
   }
 
   parseChapters(description) {
