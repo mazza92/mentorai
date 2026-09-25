@@ -3,6 +3,7 @@
 import { useTranslation } from 'react-i18next'
 import Link from 'next/link'
 import { Mail, FileText, Shield, Cookie, Chrome } from 'lucide-react'
+import { CHROME_STORE_URL } from '@/lib/chromeStore'
 
 export default function Footer() {
   const { t } = useTranslation('common')
@@ -31,6 +32,17 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Product</h3>
             <ul className="space-y-3">
+              <li>
+                <a
+                  href={CHROME_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2"
+                >
+                  <Chrome className="w-4 h-4" />
+                  Add to Chrome
+                </a>
+              </li>
               <li>
                 <Link href="/learn" className="text-slate-400 hover:text-white transition-colors text-sm">
                   Ranked topics

@@ -11,12 +11,14 @@ import { homepageFaqJsonLd, organizationJsonLd } from '@/lib/seo'
 export const metadata: Metadata = {
   metadataBase: new URL('https://lurnia.app'),
   title: {
-    default: "Don't trust the thumbnail | Lurnia: high-value YouTube search",
+    default: "Lurnia Chrome extension | Don't trust the thumbnail",
     template: '%s | Lurnia'
   },
   description:
-    "YouTube ranks hooks. Lurnia ranks videos people actually learned from (comments, likes, depth), then turns them into a playbook. Don't get fooled by the thumbnail.",
+    'Lurnia is a free Chrome extension for high-value YouTube search. Re-rank videos by comments, likes, and depth — not view count — then steal the playbook and ask the video. Add to Chrome.',
   keywords: [
+    'Lurnia Chrome extension',
+    'YouTube Chrome extension',
     'high value YouTube videos',
     'YouTube clickbait',
     "don't trust the thumbnail",
@@ -24,6 +26,7 @@ export const metadata: Metadata = {
     'skip YouTube fluff',
     'find useful YouTube tutorials',
     'YouTube search by engagement',
+    'Add to Chrome YouTube',
     'résumer vidéo YouTube',
     'vidéos YouTube utiles'
   ],
@@ -41,14 +44,14 @@ export const metadata: Metadata = {
     alternateLocale: ['fr_FR'],
     url: 'https://lurnia.app',
     siteName: 'Lurnia',
-    title: "Don't trust the thumbnail | Lurnia",
+    title: "Don't trust the thumbnail | Lurnia Chrome extension",
     description:
-      'Stop the empty-scroll. Find YouTube videos worth studying, extract the playbook, skip the fluff.',
+      'Free Chrome extension: rank YouTube by real engagement, extract the playbook, skip the fluff. Add to Chrome.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: "Don't trust the thumbnail | Lurnia",
-    description: 'High-value YouTube search. Playbooks instead of recaps.',
+    title: "Don't trust the thumbnail | Lurnia Chrome extension",
+    description: 'Free Chrome extension for high-value YouTube search. Playbooks instead of recaps. Add to Chrome.',
   },
   robots: {
     index: true,

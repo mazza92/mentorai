@@ -6,6 +6,7 @@ import ValueSearch from '@/components/ValueSearch'
 import WanderMindViewer from '@/components/WanderMindViewer'
 import ModernHeader from '@/components/ModernHeader'
 import SearchHeader from '@/components/SearchHeader'
+import ChromeExtensionInvite from '@/components/ChromeExtensionInvite'
 import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { Loader2, Search, ListChecks, MessageSquare } from 'lucide-react'
@@ -138,18 +139,11 @@ export default function Home() {
     setCurrentProject(conversation.projectId)
   }
 
-  if (!isInitialized || authLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-      </div>
-    )
-  }
-
   if (!currentProject) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-indigo-50 via-white to-violet-50/40">
         <SearchHeader />
+        <ChromeExtensionInvite />
         <main>
           <section className="relative mx-auto max-w-3xl px-4 pb-10 pt-16 sm:px-6 sm:pt-24">
             <div className="pointer-events-none absolute inset-x-0 -top-8 h-64 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.18),_transparent_60%)]" />
@@ -168,6 +162,7 @@ export default function Home() {
             <div className="relative mt-8">
               <ValueSearch
                 userId={userId}
+                autoFocus={false}
                 placeholder={t('landing.search_placeholder')}
                 rankHint={t('landing.rank_hint')}
                 searchLabel={t('landing.search_button')}
@@ -211,7 +206,7 @@ export default function Home() {
           <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
             <h2 className="text-2xl font-extrabold text-slate-900">{t('landing.faq_title')}</h2>
             <dl className="mt-6 space-y-4">
-              {[1, 2, 3, 4].map((n) => (
+              {[5, 1, 2, 3, 4].map((n) => (
                 <div key={n} className="rounded-2xl border border-indigo-50 bg-white p-5">
                   <dt className="font-semibold text-slate-900">{t(`landing.faq${n}_q`)}</dt>
                   <dd className="mt-2 text-sm leading-6 text-slate-600">{t(`landing.faq${n}_a`)}</dd>
@@ -221,6 +216,14 @@ export default function Home() {
           </section>
         </main>
         <Footer />
+      </div>
+    )
+  }
+
+  if (!isInitialized || authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
       </div>
     )
   }

@@ -1,4 +1,5 @@
 import { CLUSTER_LABEL, getAllTopics, getTopicsByCluster, type TopicCluster } from '@/data/topics'
+import { CHROME_STORE_URL } from '@/lib/chromeStore'
 
 export const SITE_URL = 'https://lurnia.app'
 
@@ -106,6 +107,22 @@ export const homepageFaqJsonLd = {
   mainEntity: [
     {
       '@type': 'Question',
+      name: 'What is the Lurnia Chrome extension?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Lurnia is a free Chrome extension for high-value YouTube search. It re-ranks videos by comments, like rate, and long-form depth instead of view count, extracts a playbook (takeaways, timestamps, what to skip), and lets you ask the video from captions. It works on youtube.com in Chrome, Edge, and Brave.'
+      }
+    },
+    {
+      '@type': 'Question',
+      name: 'How do I install the Lurnia Chrome extension?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Open the Lurnia listing on the Chrome Web Store and click Add to Chrome. It is free to install. Then open YouTube: Lurnia ranks the tab you already have open. Direct install: https://chromewebstore.google.com/detail/lurnia-youtube-learning-c/fggidhdboaodfblhdigckdfcofimocim'
+      }
+    },
+    {
+      '@type': 'Question',
       name: 'How is Lurnia different from YouTube search?',
       acceptedAnswer: {
         '@type': 'Answer',
@@ -166,9 +183,7 @@ export const organizationJsonLd = {
       logo: `${SITE_URL}/icon.svg`,
       description:
         "Don't trust the thumbnail. Lurnia finds high-value YouTube videos by real engagement, not view count, then turns them into playbooks you can use now.",
-      sameAs: [
-        'https://chromewebstore.google.com/detail/lurnia-youtube-learning-c/fggidhdboaodfblhdigckdfcofimocim'
-      ]
+      sameAs: [CHROME_STORE_URL]
     },
     {
       '@type': 'WebSite',
@@ -185,13 +200,48 @@ export const organizationJsonLd = {
     },
     {
       '@type': 'SoftwareApplication',
-      name: 'Lurnia',
-      applicationCategory: 'EducationalApplication',
-      operatingSystem: 'Web, Chrome',
-      url: SITE_URL,
+      name: 'Lurnia Chrome extension',
+      applicationCategory: 'BrowserApplication',
+      operatingSystem: 'Chrome, Edge, Brave',
+      url: `${SITE_URL}/extension`,
+      downloadUrl: CHROME_STORE_URL,
+      installUrl: CHROME_STORE_URL,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       description:
-        'Search YouTube without getting fooled by the thumbnail. Rank by comments, likes, and depth. Extract a playbook. Ask the video.'
+        'Free Chrome extension that re-ranks YouTube by comments, like rate, and long-form depth instead of view count, then extracts a playbook and lets you ask the video from captions.',
+      featureList: [
+        'Re-rank YouTube by comment rate, like rate, and long-form depth',
+        'Extract a playbook: takeaways, timestamps, what to skip',
+        'Ask any YouTube video from captions and comments',
+        'Works on youtube.com in Chrome, Edge, and Brave'
+      ]
+    },
+    {
+      '@type': 'HowTo',
+      name: 'How to install the Lurnia Chrome extension',
+      description:
+        'Install Lurnia from the Chrome Web Store in one click, then open YouTube to rank videos by real engagement.',
+      totalTime: 'PT1M',
+      step: [
+        {
+          '@type': 'HowToStep',
+          position: 1,
+          name: 'Open the Chrome Web Store',
+          text: `Go to the Lurnia Chrome Web Store listing: ${CHROME_STORE_URL}`
+        },
+        {
+          '@type': 'HowToStep',
+          position: 2,
+          name: 'Click Add to Chrome',
+          text: 'Install the free Lurnia extension. Confirm Add extension. No account is required to install.'
+        },
+        {
+          '@type': 'HowToStep',
+          position: 3,
+          name: 'Open YouTube',
+          text: 'Visit youtube.com. Use Lurnia to find signal, steal the playbook, and ask the video on the tab you already have open.'
+        }
+      ]
     }
   ]
 }
@@ -213,7 +263,9 @@ export function buildLlmsTxt() {
   return [
     '# Lurnia',
     '',
-    "> Don't trust the thumbnail. Lurnia finds high-value YouTube videos by real engagement (comments, likes, depth, not view count), then turns them into a playbook you can use now.",
+    '> Lurnia is a free Chrome extension and web app for high-value YouTube search. Install it from the Chrome Web Store to re-rank YouTube on the tab you already have open.',
+    '',
+    "Don't trust the thumbnail. Lurnia finds high-value YouTube videos by real engagement (comments, likes, depth, not view count), then turns them into a playbook you can use now.",
     '',
     'Lurnia is a YouTube search and learning product for founders, freelancers, solopreneurs, and students. YouTube ranks hooks and stop-scroller bait. We re-rank by whether people actually learned something, then extract takeaways, sequenced actions, timestamps, and what to skip.',
     '',
@@ -226,7 +278,7 @@ export function buildLlmsTxt() {
     '- Ranked topic hubs: one crawlable page per search intent, not one page per YouTube title.',
     '',
     `Website: ${SITE_URL}`,
-    'Chrome extension: https://chromewebstore.google.com/detail/lurnia-youtube-learning-c/fggidhdboaodfblhdigckdfcofimocim',
+    `Chrome Web Store (Add to Chrome): ${CHROME_STORE_URL}`,
     '',
     '## Key pages',
     '',

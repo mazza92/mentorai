@@ -263,7 +263,9 @@
     "faq3_q": "What is a playbook?",
     "faq3_a": "The usable extract: takeaways, sequenced actions, timestamps, and what to skip, so you don't rewatch a 40-minute recap.",
     "faq4_q": "Can I ask the video questions?",
-    "faq4_a": "Yes. Open any result and ask for the number, the caveat, or the next step. Answers come from captions and comments, not vibes."
+    "faq4_a": "Yes. Open any result and ask for the number, the caveat, or the next step. Answers come from captions and comments, not vibes.",
+    "faq5_q": "What is the Lurnia Chrome extension?",
+    "faq5_a": "A free Chrome extension that does the same job on youtube.com: re-rank by comments, like rate, and long-form depth, extract a playbook, and ask the video from captions. Click Add to Chrome, then open YouTube. Works in Chrome, Edge, and Brave."
   },
 
   "common": {

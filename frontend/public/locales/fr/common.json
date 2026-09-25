@@ -264,7 +264,9 @@
     "faq3_q": "C’est quoi un playbook ?",
     "faq3_a": "L’extrait utile : à retenir, actions dans l’ordre, timestamps, et ce qu’il faut zapper, pour ne pas revoir un récap de 40 minutes.",
     "faq4_q": "Je peux poser des questions à la vidéo ?",
-    "faq4_a": "Oui. Ouvre un résultat et demande le chiffre, le caveat, ou la prochaine étape. Les réponses viennent des sous-titres et des commentaires, pas des vibes."
+    "faq4_a": "Oui. Ouvre un résultat et demande le chiffre, le caveat, ou la prochaine étape. Les réponses viennent des sous-titres et des commentaires, pas des vibes.",
+    "faq5_q": "C’est quoi l’extension Chrome Lurnia ?",
+    "faq5_a": "Une extension Chrome gratuite qui fait le même travail sur youtube.com : reclasse par commentaires, likes et format long, extrait un playbook, et te laisse poser une question à la vidéo. Ajoute-la à Chrome, puis ouvre YouTube. Marche sur Chrome, Edge et Brave."
   },
 
   "common": {

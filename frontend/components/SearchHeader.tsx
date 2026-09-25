@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Zap } from 'lucide-react'
+import { Zap, Chrome } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { CHROME_STORE_URL } from '@/lib/chromeStore'
 
 export default function SearchHeader() {
   const { user } = useAuth()
@@ -18,22 +19,31 @@ export default function SearchHeader() {
             Lurnia
           </span>
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex items-center gap-3 text-sm sm:gap-4">
           <Link href="/#how" className="hidden text-slate-600 hover:text-indigo-700 sm:inline">
             How it works
           </Link>
           <Link href="/learn" className="hidden text-slate-600 hover:text-indigo-700 sm:inline">
             Topics
           </Link>
-          <Link href="/guides" className="hidden text-slate-600 hover:text-indigo-700 sm:inline">
+          <Link href="/guides" className="hidden text-slate-600 hover:text-indigo-700 md:inline">
             Playbooks
           </Link>
           <Link
             href={user ? '/settings' : '/auth'}
-            className="rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-3 py-1.5 font-medium text-white shadow-sm shadow-indigo-500/20 hover:from-blue-500 hover:to-violet-500"
+            className="hidden text-slate-600 hover:text-indigo-700 sm:inline"
           >
             {user ? 'Account' : 'Sign in'}
           </Link>
+          <a
+            href={CHROME_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-3 py-1.5 font-semibold text-white shadow-sm shadow-indigo-500/20 hover:from-blue-500 hover:to-violet-500"
+          >
+            <Chrome className="h-4 w-4" aria-hidden="true" />
+            Add to Chrome
+          </a>
         </nav>
       </div>
     </header>
