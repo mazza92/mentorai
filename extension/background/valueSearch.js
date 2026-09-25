@@ -200,7 +200,7 @@ async function hydrateVideoStats(video) {
     likes: stats.likes,
     comments: stats.comments,
     subscribers: stats.subscribers || video.subscribers,
-    published: video.published,
+    description: details.shortDescription || video.description || '',
     thumbnail: video.thumbnail || `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`
   };
 }

@@ -2,6 +2,7 @@
 
 import { api } from '../utils/api.js';
 import { storage } from '../utils/storage.js';
+import { estimateContentMix, mixSummary } from '../utils/contentMix.js';
 
 // DOM Elements
 const loginView = document.getElementById('loginView');
@@ -425,6 +426,13 @@ function renderSearchResults(videos, { persist = true } = {}) {
             <div class="value-reasons">${reasons}</div>
             ${metricsHtml}
             <button type="button" class="value-ask" data-ask="${escapeHtml(video.videoId)}">Ask</button>
+            <button type="button" class="value-overflow" data-scan="${escapeHtml(video.videoId)}" title="Quick scan" aria-label="Quick scan">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="12" cy="5" r="2"></circle>
+                <circle cx="12" cy="12" r="2"></circle>
+                <circle cx="12" cy="19" r="2"></circle>
+              </svg>
+            </button>
           </div>
         </div>
       </article>
@@ -433,7 +441,7 @@ function renderSearchResults(videos, { persist = true } = {}) {
 
   searchResults.querySelectorAll('.value-card').forEach((card) => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.value-ask')) return;
+      if (e.target.closest('.value-ask') || e.target.closest('.value-overflow')) return;
       openPlaybook(card.dataset.videoId);
     });
   });
@@ -443,7 +451,57 @@ function renderSearchResults(videos, { persist = true } = {}) {
       openYouTubeVideo(btn.dataset.ask, true);
     });
   });
+  searchResults.querySelectorAll('.value-overflow').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const video = lastSearchVideos.find((item) => item.videoId === btn.dataset.scan);
+      showScanOverlay(video || { videoId: btn.dataset.scan, title: 'This video' });
+    });
+  });
   if (persist) persistPopupState();
+}
+
+let scanVideoId = '';
+
+function showScanOverlay(video) {
+  const overlay = document.getElementById('scanOverlay');
+  const bar = document.getElementById('scanBar');
+  const legend = document.getElementById('scanLegend');
+  if (!overlay || !bar || !legend) return;
+
+  scanVideoId = video.videoId || '';
+  const mix = estimateContentMix(video);
+  document.getElementById('scanTitle').textContent = video.title || 'Content mix';
+  document.getElementById('scanChannel').textContent = video.channel || '';
+  document.getElementById('scanSummary').textContent = mixSummary(mix);
+  document.getElementById('scanSource').textContent = mix.source === 'chapters'
+    ? `Read from ${mix.chapterCount} chapters in the description.`
+    : 'Estimated from title, length, and description. Free. No playbook used.';
+
+  bar.innerHTML = mix.segments.map((seg) =>
+    `<span class="scan-slice" data-pct="${seg.pct}" style="background:${seg.color}" title="${seg.label} ${seg.pct}%"></span>`
+  ).join('');
+  legend.innerHTML = mix.segments.map((seg) => `
+    <li>
+      <span class="scan-dot" style="background:${seg.color}22">${seg.icon}</span>
+      <span class="scan-legend-label">${seg.label}</span>
+      <span class="scan-legend-pct">${seg.pct}%</span>
+    </li>
+  `).join('');
+
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      bar.querySelectorAll('.scan-slice').forEach((slice) => {
+        slice.style.width = `${slice.dataset.pct}%`;
+      });
+    });
+  });
+}
+
+function hideScanOverlay() {
+  document.getElementById('scanOverlay')?.classList.add('hidden');
+  scanVideoId = '';
 }
 
 async function openPlaybook(videoId) {
@@ -540,6 +598,15 @@ function setupEventListeners() {
   if (upgradeModalBtn) upgradeModalBtn.addEventListener('click', handleUpgrade);
   if (connectAccountBtn) connectAccountBtn.addEventListener('click', handleConnectAccount);
   if (limitModalClose) limitModalClose.addEventListener('click', hideLimitModal);
+  document.getElementById('scanClose')?.addEventListener('click', hideScanOverlay);
+  document.getElementById('scanOverlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'scanOverlay') hideScanOverlay();
+  });
+  document.getElementById('scanPlaybook')?.addEventListener('click', () => {
+    const id = scanVideoId;
+    hideScanOverlay();
+    if (id) openPlaybook(id);
+  });
 
   if (chrome?.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message) => {
